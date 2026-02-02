@@ -1,0 +1,239 @@
+.globe-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: calc(100vh - 100px);
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 26px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.page-title svg {
+  color: var(--accent-secondary);
+}
+
+.glass-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+/* Header */
+.globe-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.market-summary {
+  display: flex;
+  gap: 16px;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.summary-item.positive {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.summary-item.negative {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Content */
+.globe-content {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.globe-container {
+  padding: 0;
+  overflow: hidden;
+  min-height: 500px;
+}
+
+.globe-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Market labels on globe */
+.market-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  background: rgba(13, 13, 26, 0.9);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.market-label:hover {
+  border-color: var(--accent-primary);
+  transform: scale(1.05);
+}
+
+.market-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.market-value {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.market-value.positive { color: #22c55e; }
+.market-value.negative { color: #ef4444; }
+
+/* Sidebar */
+.globe-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.sidebar-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+/* Market List */
+.market-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.market-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.market-item:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.market-item.selected {
+  border-color: var(--accent-primary);
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.market-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.market-city {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.market-info svg.positive { color: #22c55e; }
+.market-info svg.negative { color: #ef4444; }
+
+.market-change {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.market-change.positive { color: #22c55e; }
+.market-change.negative { color: #ef4444; }
+
+/* Market Details */
+.market-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.detail-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.detail-value.positive { color: #22c55e; }
+.detail-value.negative { color: #ef4444; }
+.detail-value.status-open { color: #22c55e; }
+.detail-value.coords { 
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+  .globe-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .globe-container {
+    min-height: 400px;
+  }
+  
+  .globe-sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .globe-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .globe-sidebar {
+    grid-template-columns: 1fr;
+  }
+}

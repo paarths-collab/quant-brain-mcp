@@ -1,0 +1,259 @@
+.settings-page {
+  max-width: 1000px;
+}
+
+.settings-header {
+  margin-bottom: 32px;
+}
+
+.settings-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.settings-header p {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Grid */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.settings-section {
+  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+
+.settings-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-section h3 svg {
+  color: var(--accent-primary);
+}
+
+/* Setting Item */
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.setting-item.vertical {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.setting-item.vertical input {
+  width: 100%;
+}
+
+.setting-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.setting-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+}
+
+.theme-toggle button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.theme-toggle button.active {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  width: 48px;
+  height: 26px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #27272a;
+  border-radius: 26px;
+  transition: 0.3s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.toggle input:checked + .slider {
+  background: var(--accent-primary);
+}
+
+.toggle input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+/* Select */
+.settings-section select {
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.settings-section select:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+}
+
+/* Input */
+.settings-section input[type="text"],
+.settings-section input[type="password"] {
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: #fff;
+}
+
+.settings-section input:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+}
+
+.settings-section input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Buttons */
+.setup-btn {
+  padding: 8px 16px;
+  background: var(--accent-muted);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-primary);
+  transition: all 0.2s;
+}
+
+.setup-btn:hover {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.danger-btn {
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: #ef4444;
+  transition: all 0.2s;
+}
+
+.danger-btn:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* Footer */
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.save-btn {
+  padding: 14px 32px;
+  background: var(--accent-primary);
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.save-btn:hover {
+  background: var(--accent-secondary);
+}
+
+@media (max-width: 768px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}

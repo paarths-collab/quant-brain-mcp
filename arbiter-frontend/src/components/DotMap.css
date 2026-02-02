@@ -1,0 +1,101 @@
+.dot-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.dot-map-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.map-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.map-label {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.label-pin {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pin-dot {
+  width: 10px;
+  height: 10px;
+  background: #3b82f6;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+}
+
+.label-card {
+  background: rgba(13, 13, 13, 0.95);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
+
+.label-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.label-change {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.label-change.positive {
+  color: #22c55e;
+}
+
+.label-change.negative {
+  color: #ef4444;
+}
+
+/* Animation for labels */
+.map-label {
+  animation: labelFadeIn 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+.map-label:nth-child(1) { animation-delay: 0.1s; }
+.map-label:nth-child(2) { animation-delay: 0.2s; }
+.map-label:nth-child(3) { animation-delay: 0.3s; }
+.map-label:nth-child(4) { animation-delay: 0.4s; }
+.map-label:nth-child(5) { animation-delay: 0.5s; }
+.map-label:nth-child(6) { animation-delay: 0.6s; }
+.map-label:nth-child(7) { animation-delay: 0.7s; }
+.map-label:nth-child(8) { animation-delay: 0.8s; }
+
+@keyframes labelFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -90%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%);
+  }
+}

@@ -1,0 +1,222 @@
+.technical-page {
+  max-width: 1400px;
+}
+
+.tech-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.tech-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tech-header p {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.search-form svg {
+  color: var(--text-muted);
+}
+
+.search-form input {
+  font-size: 14px;
+  color: #fff;
+  width: 160px;
+}
+
+.search-form input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Stock Header */
+.stock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+}
+
+.stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--accent-muted);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  margin-bottom: 8px;
+}
+
+.stock-info h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.stock-name {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.stock-price-info {
+  text-align: right;
+}
+
+.current-price {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.price-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.price-change.positive { color: #22c55e; }
+.price-change.negative { color: #ef4444; }
+
+/* Controls */
+.chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.chart-type-toggle, .timeframe-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+}
+
+.chart-type-toggle button, .timeframe-toggle button {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.chart-type-toggle button:hover, .timeframe-toggle button:hover {
+  color: #fff;
+}
+
+.chart-type-toggle button.active, .timeframe-toggle button.active {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+/* Chart */
+.chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.candlestick-chart {
+  width: 100%;
+  min-height: 400px;
+}
+
+/* Indicators */
+.indicators-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+
+.indicator-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+
+.ind-name {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ind-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.ind-status {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.ind-status.bullish { color: #22c55e; }
+.ind-status.bearish { color: #ef4444; }
+.ind-status.neutral { color: #f59e0b; }
+.ind-status.high { color: var(--accent-primary); }
+.ind-status.normal { color: var(--text-muted); }
+.ind-status.above { color: #22c55e; }
+
+@media (max-width: 1200px) {
+  .indicators-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .stock-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+  
+  .stock-price-info {
+    text-align: left;
+  }
+  
+  .chart-controls {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .indicators-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

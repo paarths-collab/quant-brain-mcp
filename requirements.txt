@@ -1,54 +1,7 @@
-# --- Core Application Framework ---
-# Used to build and run the web application interface
-streamlit
-fastapi
-uvicorn[standard]
-
-# --- Data Handling & Analysis ---
-# For data manipulation, numerical operations, and financial analysis
 pandas
 numpy
 yfinance
-ta
-scikit-learn
-
-# --- Visualization ---
-# For creating interactive charts and plots
 plotly
-matplotlib
-mplfinance
-
-# --- Financial Analysis & Performance Metrics ---
-# For calculating performance metrics and risk analysis
-quantstats
-empyrical-reloaded
-
-# --- Web Scraping & API Requests ---
-# For fetching data from websites and APIs
-requests
-beautifulsoup4
-lxml
-selenium
-webdriver-manager
-
-# --- NLP & Sentiment Analysis ---
-# For processing natural language and analyzing text sentiment
-nltk
-openai
-# --- Configuration & Utilities ---
-# For handling YAML config files and defining data models
-pyyaml
-pydantic
-
-# --- API Clients & SDKs ---
-# For interacting with third-party services like trading platforms and AI models
+backtesting
+ta
 alpaca-trade-api
-google-generativeai
-
-# --- Development & Code Quality (Optional but Recommended) ---
-# Tools to format code, check for errors, and manage the environment.
-# These are not strictly required to run the app but improve development workflow.
-# black
-# ruff
-# mypy
-# pre-commit
