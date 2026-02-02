@@ -1,51 +1,119 @@
-# Python cache
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Virtual environment
+# Virtual Environments
 .venv/
 venv/
 ENV/
 env/
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# VS Code settings
-.vscode/
-*.code-workspace
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Environment variables and credentials
-*.env
-.env.*
 .env.local
+.env.*.local
+
+# Environment Variables
+.env
 .env.production
 .env.development
+*.env
 
-# API Keys and Configuration files with credentials
-config.py
-config.yaml
-*_credentials.json
-*_secrets.json
-secrets.yaml
-credentials.yaml
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Alpaca Trading credentials
-alpaca_config.py
-alpaca_credentials.json
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
-# Finnhub API credentials
-finnhub_config.py
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+.next/
+out/
 
-# OpenAI API credentials
-openai_config.py
+# Testing
+.coverage
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.tox/
+.nox/
+coverage/
+*.cover
+*.log
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# API Keys and Secrets (CRITICAL)
+**/config.yaml
+**/.env
+**/.env.*
+**/secrets.json
+**/credentials.json
+
+# Test outputs
+test_wealth_result.json
+wealth_test_response.json
+
+# Package manager lock files (optional - uncomment if needed)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
