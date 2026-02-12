@@ -49,11 +49,14 @@ class MeanReversionStrategy(Strategy):
         long_entry = df["Close"] < df["lower_band"]
         exit_long = df["Close"] > df["ma"]
 
-        df.loc[long_entry, "signal"] = 1
-        df.loc[long_entry, "entry_long"] = df["Close"]
-
-        # Exit signal (flat, handled by backtesting engine)
-        df.loc[exit_long, "signal"] = 0
+        position = 0
+        for i in range(len(df)):
+            if long_entry.iloc[i]:
+                position = 1
+                df.loc[df.index[i], "entry_long"] = df.loc[df.index[i], "Close"]
+            elif exit_long.iloc[i]:
+                position = 0
+            df.loc[df.index[i], "signal"] = position
 
         return df
 

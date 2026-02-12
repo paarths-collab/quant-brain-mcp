@@ -38,8 +38,8 @@ def get_engine():
         _engine = create_engine(DATABASE_URL, connect_args=connect_args, **ENGINE_OPTIONS)
     return _engine
 
-# For backwards compatibility
-engine = property(lambda self: get_engine())
+# For backwards compatibility (engine instance)
+engine = get_engine()
 
 # =====================================================
 # SESSION
@@ -96,7 +96,9 @@ def get_db_session():
 
 def init_db():
     """Create all tables"""
-    Base.metadata.create_all(bind=engine)
+    # Ensure models are imported so metadata is populated
+    from backend.database import models  # noqa: F401
+    Base.metadata.create_all(bind=get_engine())
 
 # =====================================================
 # HEALTH CHECK
@@ -105,7 +107,7 @@ def init_db():
 def check_db_connection() -> bool:
     """Verify DB connectivity"""
     try:
-        with engine.connect() as conn:
+        with get_engine().connect() as conn:
             conn.execute(text("SELECT 1"))
         return True
     except Exception as e:

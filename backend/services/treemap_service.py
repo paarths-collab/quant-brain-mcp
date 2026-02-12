@@ -315,7 +315,9 @@ class TreemapService:
         try:
             # Add market suffix if needed
             if market.lower() == "india":
-                if not symbol.endswith(".NS") and not symbol.endswith(".BO"):
+                if symbol.startswith("^"):
+                    yf_symbol = symbol
+                elif not symbol.endswith(".NS") and not symbol.endswith(".BO"):
                     yf_symbol = f"{symbol}.NS"
                 else:
                     yf_symbol = symbol

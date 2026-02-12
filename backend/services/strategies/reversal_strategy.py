@@ -64,11 +64,14 @@ class RSIReversalStrategy(Strategy):
             (df["rsi"].shift(1) >= self.upper)
         )
 
-        df.loc[bullish_reversal, "signal"] = 1
-        df.loc[bullish_reversal, "entry_long"] = df["Close"]
-
-        # Exit handled by backtesting engine (flat)
-        df.loc[bearish_exit, "signal"] = 0
+        position = 0
+        for i in range(len(df)):
+            if bullish_reversal.iloc[i]:
+                position = 1
+                df.loc[df.index[i], "entry_long"] = df.loc[df.index[i], "Close"]
+            elif bearish_exit.iloc[i]:
+                position = 0
+            df.loc[df.index[i], "signal"] = position
 
         return df
 

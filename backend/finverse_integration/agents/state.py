@@ -1,38 +1,40 @@
-from typing import TypedDict, List, Dict, Any, Optional, Annotated
+from typing import TypedDict, List, Dict, Any, Annotated
 import operator
 
-class WealthState(TypedDict):
-    """Shared state across all agents in the workflow"""
-    # Input
-    raw_input: str
-    market: str
-    # User Profile
+class WealthState(TypedDict, total=False):
+    """Shared state across the Investment AI (LangGraph) workflow"""
+    # Input - these fields use "last write wins" to allow updates from multiple nodes
+    raw_input: Annotated[str, lambda x, y: y]
+    market: Annotated[str, lambda x, y: y]
+
+    # User Profile & Goals
     user_profile: Dict[str, Any]
-    allocation_strategy: Dict[str, float]
+    goals: Dict[str, Any]
+    risk_score: int
+    time_horizon: int
     investable_amount: float
-    # Market Context
-    current_season: str
-    # Sector Analysis
-    sector_rankings: List[Dict[str, Any]]
-    selected_sector: str
-    sector_news: List[Dict[str, str]]
-    # Stock Selection
+
+    # Market & News Context
+    market_data: Dict[str, Any]
+    news_context: Dict[str, Any]
+
+    # Sector & Stock Selection
+    discovered_sectors: List[str]
+    selected_sector: str  # Back-compat: first item of discovered_sectors
     candidate_stocks: List[Dict[str, Any]]
-    stock_backtests: Dict[str, Any]
-    selected_stock: Dict[str, Any]
+    selected_stocks: List[Dict[str, Any]]
+    selected_stock: Dict[str, Any]  # Back-compat: first item of selected_stocks
     stock_research: Dict[str, Any]
-    # MF & Bond & Gold Selection
-    selected_mf: Dict[str, Any]
-    selected_bonds: Dict[str, Any]
-    selected_gold: Dict[str, Any]
-    macro_indicators: Dict[str, Any]
-    # Output
+
+    # Allocation & Output
+    allocation_strategy: Dict[str, Any]
     investment_report: str
-    # Reducers for logging to allow parallel writes
+
+    # Metadata / Diagnostics
     execution_log: Annotated[List[str], operator.add]
     errors: Annotated[List[str], operator.add]
     is_blocked: bool
-    # Critic Loop State
     critic_score: float
     critic_feedback: str
+    failure_reasons: List[str]
     optimization_attempts: int

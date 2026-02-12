@@ -7,6 +7,8 @@ import pandas as pd
 import yfinance as yf
 import pytz
 import requests
+import json
+from pathlib import Path
 
 # Optional dependencies
 try:
@@ -50,12 +52,28 @@ def nse_market_status() -> str:
 # 📊 Market Breadth (Yahoo fallback)
 # --------------------------------------------------
 
-def load_universe_csv(path: str) -> List[str]:
+def load_universe_json(path: str) -> List[str]:
     try:
-        df = pd.read_csv(path)
-        if "Symbol" not in df.columns:
+        file_path = Path(path)
+        if not file_path.is_absolute():
+            backend_root = Path(__file__).resolve().parents[1]
+            file_path = backend_root / file_path
+
+        if not file_path.exists():
             return ["^NSEI"]
-        return [s + ".NS" for s in df["Symbol"].dropna().astype(str)]
+
+        with file_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        symbols = [
+            item.get("Symbol")
+            for item in data
+            if isinstance(item, dict) and item.get("Symbol")
+        ]
+
+        if not symbols:
+            return ["^NSEI"]
+        return [str(s) + ".NS" for s in symbols]
     except Exception:
         return ["^NSEI"]
 
@@ -187,7 +205,7 @@ class MacroAgent:
                 pass
 
         # 2️⃣ Yahoo Finance fallback
-        symbols = load_universe_csv("data/nifty500.csv")
+        symbols = load_universe_json("data/nifty500.json")
         adv, dec, _ = breadth_from_yfinance(symbols)
 
         return {

@@ -4,12 +4,24 @@ Fetches stock data from yfinance, Reddit sentiment, and AI analysis via Gemini.
 """
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
 import json
 import re
 
 import yfinance as yf
+from backend.services.supply_chain_service import fetch_supply_chain
+
+try:
+    from duckduckgo_search import DDGS as DDGSClient
+    DDGS_AVAILABLE = True
+except Exception:
+    try:
+        from ddgs import DDGS as DDGSClient
+        DDGS_AVAILABLE = True
+    except Exception:
+        DDGS_AVAILABLE = False
+        DDGSClient = None
 
 # Optional Reddit integration
 try:
@@ -18,12 +30,10 @@ try:
 except ImportError:
     PRAW_AVAILABLE = False
 
-# Optional Gemini integration  
-try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
+# Google Generative AI deprecated - stubbed out
+# LLM functionality can be added via modern provider (OpenAI, Groq, etc.)
+GEMINI_AVAILABLE = False
+genai = None  # Stub
 
 
 # =====================================================
@@ -35,8 +45,9 @@ REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "stock-sentiment-bot")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if GEMINI_AVAILABLE and GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY) # type: ignore
+# Gemini configuration removed - deprecated
+# if GEMINI_AVAILABLE and GEMINI_API_KEY:
+#     genai.configure(api_key=GEMINI_API_KEY)
 
 
 # =====================================================
@@ -127,9 +138,79 @@ def fetch_stock_data(symbol: str) -> Dict:
         day_change = latest["Close"] - prev_close
         day_change_pct = (day_change / prev_close) * 100 if prev_close else 0
 
+    ex_dividend_raw = info.get("exDividendDate")
+    ex_dividend_date = None
+    if ex_dividend_raw:
+        try:
+            ex_dividend_date = datetime.utcfromtimestamp(int(ex_dividend_raw)).strftime("%Y-%m-%d")
+        except Exception:
+            ex_dividend_date = None
+
+    # Quarterly snapshot (best-effort)
+    quarterly = {}
+    try:
+        qf = ticker.quarterly_financials
+        if qf is not None and not qf.empty:
+            latest_col = qf.columns[0] if len(qf.columns) > 0 else None
+
+            def _get_metric(label: str):
+                if label not in qf.index:
+                    return None, None
+                series = qf.loc[label]
+                latest = series.iloc[0] if len(series) > 0 else None
+                prev = series.iloc[1] if len(series) > 1 else None
+                return latest, prev
+
+            net_income, prev_net_income = _get_metric("Net Income")
+            revenue, prev_revenue = _get_metric("Total Revenue")
+
+            def _growth(curr, prev):
+                try:
+                    if curr is None or prev in (None, 0):
+                        return None
+                    return (float(curr) - float(prev)) / float(prev) * 100
+                except Exception:
+                    return None
+
+            quarter_end = None
+            if latest_col is not None:
+                try:
+                    quarter_end = latest_col.date().isoformat()  # type: ignore
+                except Exception:
+                    quarter_end = str(latest_col)
+
+            quarterly_revenue = []
+            if "Total Revenue" in qf.index:
+                rev_series = qf.loc["Total Revenue"]
+                for idx, col in enumerate(rev_series.index[:4]):
+                    label = f"Q{idx + 1}"
+                    period = None
+                    try:
+                        period = col.date().isoformat()  # type: ignore
+                    except Exception:
+                        period = str(col)
+                    val = rev_series.iloc[idx] if idx < len(rev_series) else None
+                    quarterly_revenue.append({
+                        "quarter": label,
+                        "period": period,
+                        "revenue": float(val) if val is not None else None
+                    })
+
+            quarterly = {
+                "quarter_end": quarter_end,
+                "net_profit_q": float(net_income) if net_income is not None else None,
+                "profit_q_var": _growth(net_income, prev_net_income),
+                "sales_q": float(revenue) if revenue is not None else None,
+                "sales_q_var": _growth(revenue, prev_revenue),
+                "quarterly_revenue": quarterly_revenue,
+            }
+    except Exception:
+        quarterly = {}
+
     return {
         "symbol": symbol,
         "company_name": info.get("longName") or info.get("shortName", symbol),
+        "business_summary": info.get("longBusinessSummary"),
         "sector": info.get("sector"),
         "industry": info.get("industry"),
         "market": market,
@@ -143,19 +224,72 @@ def fetch_stock_data(symbol: str) -> Dict:
         "avg_volume": info.get("averageVolume"),
         "market_cap": info.get("marketCap"),
         "market_cap_formatted": format_large_number(info.get("marketCap"), market),
+        # Valuation
         "pe_ratio": info.get("trailingPE"),
         "forward_pe": info.get("forwardPE"),
-        "eps": info.get("trailingEps"),
+        "peg_ratio": info.get("pegRatio"),
+        "price_to_book": info.get("priceToBook"),
+        "enterprise_value": info.get("enterpriseValue"),
+        "ev_to_ebitda": info.get("enterpriseToEbitda"),
+        # Financial health
+        "debt_to_equity": info.get("debtToEquity"),
+        "current_ratio": info.get("currentRatio"),
+        "free_cashflow": info.get("freeCashflow"),
+        # Profitability
+        "roe": info.get("returnOnEquity"),
+        "operating_margins": info.get("operatingMargins"),
+        # Dividends
         "dividend_yield": info.get("dividendYield"),
+        "payout_ratio": info.get("payoutRatio"),
+        "ex_dividend_date": ex_dividend_date,
+        # Risk
         "beta": info.get("beta"),
+        "short_ratio": info.get("shortRatio"),
+        "short_percent_float": info.get("shortPercentOfFloat"),
+        # Growth
         "52w_high": info.get("fiftyTwoWeekHigh"),
         "52w_low": info.get("fiftyTwoWeekLow"),
         "revenue": info.get("totalRevenue"),
         "revenue_formatted": format_large_number(info.get("totalRevenue"), market),
         "profit_margin": info.get("profitMargins"),
+        "revenue_growth": info.get("revenueGrowth"),
+        "eps_growth": info.get("earningsGrowth"),
+        # Analyst
         "target_mean_price": info.get("targetMeanPrice"),
         "recommendation_key": info.get("recommendationKey", "").upper(),
+        "analyst_count": info.get("numberOfAnalystOpinions"),
+        # Quarterly snapshot
+        **quarterly,
     }
+
+def fetch_duckduckgo_news(company_name: str, symbol: str, limit: int = 8) -> Dict[str, Any]:
+    """
+    Fetch recent news articles via DuckDuckGo News.
+    Returns a dict with query + articles.
+    """
+    if not DDGS_AVAILABLE or DDGSClient is None:
+        return {"source": "duckduckgo", "query": None, "articles": []}
+
+    clean_symbol = symbol.replace(".NS", "").replace(".BO", "")
+    company = company_name or clean_symbol
+    query = f"\"{company}\" {clean_symbol} stock news"
+
+    try:
+        with DDGSClient() as ddgs:
+            results = list(ddgs.news(keywords=query, max_results=limit))
+        articles = []
+        for r in results:
+            articles.append({
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "source": r.get("source", "DuckDuckGo"),
+                "published": r.get("date", ""),
+                "snippet": r.get("body", ""),
+            })
+        return {"source": "duckduckgo", "query": query, "articles": articles}
+    except Exception as e:
+        print(f"DuckDuckGo news error: {e}")
+        return {"source": "duckduckgo", "query": query, "articles": []}
 
 
 # =====================================================
@@ -282,7 +416,7 @@ Respond in this exact JSON format:
 }}
 """
 
-        model = genai.GenerativeModel("gemini-1.5-flash") # type: ignore
+        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash")) # type: ignore
         response = model.generate_content(prompt)
         
         # Parse JSON from response
@@ -415,6 +549,12 @@ def analyze_stock_sentiment(symbol: str) -> Dict:
     query = stock_data.get("company_name") or symbol.split(".")[0]
     reddit_posts = fetch_reddit_posts(query)
     reddit_summary = summarize_reddit_sentiment(reddit_posts)
+
+    # Fetch recent news via DuckDuckGo
+    news = fetch_duckduckgo_news(stock_data.get("company_name", ""), symbol)
+
+    # Supply chain extraction (SEC for US, DDG crawler for India)
+    supply_chain = fetch_supply_chain(symbol, stock_data.get("company_name", ""))
     
     # Run AI analysis
     ai_analysis = analyze_with_gemini(stock_data, reddit_summary)
@@ -448,6 +588,8 @@ def analyze_stock_sentiment(symbol: str) -> Dict:
         "reddit_top_posts": reddit_summary.get("top_posts", []),
         "analysis_source": ai_analysis.get("source", "unknown"),
         "market_data": stock_data,
+        "news": news,
+        "supply_chain": supply_chain,
     }
 
 

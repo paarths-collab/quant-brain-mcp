@@ -9,6 +9,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from tavily import TavilyClient
 import requests
 
+# DuckDuckGo Search (Free fallback)
+try:
+    from duckduckgo_search import DDGS
+    DDGS_AVAILABLE = True
+except ImportError:
+    DDGS_AVAILABLE = False
+
 from ..state import WealthState
 # from ..utils.portfolio_engine import PortfolioEngine
 # from ..utils.data_loader import DataLoader
@@ -212,7 +219,21 @@ class StockSelectionAgent:
             except Exception as e:
                 print(f"   ⚠️ Tavily failed ({e}), trying fallback...")
 
-        # 2. Try NewsDataIO (Fallback A)
+        # 2. Try DuckDuckGo (Fallback A - Free, No API Key)
+        if DDGS_AVAILABLE:
+            try:
+                print("   🦆 Trying DuckDuckGo...")
+                with DDGS() as ddgs:
+                    results = list(ddgs.news(keywords=search_query, max_results=5))
+                    if results:
+                        research['summary'] = [r.get('title', '') for r in results[:3]]
+                        research['urls'] = [r.get('url', '') for r in results[:3]]
+                        research['source'] = 'DuckDuckGo'
+                        return research
+            except Exception as e:
+                print(f"   ⚠️ DuckDuckGo failed ({e}), trying fallback...")
+
+        # 3. Try NewsDataIO (Fallback B)
         news_key = os.getenv("NEWSDATAIO_API_KEY")
         if news_key:
             try:
@@ -233,7 +254,7 @@ class StockSelectionAgent:
             except Exception as e:
                 print(f"   ⚠️ NewsDataIO failed ({e}), trying fallback...")
 
-        # 3. Try Finnhub (Fallback B)
+        # 4. Try Finnhub (Fallback C)
         if self.finnhub_client:
             try:
                 print("   Trying Finnhub...")

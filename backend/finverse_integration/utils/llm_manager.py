@@ -1,6 +1,8 @@
 import os
 import random
 import time
+import asyncio
+from collections import OrderedDict
 from typing import List, Optional, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import BaseMessage
@@ -16,6 +18,10 @@ class LLMManager:
         self.gemini_keys = self._load_gemini_keys()
         self.current_key_index = 0
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        self.cache_enabled = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
+        self.cache_ttl = int(os.getenv("LLM_CACHE_TTL", "300"))
+        self.cache_max = int(os.getenv("LLM_CACHE_MAX", "128"))
+        self._cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
         
         # Initialize the primary model
         self.primary_llm = self._create_gemini_llm(self.gemini_keys[0]) if self.gemini_keys else None
@@ -60,12 +66,48 @@ class LLMManager:
         self.primary_llm = self._create_gemini_llm(new_key)
         return True
 
+    def _messages_cache_key(self, messages: List[BaseMessage]) -> str:
+        parts = [self.model_name, str(self.temperature)]
+        for msg in messages:
+            role = msg.__class__.__name__
+            content = getattr(msg, "content", "")
+            parts.append(f"{role}:{content}")
+        return "|".join(parts)
+
+    def _cache_get(self, key: str):
+        if not self.cache_enabled:
+            return None
+        if key not in self._cache:
+            return None
+        ts, value = self._cache.get(key, (0, None))
+        if (time.time() - ts) > self.cache_ttl:
+            self._cache.pop(key, None)
+            return None
+        # refresh LRU
+        self._cache.move_to_end(key, last=True)
+        return value
+
+    def _cache_set(self, key: str, value: Any) -> None:
+        if not self.cache_enabled:
+            return
+        self._cache[key] = (time.time(), value)
+        self._cache.move_to_end(key, last=True)
+        if len(self._cache) > self.cache_max:
+            self._cache.popitem(last=False)
+
     async def ainvoke(self, messages):
         """Async wrapper for invoke"""
         try:
              # Try native async if available
+             cache_key = self._messages_cache_key(messages)
+             cached = self._cache_get(cache_key)
+             if cached is not None:
+                 return cached
+
              if hasattr(self.primary_llm, 'ainvoke'):
-                 return await self.primary_llm.ainvoke(messages)
+                 result = await self.primary_llm.ainvoke(messages)
+                 self._cache_set(cache_key, result)
+                 return result
              else:
                  # Fallback to sync in thread
                  return await asyncio.to_thread(self.invoke, messages)
@@ -75,6 +117,11 @@ class LLMManager:
 
     def invoke(self, messages: List[BaseMessage]) -> Any:
         """Reliable invoke with failover logic"""
+        cache_key = self._messages_cache_key(messages)
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         max_retries = len(self.gemini_keys) + 1  # Try all keys + 1 retry
         
         for attempt in range(max_retries):
@@ -82,7 +129,9 @@ class LLMManager:
                 if not self.primary_llm:
                     raise Exception("No Primary LLM available")
                 
-                return self.primary_llm.invoke(messages)
+                result = self.primary_llm.invoke(messages)
+                self._cache_set(cache_key, result)
+                return result
                 
             except Exception as e:
                 error_str = str(e).lower()

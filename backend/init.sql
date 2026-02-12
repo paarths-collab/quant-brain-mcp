@@ -63,3 +63,58 @@ CREATE TRIGGER update_fred_data_updated_at
     BEFORE UPDATE ON fred_data
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- =====================================================
+-- SECTOR INTELLIGENCE (NEWS + SNAPSHOTS)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS sector_news_item (
+    id SERIAL PRIMARY KEY,
+    sector VARCHAR(120) NOT NULL,
+    market VARCHAR(10) NOT NULL,
+    title VARCHAR(600) NOT NULL,
+    url VARCHAR(1200),
+    source VARCHAR(200),
+    published_at TIMESTAMP,
+    snippet TEXT,
+    hash VARCHAR(64) NOT NULL,
+    ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_sector_news_hash UNIQUE (market, sector, hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sector_news_market_sector_date
+    ON sector_news_item (market, sector, published_at);
+
+CREATE TABLE IF NOT EXISTS sector_snapshot (
+    id SERIAL PRIMARY KEY,
+    sector VARCHAR(120) NOT NULL,
+    market VARCHAR(10) NOT NULL,
+    as_of TIMESTAMP NOT NULL,
+    news_item_ids JSONB,
+    sector_summary TEXT,
+    momentum VARCHAR(40),
+    risk_notes TEXT,
+    who_should_invest TEXT,
+    suitable_profiles JSONB,
+    top_stocks JSONB,
+    score DOUBLE PRECISION,
+    llm_model VARCHAR(80),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sector_snapshot_market_sector_asof
+    ON sector_snapshot (market, sector, as_of);
+
+CREATE TABLE IF NOT EXISTS sector_score (
+    id SERIAL PRIMARY KEY,
+    sector VARCHAR(120) NOT NULL,
+    market VARCHAR(10) NOT NULL,
+    as_of TIMESTAMP NOT NULL,
+    score DOUBLE PRECISION,
+    suitable_profiles JSONB,
+    rationale TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sector_score_market_sector_asof
+    ON sector_score (market, sector, as_of);

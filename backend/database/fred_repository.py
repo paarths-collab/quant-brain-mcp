@@ -16,6 +16,40 @@ class FredRepository:
     # DATA OPERATIONS
     # ===============================
 
+    def upsert_metadata(
+        self,
+        series_id: str,
+        series_type: str,
+        title: Optional[str] = None,
+        frequency: Optional[str] = None,
+        units: Optional[str] = None
+    ) -> FredSeriesMetadata:
+        obj = (
+            self.db.query(FredSeriesMetadata)
+            .filter(FredSeriesMetadata.series_id == series_id)
+            .one_or_none()
+        )
+
+        if obj:
+            obj.series_type = series_type
+            if title is not None:
+                obj.title = title
+            if frequency is not None:
+                obj.frequency = frequency
+            if units is not None:
+                obj.units = units
+        else:
+            obj = FredSeriesMetadata(
+                series_id=series_id,
+                series_type=series_type,
+                title=title,
+                frequency=frequency,
+                units=units
+            )
+            self.db.add(obj)
+
+        return obj
+
     def upsert_data(
         self,
         series_id: str,

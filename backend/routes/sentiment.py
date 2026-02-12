@@ -2,6 +2,7 @@
 Sentiment Analysis API Routes
 Endpoints for stock sentiment analysis with AI
 """
+import math
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from pydantic import BaseModel
@@ -12,6 +13,17 @@ from backend.services.stock_sentiment_service import (
 )
 
 router = APIRouter(prefix="/api/sentiment", tags=["Sentiment Analysis"])
+
+
+def _sanitize_floats(obj):
+    """Recursively replace inf/nan floats with None so JSON serialisation works."""
+    if isinstance(obj, dict):
+        return {k: _sanitize_floats(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_floats(v) for v in obj]
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    return obj
 
 
 class SentimentRequest(BaseModel):
@@ -43,7 +55,7 @@ async def get_sentiment_analysis(
         if "error" in result and result.get("market_data") is None:
             raise HTTPException(status_code=404, detail=result["error"])
         
-        return result
+        return _sanitize_floats(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -59,7 +71,7 @@ async def post_sentiment_analysis(request: SentimentRequest):
         if "error" in result and result.get("market_data") is None:
             raise HTTPException(status_code=404, detail=result["error"])
         
-        return result
+        return _sanitize_floats(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -74,10 +86,10 @@ async def batch_sentiment_analysis(request: BatchSentimentRequest):
     
     try:
         results = analyze_multiple_stocks(request.symbols)
-        return {
+        return _sanitize_floats({
             "count": len(results),
             "results": results,
-        }
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -101,7 +113,7 @@ async def get_quick_sentiment(
             raise HTTPException(status_code=404, detail=result["error"])
         
         # Return minimal data
-        return {
+        return _sanitize_floats({
             "symbol": result.get("symbol"),
             "name": result.get("name"),
             "market": result.get("market"),
@@ -110,6 +122,6 @@ async def get_quick_sentiment(
             "sentiment": result.get("sentiment"),
             "recommendation": result.get("recommendation"),
             "targetPrice": result.get("targetPrice"),
-        }
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

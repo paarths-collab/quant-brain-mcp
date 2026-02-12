@@ -1,6 +1,7 @@
 # File: utils/data_loader.py
 # Master data utility for FastAPI/HTML application
 
+import json
 import pandas as pd
 import yfinance as yf
 import ta
@@ -24,12 +25,16 @@ logger = logging.getLogger(__name__)
 def _get_indian_symbols_set():
     """Internal function to load Indian stock symbols for formatting."""
     try:
-        project_root = Path(__file__).parent.parent
-        # Assuming your indian stock list is in nifty500.csv
-        equity_file = project_root / "data" / "nifty500.csv"
+        backend_root = Path(__file__).resolve().parents[3]
+        equity_file = backend_root / "data" / "nifty500.json"
         if equity_file.exists():
-            df = pd.read_csv(equity_file)
-            return set(df['Symbol'].str.upper())
+            with equity_file.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            return set(
+                item["Symbol"].upper()
+                for item in data
+                if isinstance(item, dict) and item.get("Symbol")
+            )
     except Exception as e:
         logger.error(f"Could not load Indian symbols file: {e}")
     return set()

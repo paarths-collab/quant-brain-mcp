@@ -16,6 +16,13 @@ import json
 import requests
 from typing import Dict, Any, List, Optional
 
+# DuckDuckGo Search (Free fallback)
+try:
+    from duckduckgo_search import DDGS
+    DDGS_AVAILABLE = True
+except ImportError:
+    DDGS_AVAILABLE = False
+    print("⚠️ duckduckgo-search not installed")
 
 # API Keys (can be overridden from config)
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "fc-f93babf1646d41bebd62aa52b9b43109")
@@ -85,6 +92,103 @@ class TavilySearch:
             return {
                 "success": False,
                 "error": f"Unexpected error: {str(e)}",
+                "query": query,
+                "results": []
+            }
+
+
+class DuckDuckGoSearch:
+    """
+    DuckDuckGo Search - Free alternative, no API key required.
+    """
+    
+    def __init__(self):
+        self.available = DDGS_AVAILABLE
+    
+    def search(self, query: str, max_results: int = 5) -> Dict[str, Any]:
+        """
+        Search the web using DuckDuckGo.
+        
+        Args:
+            query: Search query
+            max_results: Maximum number of results
+            
+        Returns:
+            Dictionary with search results
+        """
+        if not self.available:
+            return {
+                "success": False,
+                "error": "DuckDuckGo search not available",
+                "query": query,
+                "results": []
+            }
+        
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.text(keywords=query, max_results=max_results))
+                return {
+                    "success": True,
+                    "query": query,
+                    "answer": "",
+                    "results": [
+                        {
+                            "title": r.get("title", ""),
+                            "url": r.get("href", ""),
+                            "content": r.get("body", "")[:500],
+                            "score": 0
+                        }
+                        for r in results
+                    ]
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"DuckDuckGo search failed: {str(e)}",
+                "query": query,
+                "results": []
+            }
+    
+    def news(self, query: str, max_results: int = 5) -> Dict[str, Any]:
+        """
+        Search news using DuckDuckGo.
+        
+        Args:
+            query: Search query
+            max_results: Maximum number of results
+            
+        Returns:
+            Dictionary with news results
+        """
+        if not self.available:
+            return {
+                "success": False,
+                "error": "DuckDuckGo search not available",
+                "query": query,
+                "results": []
+            }
+        
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.news(keywords=query, max_results=max_results))
+                return {
+                    "success": True,
+                    "query": query,
+                    "results": [
+                        {
+                            "title": r.get("title", ""),
+                            "url": r.get("url", ""),
+                            "source": r.get("source", "DuckDuckGo"),
+                            "date": r.get("date", ""),
+                            "content": r.get("body", "")[:500]
+                        }
+                        for r in results
+                    ]
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"DuckDuckGo news failed: {str(e)}",
                 "query": query,
                 "results": []
             }

@@ -7,7 +7,7 @@ def fetch_stock_peers(symbol: str) -> List[Dict]:
     """
     Fetch peer companies for a given stock symbol from FMP.
     """
-    url = f"{FMP_BASE_URL}/stock-peers"
+    url = f"https://financialmodelingprep.com/api/v4/stock_peers"
     params = {
         "symbol": symbol.upper(),
         "apikey": FMP_API_KEY,

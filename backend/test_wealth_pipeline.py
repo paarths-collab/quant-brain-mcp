@@ -75,11 +75,9 @@ async def test_wealth_pipeline():
         # Asset Allocation
         if result.get('allocation_strategy'):
             alloc = result['allocation_strategy']
-            print("\n💼 Asset Allocation:")
+            print("\n💼 Allocation Snapshot:")
             print(f"  Stocks: {alloc.get('stocks', 0) * 100:.0f}%")
-            print(f"  Mutual Funds: {alloc.get('mutual_funds', 0) * 100:.0f}%")
-            print(f"  Bonds: {alloc.get('bonds', 0) * 100:.0f}%")
-            print(f"  Gold: {alloc.get('gold', 0) * 100:.0f}%")
+            print(f"  Cash: {alloc.get('CASH', alloc.get('cash', 0)) * 100:.0f}%")
         
         # Execution Log
         if result.get('execution_log'):

@@ -5,9 +5,14 @@ This file contains all configurable settings, API keys, and constants.
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent
+
+# Load environment variables from backend/.env
+env_path = PROJECT_ROOT / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # --- API KEYS AND CREDENTIALS ---
 # Add your API keys here - these should be set as environment variables for security
@@ -44,7 +49,7 @@ RAPIDAPI_HOSTS = {
 
 # --- FILE PATHS ---
 DATA_DIR = PROJECT_ROOT / "data"
-NIFTY500_FILE = DATA_DIR / "nifty500.csv"
+NIFTY500_FILE = DATA_DIR / "nifty500.json"
 PORTFOLIO_REPORT_FILE = PROJECT_ROOT / "portfolio_report.html"
 
 # --- STRATEGY DEFAULTS ---

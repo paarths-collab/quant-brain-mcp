@@ -1,15 +1,17 @@
-from xhtml2pdf import pisa
+"""
+PDF generator using WeasyPrint.
+Converts HTML files to PDF without external binaries.
+"""
 import os
 
 def convert_html_to_pdf(source_html_path: str, output_pdf_path: str) -> dict:
     """
-    Converts an HTML file to PDF using xhtml2pdf.
-    This is a pure Python library and does not require external binaries.
-    
+    Converts an HTML file to PDF using WeasyPrint.
+
     Args:
-        source_html_path (str): Absolute path to the source HTML file.
-        output_pdf_path (str): Absolute path where the PDF should be saved.
-        
+        source_html_path: Absolute path to the source HTML file.
+        output_pdf_path: Absolute path where the PDF should be saved.
+
     Returns:
         dict: {"success": bool, "error": str}
     """
@@ -17,24 +19,18 @@ def convert_html_to_pdf(source_html_path: str, output_pdf_path: str) -> dict:
         if not os.path.exists(source_html_path):
             return {"success": False, "error": f"Source file not found: {source_html_path}"}
 
-        # Open input and output files
-        with open(source_html_path, "r", encoding="utf-8") as source_file:
-            source_html = source_file.read()
-            
-        with open(output_pdf_path, "wb") as output_file:
-            # Convert HTML to PDF
-            pisa_status = pisa.CreatePDF(
-                source_html,                # the HTML to convert
-                dest=output_file            # file handle to recieve result
-            )
+        from weasyprint import HTML
+        HTML(filename=source_html_path).write_pdf(output_pdf_path)
 
-        if pisa_status.err:
-            return {"success": False, "error": "xhtml2pdf conversion error."}
-            
         if os.path.exists(output_pdf_path):
             return {"success": True, "path": output_pdf_path}
         else:
-             return {"success": False, "error": "PDF file was not created."}
+            return {"success": False, "error": "PDF file was not created."}
 
+    except ImportError:
+        return {
+            "success": False,
+            "error": "weasyprint is not installed. Run: pip install weasyprint"
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}

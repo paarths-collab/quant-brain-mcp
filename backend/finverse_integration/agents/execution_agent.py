@@ -1,14 +1,28 @@
 # import streamlit as st
 import pandas as pd
-from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
 import os
+
+# Optional Alpaca trading imports
+try:
+    from alpaca.trading.client import TradingClient
+    from alpaca.trading.requests import MarketOrderRequest
+    from alpaca.trading.enums import OrderSide, TimeInForce
+    ALPACA_AVAILABLE = True
+except ModuleNotFoundError:
+    ALPACA_AVAILABLE = False
+    TradingClient = None
+    MarketOrderRequest = None
+    OrderSide = None
+    TimeInForce = None
 
 class ExecutionAgent:
     def __init__(self, api_key: str, api_secret: str, paper: bool = True):
         """Initializes the trading client for Alpaca."""
         self.api = None
+        
+        if not ALPACA_AVAILABLE:
+            return
+            
         if not api_key or not api_secret:
             print("[WARNING] ExecutionAgent: Alpaca API Key or Secret is missing.")
             return

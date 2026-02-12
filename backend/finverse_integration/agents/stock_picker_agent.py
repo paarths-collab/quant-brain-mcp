@@ -1,50 +1,56 @@
-import yfinance as yf
+import json
 import pandas as pd
 from typing import List, Dict, Any
-import os
+from pathlib import Path
 
 class StockPickerAgent:
     """Selects potential candidates based on Sector and Market"""
+
+    # agents -> finverse_integration -> backend
+    DATA_DIR = Path(__file__).resolve().parents[2] / "data"
     
     def run(self, market: str, sector: str, weights: Dict[str, float]) -> pd.DataFrame:
         """
-        Selects top candidate stocks from local CSV data based on Market and Sector.
+        Selects top candidate stocks from local JSON data based on Market and Sector.
         """
-        print(f"📊 StockPicker: Searching for {sector} stocks in {market} via Local CSV...")
+        print(f"📊 StockPicker: Searching for {sector} stocks in {market} via Local JSON...")
         
         try:
             # Load Data
             if market == 'IN':
-                file_path = os.path.join("data", "nifty500.csv")
-                # Expected: Company Name, Industry, Symbol, etc.
+                file_path = self.DATA_DIR / "nifty500.json"
             else:
-                file_path = os.path.join("data", "us_stocks.csv")
+                file_path = self.DATA_DIR / "us_stocks.json"
             
-            if not os.path.exists(file_path):
+            if not file_path.exists():
                 print(f"⚠️ Data file not found: {file_path}. Falling back to default list.")
                 return self._get_fallback_stocks(market, sector)
 
-            df = pd.read_csv(file_path)
+            with file_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            df = pd.DataFrame(data)
             
             # Normalize Columns
             # We need 'Ticker' and 'Sector'/'Industry'
             # Check likely column names
             cols = [c.lower() for c in df.columns]
+            col_map = {c.lower(): c for c in df.columns}
             
             # Map Symbol
             if 'symbol' in cols:
-                df['Ticker'] = df.iloc[:, cols.index('symbol')]
+                df['Ticker'] = df[col_map['symbol']]
             elif 'ticker' in cols: 
-                 df['Ticker'] = df.iloc[:, cols.index('ticker')]
+                 df['Ticker'] = df[col_map['ticker']]
             else:
                  # Fallback: assume 3rd column is ticker based on preview
                  df['Ticker'] = df.iloc[:, 2]
 
             # Map Sector
             if 'industry' in cols:
-                df['Sector_Col'] = df.iloc[:, cols.index('industry')]
+                df['Sector_Col'] = df[col_map['industry']]
             elif 'sector' in cols:
-                df['Sector_Col'] = df.iloc[:, cols.index('sector')]
+                df['Sector_Col'] = df[col_map['sector']]
             else:
                  # Fallback: assume 2nd column
                  df['Sector_Col'] = df.iloc[:, 1]

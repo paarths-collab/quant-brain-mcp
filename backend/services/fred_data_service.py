@@ -31,8 +31,11 @@ DEFAULT_RATE_SERIES = {
 DEFAULT_ECONOMIC_SERIES = {
     'CPIAUCSL': {'type': 'economic', 'title': 'Consumer Price Index'},
     'UNRATE': {'type': 'economic', 'title': 'Unemployment Rate'},
+    'EMRATIO': {'type': 'economic', 'title': 'Employment-Population Ratio'},
+    'PAYEMS': {'type': 'economic', 'title': 'Nonfarm Payrolls'},
     'GDP': {'type': 'economic', 'title': 'Gross Domestic Product'},
     'INDPRO': {'type': 'economic', 'title': 'Industrial Production Index'},
+    'M2SL': {'type': 'economic', 'title': 'M2 Money Stock'},
 }
 
 # Commodity series (Oil, Gold, etc.)
@@ -41,12 +44,33 @@ DEFAULT_COMMODITY_SERIES = {
     'DCOILBRENTEU': {'type': 'commodity', 'title': 'Crude Oil Brent'},
     'GASREGW': {'type': 'commodity', 'title': 'US Regular Gas Price'},
     'GOLDPMGBD228NLBM': {'type': 'commodity', 'title': 'Gold Price (London)'},
-    'DEXUSEU': {'type': 'commodity', 'title': 'USD/EUR Exchange Rate'},
-    'DEXJPUS': {'type': 'commodity', 'title': 'JPY/USD Exchange Rate'},
-    'DEXUSUK': {'type': 'commodity', 'title': 'USD/GBP Exchange Rate'},
+    'NASDAQQSLVO': {'type': 'commodity', 'title': 'Silver Index (NASDAQ)'},
 }
 
-ALL_DEFAULT_SERIES = {**DEFAULT_INDEX_SERIES, **DEFAULT_RATE_SERIES, **DEFAULT_ECONOMIC_SERIES, **DEFAULT_COMMODITY_SERIES}
+DEFAULT_FX_SERIES = {
+    'DEXUSEU': {'type': 'fx', 'title': 'USD/EUR Exchange Rate'},
+    'DEXJPUS': {'type': 'fx', 'title': 'JPY/USD Exchange Rate'},
+    'DEXUSUK': {'type': 'fx', 'title': 'USD/GBP Exchange Rate'},
+}
+
+DEFAULT_SPREAD_SERIES = {
+    'T10Y2Y': {'type': 'spread', 'title': '10Y-2Y Treasury Spread'},
+    'T10YIE': {'type': 'spread', 'title': '10Y Breakeven Inflation Rate'},
+}
+
+ALL_DEFAULT_SERIES = {
+    **DEFAULT_INDEX_SERIES,
+    **DEFAULT_RATE_SERIES,
+    **DEFAULT_ECONOMIC_SERIES,
+    **DEFAULT_COMMODITY_SERIES,
+    **DEFAULT_FX_SERIES,
+    **DEFAULT_SPREAD_SERIES,
+}
+
+SERIES_ALIASES = {
+    "GOLDAMGBD228NLBM": "GOLDPMGBD228NLBM",
+    "GOLDPMGBD228NLBM": "GOLDAMGBD228NLBM",
+}
 
 
 class FredDataService:
@@ -71,10 +95,25 @@ class FredDataService:
                 observation_start=start_date,
                 observation_end=end_date
             )
-            return data
+            if not data.empty:
+                return data
         except Exception as e:
             print(f"Error fetching {series_id}: {e}")
-            return pd.Series()
+
+        alt_id = SERIES_ALIASES.get(series_id)
+        if alt_id:
+            try:
+                data = self.fred.get_series(
+                    alt_id,
+                    observation_start=start_date,
+                    observation_end=end_date
+                )
+                if not data.empty:
+                    return data
+            except Exception as e:
+                print(f"Error fetching fallback {alt_id}: {e}")
+
+        return pd.Series()
     
     def fetch_and_store_series(
         self,

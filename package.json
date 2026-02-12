@@ -8,5 +8,8 @@
     "lucide-react": "^0.563.0",
     "tailwind-merge": "^3.4.0",
     "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
   }
 }

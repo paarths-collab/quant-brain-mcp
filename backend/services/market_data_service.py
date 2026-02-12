@@ -1,16 +1,20 @@
 import yfinance as yf
 import pandas as pd
 import ta
+import math
 from typing import List, Dict, Optional
 
-def fetch_candles(symbol: str, interval: str = "1d", period: str = "1y") -> List[Dict]:
+def fetch_candles(symbol: str, interval: str = "1d", period: str = "1y", start: Optional[str] = None, end: Optional[str] = None) -> List[Dict]:
     """
     Fetches OHLCV data from yfinance and formats it for D3 charts.
     """
     try:
         ticker = yf.Ticker(symbol)
         # yfinance period options: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
-        df = ticker.history(period=period, interval=interval)
+        if start and end:
+            df = ticker.history(start=start, end=end, interval=interval)
+        else:
+            df = ticker.history(period=period, interval=interval)
         
         if df.empty:
             return []
@@ -84,24 +88,38 @@ def calculate_indicators(symbol: str, period: str = "1y", interval: str = "1d") 
         df.reset_index(inplace=True)
         df['Date'] = df['Date'].astype(str)
         
-        # Handle NaNs (replace with None or 0)
+        # Handle NaNs and infinities (replace with None)
         df = df.where(pd.notnull(df), None)
+        df = df.replace([float("inf"), float("-inf")], None)
+
+        def _clean_list(values):
+            cleaned = []
+            for v in values:
+                if v is None:
+                    cleaned.append(None)
+                else:
+                    try:
+                        fv = float(v)
+                        cleaned.append(fv if math.isfinite(fv) else None)
+                    except Exception:
+                        cleaned.append(None)
+            return cleaned
 
         indicators = {
             "dates": df['Date'].tolist(),
-            "rsi": df['RSI'].tolist(),
+            "rsi": _clean_list(df['RSI'].tolist()),
             "macd": {
-                "line": df['MACD'].tolist(),
-                "signal": df['MACD_Signal'].tolist(),
-                "histogram": df['MACD_Hist'].tolist()
+                "line": _clean_list(df['MACD'].tolist()),
+                "signal": _clean_list(df['MACD_Signal'].tolist()),
+                "histogram": _clean_list(df['MACD_Hist'].tolist())
             },
             "ema": {
-                "20": df['EMA_20'].tolist(),
-                "50": df['EMA_50'].tolist(),
-                "200": df['EMA_200'].tolist()
+                "20": _clean_list(df['EMA_20'].tolist()),
+                "50": _clean_list(df['EMA_50'].tolist()),
+                "200": _clean_list(df['EMA_200'].tolist())
             },
-            "atr": df['ATR'].tolist(),
-            "vwap": df['VWAP'].tolist()
+            "atr": _clean_list(df['ATR'].tolist()),
+            "vwap": _clean_list(df['VWAP'].tolist())
         }
         
         return indicators

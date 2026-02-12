@@ -1,7 +1,0 @@
-pandas
-numpy
-yfinance
-plotly
-backtesting
-ta
-alpaca-trade-api

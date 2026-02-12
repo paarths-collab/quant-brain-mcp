@@ -19,7 +19,6 @@ try:
     from backend.agents.execution_agent import ExecutionAgent
 except ImportError:
     ExecutionAgent = None
-    print("⚠️ ExecutionAgent not available (missing alpaca package)")
 
 # Optional agents - may not exist
 try:
@@ -77,40 +76,169 @@ def _load_modules_from_path(path: Path, module_prefix: str):
     return modules
 
 class Orchestrator:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], enabled_agents: Optional[List[str]] = None):
+        """
+        Initialize Orchestrator with lazy agent loading.
+        
+        Args:
+            config: Configuration dictionary  
+            enabled_agents: List of agent names to enable. If None, enables all agents.
+                           Example: ["yfinance", "macro", "insider"]
+        """
         self.cfg = config
         self.keys = self.cfg.get("api_keys", {})
         self.sets = self.cfg.get("agent_settings", {})
         self.rapidapi_cfg = self.cfg.get("rapidapi", {})
-        print("Orchestrator: Initializing all agents...")
-        self._initialize_agents()
-        self._register_strategies()
-        print("Orchestrator: Initialization complete.")
-
-    def _initialize_agents(self):
-        self.yfinance_agent = YFinanceAgent()
+        self.enabled_agents = enabled_agents
         
-        # --- INITIALIZATION FOR OPENROUTER (prefer openrouter1 for Qwen, fallback to openrouter) ---
-        openrouter_key = self.keys.get("openrouter1") or self.keys.get("openrouter")
-        self.llm_agent = LLMAgent(openrouter_api_key=openrouter_key)
+        # Cache for lazy-loaded agents
+        self._agent_cache = {}
         
-        self.macro_agent = MacroAgent(fred_api_key=self.keys.get("fred"))
-        self.stock_picker_agent = StockPickerAgent()
-        self.sector_agent = SectorAgent(
-            news_api_key=self.keys.get("newsapi"),
-            us_universe=self.stock_picker_agent.us_stock_universe,
-            indian_universe=self.stock_picker_agent.indian_stock_universe
-        )
-        self.screener_agent = ScreenerAgent(rapidapi_config=self.rapidapi_cfg)
-        self.execution_agent = ExecutionAgent(api_key=self.keys.get("alpaca_key_id"), api_secret=self.keys.get("alpaca_secret_key"), paper=self.sets.get("paper_trading", True))
-        self.insider_agent = InsiderAgent(finnhub_key=self.keys.get("finnhub"), rapidapi_config=self.rapidapi_cfg)
-        self.sentiment_agent = SentimentAgent(llm_agent=self.llm_agent)
+        print(f"Orchestrator: Lazy loading enabled. Agents to load: {enabled_agents or 'all'}")
+        
+        # Only initialize strategies if needed
+        if enabled_agents is None or any(a in enabled_agents for a in ["long_term", "short_term"]):
+            self._register_strategies()
+        else:
+            self.long_term_modules = {}
+            self.short_term_modules = {}
+        
+        print("Orchestrator: Initialization complete (lazy mode).")
+    
+    def _should_load_agent(self, agent_name: str) -> bool:
+        """Check if an agent should be loaded"""
+        if self.enabled_agents is None:
+            return True  # Load all agents
+        return agent_name in self.enabled_agents
+    
+    @property
+    def yfinance_agent(self):
+        """Lazy load YFinanceAgent"""
+        if "yfinance_agent" not in self._agent_cache:
+            if self._should_load_agent("yfinance"):
+                self._agent_cache["yfinance_agent"] = YFinanceAgent()
+            else:
+                raise AttributeError("YFinanceAgent not enabled in this orchestrator instance")
+        return self._agent_cache["yfinance_agent"]
+    
+    @property
+    def llm_agent(self):
+        """Lazy load LLMAgent"""
+        if "llm_agent" not in self._agent_cache:
+            if self._should_load_agent("llm"):
+                openrouter_key = self.keys.get("openrouter1") or self.keys.get("openrouter")
+                self._agent_cache["llm_agent"] = LLMAgent(openrouter_api_key=openrouter_key)
+            else:
+                raise AttributeError("LLMAgent not enabled in this orchestrator instance")
+        return self._agent_cache["llm_agent"]
+    
+    @property
+    def macro_agent(self):
+        """Lazy load MacroAgent"""
+        if "macro_agent" not in self._agent_cache:
+            if self._should_load_agent("macro"):
+                self._agent_cache["macro_agent"] = MacroAgent(fred_api_key=self.keys.get("fred"))
+            else:
+                raise AttributeError("MacroAgent not enabled in this orchestrator instance")
+        return self._agent_cache["macro_agent"]
+    
+    @property
+    def stock_picker_agent(self):
+        """Lazy load StockPickerAgent"""
+        if "stock_picker_agent" not in self._agent_cache:
+            if self._should_load_agent("stock_picker"):
+                self._agent_cache["stock_picker_agent"] = StockPickerAgent()
+            else:
+                raise AttributeError("StockPickerAgent not enabled in this orchestrator instance")
+        return self._agent_cache["stock_picker_agent"]
+    
+    @property
+    def sector_agent(self):
+        """Lazy load SectorAgent"""
+        if "sector_agent" not in self._agent_cache:
+            if self._should_load_agent("sector"):
+                # Only access stock_picker_agent if it's enabled
+                if self._should_load_agent("stock_picker"):
+                    us_universe = self.stock_picker_agent.us_stock_universe
+                    indian_universe = self.stock_picker_agent.indian_stock_universe
+                else:
+                    us_universe = []
+                    indian_universe = []
+                
+                self._agent_cache["sector_agent"] = SectorAgent(
+                    news_api_key=self.keys.get("newsapi"),
+                    us_universe=us_universe,
+                    indian_universe=indian_universe
+                )
+            else:
+                raise AttributeError("SectorAgent not enabled in this orchestrator instance")
+        return self._agent_cache["sector_agent"]
+    
+    @property
+    def screener_agent(self):
+        """Lazy load ScreenerAgent"""
+        if "screener_agent" not in self._agent_cache:
+            if self._should_load_agent("screener"):
+                self._agent_cache["screener_agent"] = ScreenerAgent(rapidapi_config=self.rapidapi_cfg)
+            else:
+                raise AttributeError("ScreenerAgent not enabled in this orchestrator instance")
+        return self._agent_cache["screener_agent"]
+    
+    @property
+    def execution_agent(self):
+        """Lazy load ExecutionAgent"""
+        if "execution_agent" not in self._agent_cache:
+            if self._should_load_agent("execution"):
+                if ExecutionAgent is None:
+                    return None
+                self._agent_cache["execution_agent"] = ExecutionAgent(
+                    api_key=self.keys.get("alpaca_key_id"),
+                    api_secret=self.keys.get("alpaca_secret_key"),
+                    paper=self.sets.get("paper_trading", True)
+                )
+            else:
+                raise AttributeError("ExecutionAgent not enabled in this orchestrator instance")
+        return self._agent_cache["execution_agent"]
+    
+    @property
+    def insider_agent(self):
+        """Lazy load InsiderAgent"""
+        if "insider_agent" not in self._agent_cache:
+            if self._should_load_agent("insider"):
+                self._agent_cache["insider_agent"] = InsiderAgent(
+                    finnhub_key=self.keys.get("finnhub"),
+                    rapidapi_config=self.rapidapi_cfg
+                )
+            else:
+                raise AttributeError("InsiderAgent not enabled in this orchestrator instance")
+        return self._agent_cache["insider_agent"]
+    
+    @property
+    def sentiment_agent(self):
+        """Lazy load SentimentAgent"""
+        if "sentiment_agent" not in self._agent_cache:
+            if self._should_load_agent("sentiment"):
+                if SentimentAgent is None:
+                    print("⚠️ SentimentAgent not available")
+                    return None
+                self._agent_cache["sentiment_agent"] = SentimentAgent(llm_agent=self.llm_agent)
+            else:
+                raise AttributeError("SentimentAgent not enabled in this orchestrator instance")
+        return self._agent_cache["sentiment_agent"]
 
     def _register_strategies(self):
         print("Orchestrator: Discovering and registering strategies...")
-        long_term_path, short_term_path = Path("Long_Term_Strategy"), Path("strategies")
-        self.long_term_modules = _load_modules_from_path(long_term_path, "Long_Term_Strategy")
-        self.short_term_modules = _load_modules_from_path(short_term_path, "strategies")
+        base_dir = Path(__file__).resolve().parents[1]
+        long_term_path = base_dir / "long_term"
+        short_term_path = base_dir / "finverse_integration" / "strategies"
+
+        if not long_term_path.exists():
+            print(f"⚠️ Long-term strategy path not found: {long_term_path}")
+        if not short_term_path.exists():
+            print(f"⚠️ Short-term strategy path not found: {short_term_path}")
+
+        self.long_term_modules = _load_modules_from_path(long_term_path, "backend.long_term")
+        self.short_term_modules = _load_modules_from_path(short_term_path, "backend.finverse_integration.strategies")
         print(f"Registered {len(self.long_term_modules)} long-term strategies.")
         print(f"Registered {len(self.short_term_modules)} short-term strategies.")
 

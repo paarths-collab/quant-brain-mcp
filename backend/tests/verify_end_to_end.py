@@ -21,9 +21,9 @@ async def run_verification():
         return
 
     user_input = """
-    I earn $10,000/month. I save $3000. 
-    I want to invest for a house in 5 years. 
-    Review my portfolio. I want some Gold and good Bonds. 
+    I earn $10,000/month. I save $3000.
+    I want to invest for a house in 5 years.
+    Review my portfolio with a moderate risk profile.
     US Market.
     """
 
@@ -46,8 +46,11 @@ async def run_verification():
             f.write(f"- Score: {final_state.get('critic_score')}\n")
             f.write(f"- Feedback: {final_state.get('critic_feedback')}\n")
             
-            f.write("\n## Gold Decision\n")
-            f.write(f"```json\n{final_state.get('selected_gold', {})}\n```\n")
+            f.write("\n## Selected Stocks\n")
+            f.write(f"```json\n{final_state.get('selected_stocks', [])}\n```\n")
+
+            f.write("\n## Allocation\n")
+            f.write(f"```json\n{final_state.get('allocation_strategy', {})}\n```\n")
             
             f.write("\n## Final Report\n")
             f.write(final_state.get('investment_report', 'No Report'))

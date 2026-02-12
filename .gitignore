@@ -112,6 +112,18 @@ temp/
 # Test outputs
 test_wealth_result.json
 wealth_test_response.json
+test_request.json
+debug_output.txt
+
+# Generated Reports
+backend/reports/
+
+# Data Files
+backend/data/*.parquet
+backend/data/*.csv
+
+# Logs
+*.log
 
 # Package manager lock files (optional - uncomment if needed)
 # package-lock.json

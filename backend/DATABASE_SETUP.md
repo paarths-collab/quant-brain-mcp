@@ -1,6 +1,7 @@
 # Database Setup with Docker
 
 This guide explains how to set up the PostgreSQL database for storing FRED API data.
+It also covers the Sector Intelligence cache tables used for sector-level news + LLM snapshots.
 
 ## Quick Start
 
@@ -39,7 +40,7 @@ cp .env.example .env
 
 Edit `.env`:
 ```env
-DATABASE_URL=postgresql://boomerang:boomerang_secret@localhost:5432/boomerang_db
+DATABASE_URL=postgresql://boomerang:boomerang_secret@127.0.0.1:5435/boomerang_db
 FRED_API_KEY=your_actual_fred_api_key
 ```
 
@@ -76,6 +77,48 @@ Stores metadata about each FRED series.
 | frequency | VARCHAR(20) | Data frequency (Daily, Monthly, etc.) |
 | units | VARCHAR(100) | Unit of measurement |
 | last_updated | TIMESTAMP | When last synced |
+
+### sector_news_item Table
+Raw news headlines stored per sector.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| sector | VARCHAR(120) | Sector name (e.g., Technology) |
+| market | VARCHAR(10) | Market code (US/IN) |
+| title | VARCHAR(600) | Headline |
+| url | VARCHAR(1200) | Article URL |
+| source | VARCHAR(200) | Publisher |
+| published_at | TIMESTAMP | Published date |
+| snippet | TEXT | Short summary |
+| hash | VARCHAR(64) | Dedupe hash |
+
+### sector_snapshot Table
+LLM-generated snapshot for each sector.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| sector | VARCHAR(120) | Sector name |
+| market | VARCHAR(10) | Market code (US/IN) |
+| as_of | TIMESTAMP | Snapshot time |
+| sector_summary | TEXT | LLM summary |
+| momentum | VARCHAR(40) | bullish/neutral/bearish |
+| risk_notes | TEXT | Key risks |
+| who_should_invest | TEXT | Suitable audience |
+| suitable_profiles | JSONB | Structured suitability |
+| top_stocks | JSONB | LLM-selected stock list |
+| score | DOUBLE PRECISION | 0-100 sector score |
+
+### sector_score Table
+Numeric score and suitability profile.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| sector | VARCHAR(120) | Sector name |
+| market | VARCHAR(10) | Market code (US/IN) |
+| as_of | TIMESTAMP | Snapshot time |
+| score | DOUBLE PRECISION | 0-100 |
+| suitable_profiles | JSONB | Structured suitability |
+| rationale | TEXT | Short rationale |
 
 ## API Endpoints
 
@@ -120,6 +163,56 @@ GET /api/fred/available-series
 
 # Smart endpoint (auto-refreshes if stale)
 GET /api/fred/smart/SP500?max_age_hours=24
+```
+
+### Sector Intelligence Endpoints
+
+```bash
+# Refresh all sectors (US + IN)
+POST /api/sector-intel/refresh
+
+# Refresh a single sector
+POST /api/sector-intel/refresh
+{"market": "US", "sector": "Technology", "force": true}
+
+# List latest snapshots
+GET /api/sector-intel/latest?market=US
+
+# Get a specific sector
+GET /api/sector-intel/latest?market=IN&sector=Financial%20Services
+
+# Recommend sectors for a user profile
+POST /api/sector-intel/recommend
+{"market": "US", "risk_score": 6, "time_horizon_years": 5, "goal": "growth", "limit": 5}
+
+# Fetch sector stocks with optional enrichments
+GET /api/sector-intel/sector/Technology/stocks?market=US&include_fundamentals=true&include_news=true
+```
+
+## Sector Intelligence Worker
+
+Run the background worker to refresh sector snapshots on a schedule:
+
+```bash
+python -m backend.tools.sector_intel_worker --loop
+```
+
+Optional flags:
+- `--once` to run a single cycle
+- `--force` to ignore freshness checks
+- `--markets=US,IN` to limit markets
+- `--interval-minutes=60` to adjust refresh cadence
+
+## Sector Intelligence Environment Variables
+
+```env
+SECTOR_INTEL_NEWS_LIMIT=10
+SECTOR_INTEL_STOCKS_LIMIT=12
+SECTOR_INTEL_PRICE_PERIOD=3mo
+SECTOR_INTEL_REFRESH_MINUTES=60
+SECTOR_INTEL_SECTOR_GAP_SECONDS=120
+SECTOR_INTEL_MARKETS=US,IN
+SECTOR_INTEL_LLM_MODEL=llama-3.1-8b-instant
 ```
 
 ## Available FRED Series

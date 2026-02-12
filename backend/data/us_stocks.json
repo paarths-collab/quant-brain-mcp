@@ -1,0 +1,2512 @@
+[
+  {
+    "Company Name": "3M",
+    "Industry": "Industrials",
+    "Symbol": "MMM"
+  },
+  {
+    "Company Name": "A. O. Smith",
+    "Industry": "Industrials",
+    "Symbol": "AOS"
+  },
+  {
+    "Company Name": "Abbott Laboratories",
+    "Industry": "Health Care",
+    "Symbol": "ABT"
+  },
+  {
+    "Company Name": "AbbVie",
+    "Industry": "Health Care",
+    "Symbol": "ABBV"
+  },
+  {
+    "Company Name": "Accenture",
+    "Industry": "Information Technology",
+    "Symbol": "ACN"
+  },
+  {
+    "Company Name": "Adobe Inc.",
+    "Industry": "Information Technology",
+    "Symbol": "ADBE"
+  },
+  {
+    "Company Name": "Advanced Micro Devices",
+    "Industry": "Information Technology",
+    "Symbol": "AMD"
+  },
+  {
+    "Company Name": "AES Corporation",
+    "Industry": "Utilities",
+    "Symbol": "AES"
+  },
+  {
+    "Company Name": "Aflac",
+    "Industry": "Financials",
+    "Symbol": "AFL"
+  },
+  {
+    "Company Name": "Agilent Technologies",
+    "Industry": "Health Care",
+    "Symbol": "A"
+  },
+  {
+    "Company Name": "Air Products",
+    "Industry": "Materials",
+    "Symbol": "APD"
+  },
+  {
+    "Company Name": "Airbnb",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "ABNB"
+  },
+  {
+    "Company Name": "Akamai Technologies",
+    "Industry": "Information Technology",
+    "Symbol": "AKAM"
+  },
+  {
+    "Company Name": "Albemarle Corporation",
+    "Industry": "Materials",
+    "Symbol": "ALB"
+  },
+  {
+    "Company Name": "Alexandria Real Estate Equities",
+    "Industry": "Real Estate",
+    "Symbol": "ARE"
+  },
+  {
+    "Company Name": "Align Technology",
+    "Industry": "Health Care",
+    "Symbol": "ALGN"
+  },
+  {
+    "Company Name": "Allegion",
+    "Industry": "Industrials",
+    "Symbol": "ALLE"
+  },
+  {
+    "Company Name": "Alliant Energy",
+    "Industry": "Utilities",
+    "Symbol": "LNT"
+  },
+  {
+    "Company Name": "Allstate",
+    "Industry": "Financials",
+    "Symbol": "ALL"
+  },
+  {
+    "Company Name": "Alphabet Inc. (Class A)",
+    "Industry": "Communication Services",
+    "Symbol": "GOOGL"
+  },
+  {
+    "Company Name": "Alphabet Inc. (Class C)",
+    "Industry": "Communication Services",
+    "Symbol": "GOOG"
+  },
+  {
+    "Company Name": "Altria",
+    "Industry": "Consumer Staples",
+    "Symbol": "MO"
+  },
+  {
+    "Company Name": "Amazon",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "AMZN"
+  },
+  {
+    "Company Name": "Amcor",
+    "Industry": "Materials",
+    "Symbol": "AMCR"
+  },
+  {
+    "Company Name": "Ameren",
+    "Industry": "Utilities",
+    "Symbol": "AEE"
+  },
+  {
+    "Company Name": "American Electric Power",
+    "Industry": "Utilities",
+    "Symbol": "AEP"
+  },
+  {
+    "Company Name": "American Express",
+    "Industry": "Financials",
+    "Symbol": "AXP"
+  },
+  {
+    "Company Name": "American International Group",
+    "Industry": "Financials",
+    "Symbol": "AIG"
+  },
+  {
+    "Company Name": "American Tower",
+    "Industry": "Real Estate",
+    "Symbol": "AMT"
+  },
+  {
+    "Company Name": "American Water Works",
+    "Industry": "Utilities",
+    "Symbol": "AWK"
+  },
+  {
+    "Company Name": "Ameriprise Financial",
+    "Industry": "Financials",
+    "Symbol": "AMP"
+  },
+  {
+    "Company Name": "Ametek",
+    "Industry": "Industrials",
+    "Symbol": "AME"
+  },
+  {
+    "Company Name": "Amgen",
+    "Industry": "Health Care",
+    "Symbol": "AMGN"
+  },
+  {
+    "Company Name": "Amphenol",
+    "Industry": "Information Technology",
+    "Symbol": "APH"
+  },
+  {
+    "Company Name": "Analog Devices",
+    "Industry": "Information Technology",
+    "Symbol": "ADI"
+  },
+  {
+    "Company Name": "Aon plc",
+    "Industry": "Financials",
+    "Symbol": "AON"
+  },
+  {
+    "Company Name": "APA Corporation",
+    "Industry": "Energy",
+    "Symbol": "APA"
+  },
+  {
+    "Company Name": "AppLovin",
+    "Industry": "Information Technology",
+    "Symbol": "APP"
+  },
+  {
+    "Company Name": "Apollo Global Management",
+    "Industry": "Financials",
+    "Symbol": "APO"
+  },
+  {
+    "Company Name": "Apple Inc.",
+    "Industry": "Information Technology",
+    "Symbol": "AAPL"
+  },
+  {
+    "Company Name": "Applied Materials",
+    "Industry": "Information Technology",
+    "Symbol": "AMAT"
+  },
+  {
+    "Company Name": "Aptiv",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "APTV"
+  },
+  {
+    "Company Name": "Arch Capital Group",
+    "Industry": "Financials",
+    "Symbol": "ACGL"
+  },
+  {
+    "Company Name": "Archer Daniels Midland",
+    "Industry": "Consumer Staples",
+    "Symbol": "ADM"
+  },
+  {
+    "Company Name": "Arista Networks",
+    "Industry": "Information Technology",
+    "Symbol": "ANET"
+  },
+  {
+    "Company Name": "Arthur J. Gallagher & Co.",
+    "Industry": "Financials",
+    "Symbol": "AJG"
+  },
+  {
+    "Company Name": "Assurant",
+    "Industry": "Financials",
+    "Symbol": "AIZ"
+  },
+  {
+    "Company Name": "AT&T",
+    "Industry": "Communication Services",
+    "Symbol": "T"
+  },
+  {
+    "Company Name": "Atmos Energy",
+    "Industry": "Utilities",
+    "Symbol": "ATO"
+  },
+  {
+    "Company Name": "Autodesk",
+    "Industry": "Information Technology",
+    "Symbol": "ADSK"
+  },
+  {
+    "Company Name": "Automatic Data Processing",
+    "Industry": "Industrials",
+    "Symbol": "ADP"
+  },
+  {
+    "Company Name": "AutoZone",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "AZO"
+  },
+  {
+    "Company Name": "AvalonBay Communities",
+    "Industry": "Real Estate",
+    "Symbol": "AVB"
+  },
+  {
+    "Company Name": "Avery Dennison",
+    "Industry": "Materials",
+    "Symbol": "AVY"
+  },
+  {
+    "Company Name": "Axon Enterprise",
+    "Industry": "Industrials",
+    "Symbol": "AXON"
+  },
+  {
+    "Company Name": "Baker Hughes",
+    "Industry": "Energy",
+    "Symbol": "BKR"
+  },
+  {
+    "Company Name": "Ball Corporation",
+    "Industry": "Materials",
+    "Symbol": "BALL"
+  },
+  {
+    "Company Name": "Bank of America",
+    "Industry": "Financials",
+    "Symbol": "BAC"
+  },
+  {
+    "Company Name": "Baxter International",
+    "Industry": "Health Care",
+    "Symbol": "BAX"
+  },
+  {
+    "Company Name": "Becton Dickinson",
+    "Industry": "Health Care",
+    "Symbol": "BDX"
+  },
+  {
+    "Company Name": "Berkshire Hathaway",
+    "Industry": "Financials",
+    "Symbol": "BRK-B"
+  },
+  {
+    "Company Name": "Best Buy",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "BBY"
+  },
+  {
+    "Company Name": "Bio-Techne",
+    "Industry": "Health Care",
+    "Symbol": "TECH"
+  },
+  {
+    "Company Name": "Biogen",
+    "Industry": "Health Care",
+    "Symbol": "BIIB"
+  },
+  {
+    "Company Name": "BlackRock",
+    "Industry": "Financials",
+    "Symbol": "BLK"
+  },
+  {
+    "Company Name": "Blackstone Inc.",
+    "Industry": "Financials",
+    "Symbol": "BX"
+  },
+  {
+    "Company Name": "Block, Inc.",
+    "Industry": "Financials",
+    "Symbol": "XYZ"
+  },
+  {
+    "Company Name": "BNY Mellon",
+    "Industry": "Financials",
+    "Symbol": "BK"
+  },
+  {
+    "Company Name": "Boeing",
+    "Industry": "Industrials",
+    "Symbol": "BA"
+  },
+  {
+    "Company Name": "Booking Holdings",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "BKNG"
+  },
+  {
+    "Company Name": "Boston Scientific",
+    "Industry": "Health Care",
+    "Symbol": "BSX"
+  },
+  {
+    "Company Name": "Bristol Myers Squibb",
+    "Industry": "Health Care",
+    "Symbol": "BMY"
+  },
+  {
+    "Company Name": "Broadcom",
+    "Industry": "Information Technology",
+    "Symbol": "AVGO"
+  },
+  {
+    "Company Name": "Broadridge Financial Solutions",
+    "Industry": "Industrials",
+    "Symbol": "BR"
+  },
+  {
+    "Company Name": "Brown & Brown",
+    "Industry": "Financials",
+    "Symbol": "BRO"
+  },
+  {
+    "Company Name": "Brown\u2013Forman",
+    "Industry": "Consumer Staples",
+    "Symbol": "BF-B"
+  },
+  {
+    "Company Name": "Builders FirstSource",
+    "Industry": "Industrials",
+    "Symbol": "BLDR"
+  },
+  {
+    "Company Name": "Bunge Global",
+    "Industry": "Consumer Staples",
+    "Symbol": "BG"
+  },
+  {
+    "Company Name": "BXP, Inc.",
+    "Industry": "Real Estate",
+    "Symbol": "BXP"
+  },
+  {
+    "Company Name": "C.H. Robinson",
+    "Industry": "Industrials",
+    "Symbol": "CHRW"
+  },
+  {
+    "Company Name": "Cadence Design Systems",
+    "Industry": "Information Technology",
+    "Symbol": "CDNS"
+  },
+  {
+    "Company Name": "Camden Property Trust",
+    "Industry": "Real Estate",
+    "Symbol": "CPT"
+  },
+  {
+    "Company Name": "Campbell's Company (The)",
+    "Industry": "Consumer Staples",
+    "Symbol": "CPB"
+  },
+  {
+    "Company Name": "Capital One",
+    "Industry": "Financials",
+    "Symbol": "COF"
+  },
+  {
+    "Company Name": "Cardinal Health",
+    "Industry": "Health Care",
+    "Symbol": "CAH"
+  },
+  {
+    "Company Name": "CarMax",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "KMX"
+  },
+  {
+    "Company Name": "Carnival",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "CCL"
+  },
+  {
+    "Company Name": "Carrier Global",
+    "Industry": "Industrials",
+    "Symbol": "CARR"
+  },
+  {
+    "Company Name": "Caterpillar Inc.",
+    "Industry": "Industrials",
+    "Symbol": "CAT"
+  },
+  {
+    "Company Name": "Cboe Global Markets",
+    "Industry": "Financials",
+    "Symbol": "CBOE"
+  },
+  {
+    "Company Name": "CBRE Group",
+    "Industry": "Real Estate",
+    "Symbol": "CBRE"
+  },
+  {
+    "Company Name": "CDW Corporation",
+    "Industry": "Information Technology",
+    "Symbol": "CDW"
+  },
+  {
+    "Company Name": "Cencora",
+    "Industry": "Health Care",
+    "Symbol": "COR"
+  },
+  {
+    "Company Name": "Centene Corporation",
+    "Industry": "Health Care",
+    "Symbol": "CNC"
+  },
+  {
+    "Company Name": "CenterPoint Energy",
+    "Industry": "Utilities",
+    "Symbol": "CNP"
+  },
+  {
+    "Company Name": "CF Industries",
+    "Industry": "Materials",
+    "Symbol": "CF"
+  },
+  {
+    "Company Name": "Charles River Laboratories",
+    "Industry": "Health Care",
+    "Symbol": "CRL"
+  },
+  {
+    "Company Name": "Charles Schwab Corporation",
+    "Industry": "Financials",
+    "Symbol": "SCHW"
+  },
+  {
+    "Company Name": "Charter Communications",
+    "Industry": "Communication Services",
+    "Symbol": "CHTR"
+  },
+  {
+    "Company Name": "Chevron Corporation",
+    "Industry": "Energy",
+    "Symbol": "CVX"
+  },
+  {
+    "Company Name": "Chipotle Mexican Grill",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "CMG"
+  },
+  {
+    "Company Name": "Chubb Limited",
+    "Industry": "Financials",
+    "Symbol": "CB"
+  },
+  {
+    "Company Name": "Church & Dwight",
+    "Industry": "Consumer Staples",
+    "Symbol": "CHD"
+  },
+  {
+    "Company Name": "Cigna",
+    "Industry": "Health Care",
+    "Symbol": "CI"
+  },
+  {
+    "Company Name": "Cincinnati Financial",
+    "Industry": "Financials",
+    "Symbol": "CINF"
+  },
+  {
+    "Company Name": "Cintas",
+    "Industry": "Industrials",
+    "Symbol": "CTAS"
+  },
+  {
+    "Company Name": "Cisco",
+    "Industry": "Information Technology",
+    "Symbol": "CSCO"
+  },
+  {
+    "Company Name": "Citigroup",
+    "Industry": "Financials",
+    "Symbol": "C"
+  },
+  {
+    "Company Name": "Citizens Financial Group",
+    "Industry": "Financials",
+    "Symbol": "CFG"
+  },
+  {
+    "Company Name": "Clorox",
+    "Industry": "Consumer Staples",
+    "Symbol": "CLX"
+  },
+  {
+    "Company Name": "CME Group",
+    "Industry": "Financials",
+    "Symbol": "CME"
+  },
+  {
+    "Company Name": "CMS Energy",
+    "Industry": "Utilities",
+    "Symbol": "CMS"
+  },
+  {
+    "Company Name": "Coca-Cola Company (The)",
+    "Industry": "Consumer Staples",
+    "Symbol": "KO"
+  },
+  {
+    "Company Name": "Cognizant",
+    "Industry": "Information Technology",
+    "Symbol": "CTSH"
+  },
+  {
+    "Company Name": "Coinbase",
+    "Industry": "Financials",
+    "Symbol": "COIN"
+  },
+  {
+    "Company Name": "Colgate-Palmolive",
+    "Industry": "Consumer Staples",
+    "Symbol": "CL"
+  },
+  {
+    "Company Name": "Comcast",
+    "Industry": "Communication Services",
+    "Symbol": "CMCSA"
+  },
+  {
+    "Company Name": "Conagra Brands",
+    "Industry": "Consumer Staples",
+    "Symbol": "CAG"
+  },
+  {
+    "Company Name": "ConocoPhillips",
+    "Industry": "Energy",
+    "Symbol": "COP"
+  },
+  {
+    "Company Name": "Consolidated Edison",
+    "Industry": "Utilities",
+    "Symbol": "ED"
+  },
+  {
+    "Company Name": "Constellation Brands",
+    "Industry": "Consumer Staples",
+    "Symbol": "STZ"
+  },
+  {
+    "Company Name": "Constellation Energy",
+    "Industry": "Utilities",
+    "Symbol": "CEG"
+  },
+  {
+    "Company Name": "Cooper Companies (The)",
+    "Industry": "Health Care",
+    "Symbol": "COO"
+  },
+  {
+    "Company Name": "Copart",
+    "Industry": "Industrials",
+    "Symbol": "CPRT"
+  },
+  {
+    "Company Name": "Corning Inc.",
+    "Industry": "Information Technology",
+    "Symbol": "GLW"
+  },
+  {
+    "Company Name": "Corpay",
+    "Industry": "Financials",
+    "Symbol": "CPAY"
+  },
+  {
+    "Company Name": "Corteva",
+    "Industry": "Materials",
+    "Symbol": "CTVA"
+  },
+  {
+    "Company Name": "CoStar Group",
+    "Industry": "Real Estate",
+    "Symbol": "CSGP"
+  },
+  {
+    "Company Name": "Costco",
+    "Industry": "Consumer Staples",
+    "Symbol": "COST"
+  },
+  {
+    "Company Name": "Coterra",
+    "Industry": "Energy",
+    "Symbol": "CTRA"
+  },
+  {
+    "Company Name": "CrowdStrike",
+    "Industry": "Information Technology",
+    "Symbol": "CRWD"
+  },
+  {
+    "Company Name": "Crown Castle",
+    "Industry": "Real Estate",
+    "Symbol": "CCI"
+  },
+  {
+    "Company Name": "CSX Corporation",
+    "Industry": "Industrials",
+    "Symbol": "CSX"
+  },
+  {
+    "Company Name": "Cummins",
+    "Industry": "Industrials",
+    "Symbol": "CMI"
+  },
+  {
+    "Company Name": "CVS Health",
+    "Industry": "Health Care",
+    "Symbol": "CVS"
+  },
+  {
+    "Company Name": "Danaher Corporation",
+    "Industry": "Health Care",
+    "Symbol": "DHR"
+  },
+  {
+    "Company Name": "Darden Restaurants",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "DRI"
+  },
+  {
+    "Company Name": "Datadog",
+    "Industry": "Information Technology",
+    "Symbol": "DDOG"
+  },
+  {
+    "Company Name": "DaVita",
+    "Industry": "Health Care",
+    "Symbol": "DVA"
+  },
+  {
+    "Company Name": "Dayforce",
+    "Industry": "Industrials",
+    "Symbol": "DAY"
+  },
+  {
+    "Company Name": "Deckers Brands",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "DECK"
+  },
+  {
+    "Company Name": "Deere & Company",
+    "Industry": "Industrials",
+    "Symbol": "DE"
+  },
+  {
+    "Company Name": "Dell Technologies",
+    "Industry": "Information Technology",
+    "Symbol": "DELL"
+  },
+  {
+    "Company Name": "Delta Air Lines",
+    "Industry": "Industrials",
+    "Symbol": "DAL"
+  },
+  {
+    "Company Name": "Devon Energy",
+    "Industry": "Energy",
+    "Symbol": "DVN"
+  },
+  {
+    "Company Name": "Dexcom",
+    "Industry": "Health Care",
+    "Symbol": "DXCM"
+  },
+  {
+    "Company Name": "Diamondback Energy",
+    "Industry": "Energy",
+    "Symbol": "FANG"
+  },
+  {
+    "Company Name": "Digital Realty",
+    "Industry": "Real Estate",
+    "Symbol": "DLR"
+  },
+  {
+    "Company Name": "Dollar General",
+    "Industry": "Consumer Staples",
+    "Symbol": "DG"
+  },
+  {
+    "Company Name": "Dollar Tree",
+    "Industry": "Consumer Staples",
+    "Symbol": "DLTR"
+  },
+  {
+    "Company Name": "Dominion Energy",
+    "Industry": "Utilities",
+    "Symbol": "D"
+  },
+  {
+    "Company Name": "Domino's",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "DPZ"
+  },
+  {
+    "Company Name": "DoorDash",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "DASH"
+  },
+  {
+    "Company Name": "Dover Corporation",
+    "Industry": "Industrials",
+    "Symbol": "DOV"
+  },
+  {
+    "Company Name": "Dow Inc.",
+    "Industry": "Materials",
+    "Symbol": "DOW"
+  },
+  {
+    "Company Name": "D. R. Horton",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "DHI"
+  },
+  {
+    "Company Name": "DTE Energy",
+    "Industry": "Utilities",
+    "Symbol": "DTE"
+  },
+  {
+    "Company Name": "Duke Energy",
+    "Industry": "Utilities",
+    "Symbol": "DUK"
+  },
+  {
+    "Company Name": "DuPont",
+    "Industry": "Materials",
+    "Symbol": "DD"
+  },
+  {
+    "Company Name": "Eastman Chemical Company",
+    "Industry": "Materials",
+    "Symbol": "EMN"
+  },
+  {
+    "Company Name": "Eaton Corporation",
+    "Industry": "Industrials",
+    "Symbol": "ETN"
+  },
+  {
+    "Company Name": "eBay Inc.",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "EBAY"
+  },
+  {
+    "Company Name": "Ecolab",
+    "Industry": "Materials",
+    "Symbol": "ECL"
+  },
+  {
+    "Company Name": "Edison International",
+    "Industry": "Utilities",
+    "Symbol": "EIX"
+  },
+  {
+    "Company Name": "Edwards Lifesciences",
+    "Industry": "Health Care",
+    "Symbol": "EW"
+  },
+  {
+    "Company Name": "Electronic Arts",
+    "Industry": "Communication Services",
+    "Symbol": "EA"
+  },
+  {
+    "Company Name": "Elevance Health",
+    "Industry": "Health Care",
+    "Symbol": "ELV"
+  },
+  {
+    "Company Name": "Emcor",
+    "Industry": "Industrials",
+    "Symbol": "EME"
+  },
+  {
+    "Company Name": "Emerson Electric",
+    "Industry": "Industrials",
+    "Symbol": "EMR"
+  },
+  {
+    "Company Name": "Entergy",
+    "Industry": "Utilities",
+    "Symbol": "ETR"
+  },
+  {
+    "Company Name": "EOG Resources",
+    "Industry": "Energy",
+    "Symbol": "EOG"
+  },
+  {
+    "Company Name": "EPAM Systems",
+    "Industry": "Information Technology",
+    "Symbol": "EPAM"
+  },
+  {
+    "Company Name": "EQT Corporation",
+    "Industry": "Energy",
+    "Symbol": "EQT"
+  },
+  {
+    "Company Name": "Equifax",
+    "Industry": "Industrials",
+    "Symbol": "EFX"
+  },
+  {
+    "Company Name": "Equinix",
+    "Industry": "Real Estate",
+    "Symbol": "EQIX"
+  },
+  {
+    "Company Name": "Equity Residential",
+    "Industry": "Real Estate",
+    "Symbol": "EQR"
+  },
+  {
+    "Company Name": "Erie Indemnity",
+    "Industry": "Financials",
+    "Symbol": "ERIE"
+  },
+  {
+    "Company Name": "Essex Property Trust",
+    "Industry": "Real Estate",
+    "Symbol": "ESS"
+  },
+  {
+    "Company Name": "Est\u00e9e Lauder Companies (The)",
+    "Industry": "Consumer Staples",
+    "Symbol": "EL"
+  },
+  {
+    "Company Name": "Everest Group",
+    "Industry": "Financials",
+    "Symbol": "EG"
+  },
+  {
+    "Company Name": "Evergy",
+    "Industry": "Utilities",
+    "Symbol": "EVRG"
+  },
+  {
+    "Company Name": "Eversource Energy",
+    "Industry": "Utilities",
+    "Symbol": "ES"
+  },
+  {
+    "Company Name": "Exelon",
+    "Industry": "Utilities",
+    "Symbol": "EXC"
+  },
+  {
+    "Company Name": "Expand Energy",
+    "Industry": "Energy",
+    "Symbol": "EXE"
+  },
+  {
+    "Company Name": "Expedia Group",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "EXPE"
+  },
+  {
+    "Company Name": "Expeditors International",
+    "Industry": "Industrials",
+    "Symbol": "EXPD"
+  },
+  {
+    "Company Name": "Extra Space Storage",
+    "Industry": "Real Estate",
+    "Symbol": "EXR"
+  },
+  {
+    "Company Name": "ExxonMobil",
+    "Industry": "Energy",
+    "Symbol": "XOM"
+  },
+  {
+    "Company Name": "F5, Inc.",
+    "Industry": "Information Technology",
+    "Symbol": "FFIV"
+  },
+  {
+    "Company Name": "FactSet",
+    "Industry": "Financials",
+    "Symbol": "FDS"
+  },
+  {
+    "Company Name": "Fair Isaac",
+    "Industry": "Information Technology",
+    "Symbol": "FICO"
+  },
+  {
+    "Company Name": "Fastenal",
+    "Industry": "Industrials",
+    "Symbol": "FAST"
+  },
+  {
+    "Company Name": "Federal Realty Investment Trust",
+    "Industry": "Real Estate",
+    "Symbol": "FRT"
+  },
+  {
+    "Company Name": "FedEx",
+    "Industry": "Industrials",
+    "Symbol": "FDX"
+  },
+  {
+    "Company Name": "Fidelity National Information Services",
+    "Industry": "Financials",
+    "Symbol": "FIS"
+  },
+  {
+    "Company Name": "Fifth Third Bancorp",
+    "Industry": "Financials",
+    "Symbol": "FITB"
+  },
+  {
+    "Company Name": "First Solar",
+    "Industry": "Information Technology",
+    "Symbol": "FSLR"
+  },
+  {
+    "Company Name": "FirstEnergy",
+    "Industry": "Utilities",
+    "Symbol": "FE"
+  },
+  {
+    "Company Name": "Fiserv",
+    "Industry": "Financials",
+    "Symbol": "FI"
+  },
+  {
+    "Company Name": "Ford Motor Company",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "F"
+  },
+  {
+    "Company Name": "Fortinet",
+    "Industry": "Information Technology",
+    "Symbol": "FTNT"
+  },
+  {
+    "Company Name": "Fortive",
+    "Industry": "Industrials",
+    "Symbol": "FTV"
+  },
+  {
+    "Company Name": "Fox Corporation (Class A)",
+    "Industry": "Communication Services",
+    "Symbol": "FOXA"
+  },
+  {
+    "Company Name": "Fox Corporation (Class B)",
+    "Industry": "Communication Services",
+    "Symbol": "FOX"
+  },
+  {
+    "Company Name": "Franklin Resources",
+    "Industry": "Financials",
+    "Symbol": "BEN"
+  },
+  {
+    "Company Name": "Freeport-McMoRan",
+    "Industry": "Materials",
+    "Symbol": "FCX"
+  },
+  {
+    "Company Name": "Garmin",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "GRMN"
+  },
+  {
+    "Company Name": "Gartner",
+    "Industry": "Information Technology",
+    "Symbol": "IT"
+  },
+  {
+    "Company Name": "GE Aerospace",
+    "Industry": "Industrials",
+    "Symbol": "GE"
+  },
+  {
+    "Company Name": "GE HealthCare",
+    "Industry": "Health Care",
+    "Symbol": "GEHC"
+  },
+  {
+    "Company Name": "GE Vernova",
+    "Industry": "Industrials",
+    "Symbol": "GEV"
+  },
+  {
+    "Company Name": "Gen Digital",
+    "Industry": "Information Technology",
+    "Symbol": "GEN"
+  },
+  {
+    "Company Name": "Generac",
+    "Industry": "Industrials",
+    "Symbol": "GNRC"
+  },
+  {
+    "Company Name": "General Dynamics",
+    "Industry": "Industrials",
+    "Symbol": "GD"
+  },
+  {
+    "Company Name": "General Mills",
+    "Industry": "Consumer Staples",
+    "Symbol": "GIS"
+  },
+  {
+    "Company Name": "General Motors",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "GM"
+  },
+  {
+    "Company Name": "Genuine Parts Company",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "GPC"
+  },
+  {
+    "Company Name": "Gilead Sciences",
+    "Industry": "Health Care",
+    "Symbol": "GILD"
+  },
+  {
+    "Company Name": "Global Payments",
+    "Industry": "Financials",
+    "Symbol": "GPN"
+  },
+  {
+    "Company Name": "Globe Life",
+    "Industry": "Financials",
+    "Symbol": "GL"
+  },
+  {
+    "Company Name": "GoDaddy",
+    "Industry": "Information Technology",
+    "Symbol": "GDDY"
+  },
+  {
+    "Company Name": "Goldman Sachs",
+    "Industry": "Financials",
+    "Symbol": "GS"
+  },
+  {
+    "Company Name": "Halliburton",
+    "Industry": "Energy",
+    "Symbol": "HAL"
+  },
+  {
+    "Company Name": "Hartford (The)",
+    "Industry": "Financials",
+    "Symbol": "HIG"
+  },
+  {
+    "Company Name": "Hasbro",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "HAS"
+  },
+  {
+    "Company Name": "HCA Healthcare",
+    "Industry": "Health Care",
+    "Symbol": "HCA"
+  },
+  {
+    "Company Name": "Healthpeak Properties",
+    "Industry": "Real Estate",
+    "Symbol": "DOC"
+  },
+  {
+    "Company Name": "Henry Schein",
+    "Industry": "Health Care",
+    "Symbol": "HSIC"
+  },
+  {
+    "Company Name": "Hershey Company (The)",
+    "Industry": "Consumer Staples",
+    "Symbol": "HSY"
+  },
+  {
+    "Company Name": "Hewlett Packard Enterprise",
+    "Industry": "Information Technology",
+    "Symbol": "HPE"
+  },
+  {
+    "Company Name": "Hilton Worldwide",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "HLT"
+  },
+  {
+    "Company Name": "Hologic",
+    "Industry": "Health Care",
+    "Symbol": "HOLX"
+  },
+  {
+    "Company Name": "Home Depot (The)",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "HD"
+  },
+  {
+    "Company Name": "Honeywell",
+    "Industry": "Industrials",
+    "Symbol": "HON"
+  },
+  {
+    "Company Name": "Hormel Foods",
+    "Industry": "Consumer Staples",
+    "Symbol": "HRL"
+  },
+  {
+    "Company Name": "Host Hotels & Resorts",
+    "Industry": "Real Estate",
+    "Symbol": "HST"
+  },
+  {
+    "Company Name": "Howmet Aerospace",
+    "Industry": "Industrials",
+    "Symbol": "HWM"
+  },
+  {
+    "Company Name": "HP Inc.",
+    "Industry": "Information Technology",
+    "Symbol": "HPQ"
+  },
+  {
+    "Company Name": "Hubbell Incorporated",
+    "Industry": "Industrials",
+    "Symbol": "HUBB"
+  },
+  {
+    "Company Name": "Humana",
+    "Industry": "Health Care",
+    "Symbol": "HUM"
+  },
+  {
+    "Company Name": "Huntington Bancshares",
+    "Industry": "Financials",
+    "Symbol": "HBAN"
+  },
+  {
+    "Company Name": "Huntington Ingalls Industries",
+    "Industry": "Industrials",
+    "Symbol": "HII"
+  },
+  {
+    "Company Name": "IBM",
+    "Industry": "Information Technology",
+    "Symbol": "IBM"
+  },
+  {
+    "Company Name": "IDEX Corporation",
+    "Industry": "Industrials",
+    "Symbol": "IEX"
+  },
+  {
+    "Company Name": "Idexx Laboratories",
+    "Industry": "Health Care",
+    "Symbol": "IDXX"
+  },
+  {
+    "Company Name": "Illinois Tool Works",
+    "Industry": "Industrials",
+    "Symbol": "ITW"
+  },
+  {
+    "Company Name": "Incyte",
+    "Industry": "Health Care",
+    "Symbol": "INCY"
+  },
+  {
+    "Company Name": "Ingersoll Rand",
+    "Industry": "Industrials",
+    "Symbol": "IR"
+  },
+  {
+    "Company Name": "Insulet Corporation",
+    "Industry": "Health Care",
+    "Symbol": "PODD"
+  },
+  {
+    "Company Name": "Intel",
+    "Industry": "Information Technology",
+    "Symbol": "INTC"
+  },
+  {
+    "Company Name": "Interactive Brokers",
+    "Industry": "Financials",
+    "Symbol": "IBKR"
+  },
+  {
+    "Company Name": "Intercontinental Exchange",
+    "Industry": "Financials",
+    "Symbol": "ICE"
+  },
+  {
+    "Company Name": "International Flavors & Fragrances",
+    "Industry": "Materials",
+    "Symbol": "IFF"
+  },
+  {
+    "Company Name": "International Paper",
+    "Industry": "Materials",
+    "Symbol": "IP"
+  },
+  {
+    "Company Name": "Intuit",
+    "Industry": "Information Technology",
+    "Symbol": "INTU"
+  },
+  {
+    "Company Name": "Intuitive Surgical",
+    "Industry": "Health Care",
+    "Symbol": "ISRG"
+  },
+  {
+    "Company Name": "Invesco",
+    "Industry": "Financials",
+    "Symbol": "IVZ"
+  },
+  {
+    "Company Name": "Invitation Homes",
+    "Industry": "Real Estate",
+    "Symbol": "INVH"
+  },
+  {
+    "Company Name": "IQVIA",
+    "Industry": "Health Care",
+    "Symbol": "IQV"
+  },
+  {
+    "Company Name": "Iron Mountain",
+    "Industry": "Real Estate",
+    "Symbol": "IRM"
+  },
+  {
+    "Company Name": "J.B. Hunt",
+    "Industry": "Industrials",
+    "Symbol": "JBHT"
+  },
+  {
+    "Company Name": "Jabil",
+    "Industry": "Information Technology",
+    "Symbol": "JBL"
+  },
+  {
+    "Company Name": "Jack Henry & Associates",
+    "Industry": "Financials",
+    "Symbol": "JKHY"
+  },
+  {
+    "Company Name": "Jacobs Solutions",
+    "Industry": "Industrials",
+    "Symbol": "J"
+  },
+  {
+    "Company Name": "Johnson & Johnson",
+    "Industry": "Health Care",
+    "Symbol": "JNJ"
+  },
+  {
+    "Company Name": "Johnson Controls",
+    "Industry": "Industrials",
+    "Symbol": "JCI"
+  },
+  {
+    "Company Name": "JPMorgan Chase",
+    "Industry": "Financials",
+    "Symbol": "JPM"
+  },
+  {
+    "Company Name": "Kellanova",
+    "Industry": "Consumer Staples",
+    "Symbol": "K"
+  },
+  {
+    "Company Name": "Kenvue",
+    "Industry": "Consumer Staples",
+    "Symbol": "KVUE"
+  },
+  {
+    "Company Name": "Keurig Dr Pepper",
+    "Industry": "Consumer Staples",
+    "Symbol": "KDP"
+  },
+  {
+    "Company Name": "KeyCorp",
+    "Industry": "Financials",
+    "Symbol": "KEY"
+  },
+  {
+    "Company Name": "Keysight Technologies",
+    "Industry": "Information Technology",
+    "Symbol": "KEYS"
+  },
+  {
+    "Company Name": "Kimberly-Clark",
+    "Industry": "Consumer Staples",
+    "Symbol": "KMB"
+  },
+  {
+    "Company Name": "Kimco Realty",
+    "Industry": "Real Estate",
+    "Symbol": "KIM"
+  },
+  {
+    "Company Name": "Kinder Morgan",
+    "Industry": "Energy",
+    "Symbol": "KMI"
+  },
+  {
+    "Company Name": "KKR & Co.",
+    "Industry": "Financials",
+    "Symbol": "KKR"
+  },
+  {
+    "Company Name": "KLA Corporation",
+    "Industry": "Information Technology",
+    "Symbol": "KLAC"
+  },
+  {
+    "Company Name": "Kraft Heinz",
+    "Industry": "Consumer Staples",
+    "Symbol": "KHC"
+  },
+  {
+    "Company Name": "Kroger",
+    "Industry": "Consumer Staples",
+    "Symbol": "KR"
+  },
+  {
+    "Company Name": "L3Harris",
+    "Industry": "Industrials",
+    "Symbol": "LHX"
+  },
+  {
+    "Company Name": "Labcorp",
+    "Industry": "Health Care",
+    "Symbol": "LH"
+  },
+  {
+    "Company Name": "Lam Research",
+    "Industry": "Information Technology",
+    "Symbol": "LRCX"
+  },
+  {
+    "Company Name": "Lamb Weston",
+    "Industry": "Consumer Staples",
+    "Symbol": "LW"
+  },
+  {
+    "Company Name": "Las Vegas Sands",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "LVS"
+  },
+  {
+    "Company Name": "Leidos",
+    "Industry": "Industrials",
+    "Symbol": "LDOS"
+  },
+  {
+    "Company Name": "Lennar",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "LEN"
+  },
+  {
+    "Company Name": "Lennox International",
+    "Industry": "Industrials",
+    "Symbol": "LII"
+  },
+  {
+    "Company Name": "Lilly (Eli)",
+    "Industry": "Health Care",
+    "Symbol": "LLY"
+  },
+  {
+    "Company Name": "Linde plc",
+    "Industry": "Materials",
+    "Symbol": "LIN"
+  },
+  {
+    "Company Name": "Live Nation Entertainment",
+    "Industry": "Communication Services",
+    "Symbol": "LYV"
+  },
+  {
+    "Company Name": "LKQ Corporation",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "LKQ"
+  },
+  {
+    "Company Name": "Lockheed Martin",
+    "Industry": "Industrials",
+    "Symbol": "LMT"
+  },
+  {
+    "Company Name": "Loews Corporation",
+    "Industry": "Financials",
+    "Symbol": "L"
+  },
+  {
+    "Company Name": "Lowe's",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "LOW"
+  },
+  {
+    "Company Name": "Lululemon Athletica",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "LULU"
+  },
+  {
+    "Company Name": "LyondellBasell",
+    "Industry": "Materials",
+    "Symbol": "LYB"
+  },
+  {
+    "Company Name": "M&T Bank",
+    "Industry": "Financials",
+    "Symbol": "MTB"
+  },
+  {
+    "Company Name": "Marathon Petroleum",
+    "Industry": "Energy",
+    "Symbol": "MPC"
+  },
+  {
+    "Company Name": "Marriott International",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "MAR"
+  },
+  {
+    "Company Name": "Marsh McLennan",
+    "Industry": "Financials",
+    "Symbol": "MMC"
+  },
+  {
+    "Company Name": "Martin Marietta Materials",
+    "Industry": "Materials",
+    "Symbol": "MLM"
+  },
+  {
+    "Company Name": "Masco",
+    "Industry": "Industrials",
+    "Symbol": "MAS"
+  },
+  {
+    "Company Name": "Mastercard",
+    "Industry": "Financials",
+    "Symbol": "MA"
+  },
+  {
+    "Company Name": "Match Group",
+    "Industry": "Communication Services",
+    "Symbol": "MTCH"
+  },
+  {
+    "Company Name": "McCormick & Company",
+    "Industry": "Consumer Staples",
+    "Symbol": "MKC"
+  },
+  {
+    "Company Name": "McDonald's",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "MCD"
+  },
+  {
+    "Company Name": "McKesson Corporation",
+    "Industry": "Health Care",
+    "Symbol": "MCK"
+  },
+  {
+    "Company Name": "Medtronic",
+    "Industry": "Health Care",
+    "Symbol": "MDT"
+  },
+  {
+    "Company Name": "Merck & Co.",
+    "Industry": "Health Care",
+    "Symbol": "MRK"
+  },
+  {
+    "Company Name": "Meta Platforms",
+    "Industry": "Communication Services",
+    "Symbol": "META"
+  },
+  {
+    "Company Name": "MetLife",
+    "Industry": "Financials",
+    "Symbol": "MET"
+  },
+  {
+    "Company Name": "Mettler Toledo",
+    "Industry": "Health Care",
+    "Symbol": "MTD"
+  },
+  {
+    "Company Name": "MGM Resorts",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "MGM"
+  },
+  {
+    "Company Name": "Microchip Technology",
+    "Industry": "Information Technology",
+    "Symbol": "MCHP"
+  },
+  {
+    "Company Name": "Micron Technology",
+    "Industry": "Information Technology",
+    "Symbol": "MU"
+  },
+  {
+    "Company Name": "Microsoft",
+    "Industry": "Information Technology",
+    "Symbol": "MSFT"
+  },
+  {
+    "Company Name": "Mid-America Apartment Communities",
+    "Industry": "Real Estate",
+    "Symbol": "MAA"
+  },
+  {
+    "Company Name": "Moderna",
+    "Industry": "Health Care",
+    "Symbol": "MRNA"
+  },
+  {
+    "Company Name": "Mohawk Industries",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "MHK"
+  },
+  {
+    "Company Name": "Molina Healthcare",
+    "Industry": "Health Care",
+    "Symbol": "MOH"
+  },
+  {
+    "Company Name": "Molson Coors Beverage Company",
+    "Industry": "Consumer Staples",
+    "Symbol": "TAP"
+  },
+  {
+    "Company Name": "Mondelez International",
+    "Industry": "Consumer Staples",
+    "Symbol": "MDLZ"
+  },
+  {
+    "Company Name": "Monolithic Power Systems",
+    "Industry": "Information Technology",
+    "Symbol": "MPWR"
+  },
+  {
+    "Company Name": "Monster Beverage",
+    "Industry": "Consumer Staples",
+    "Symbol": "MNST"
+  },
+  {
+    "Company Name": "Moody's Corporation",
+    "Industry": "Financials",
+    "Symbol": "MCO"
+  },
+  {
+    "Company Name": "Morgan Stanley",
+    "Industry": "Financials",
+    "Symbol": "MS"
+  },
+  {
+    "Company Name": "Mosaic Company (The)",
+    "Industry": "Materials",
+    "Symbol": "MOS"
+  },
+  {
+    "Company Name": "Motorola Solutions",
+    "Industry": "Information Technology",
+    "Symbol": "MSI"
+  },
+  {
+    "Company Name": "MSCI Inc.",
+    "Industry": "Financials",
+    "Symbol": "MSCI"
+  },
+  {
+    "Company Name": "Nasdaq, Inc.",
+    "Industry": "Financials",
+    "Symbol": "NDAQ"
+  },
+  {
+    "Company Name": "NetApp",
+    "Industry": "Information Technology",
+    "Symbol": "NTAP"
+  },
+  {
+    "Company Name": "Netflix",
+    "Industry": "Communication Services",
+    "Symbol": "NFLX"
+  },
+  {
+    "Company Name": "Newmont",
+    "Industry": "Materials",
+    "Symbol": "NEM"
+  },
+  {
+    "Company Name": "News Corp (Class A)",
+    "Industry": "Communication Services",
+    "Symbol": "NWSA"
+  },
+  {
+    "Company Name": "News Corp (Class B)",
+    "Industry": "Communication Services",
+    "Symbol": "NWS"
+  },
+  {
+    "Company Name": "NextEra Energy",
+    "Industry": "Utilities",
+    "Symbol": "NEE"
+  },
+  {
+    "Company Name": "Nike, Inc.",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "NKE"
+  },
+  {
+    "Company Name": "NiSource",
+    "Industry": "Utilities",
+    "Symbol": "NI"
+  },
+  {
+    "Company Name": "Nordson Corporation",
+    "Industry": "Industrials",
+    "Symbol": "NDSN"
+  },
+  {
+    "Company Name": "Norfolk Southern",
+    "Industry": "Industrials",
+    "Symbol": "NSC"
+  },
+  {
+    "Company Name": "Northern Trust",
+    "Industry": "Financials",
+    "Symbol": "NTRS"
+  },
+  {
+    "Company Name": "Northrop Grumman",
+    "Industry": "Industrials",
+    "Symbol": "NOC"
+  },
+  {
+    "Company Name": "Norwegian Cruise Line Holdings",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "NCLH"
+  },
+  {
+    "Company Name": "NRG Energy",
+    "Industry": "Utilities",
+    "Symbol": "NRG"
+  },
+  {
+    "Company Name": "Nucor",
+    "Industry": "Materials",
+    "Symbol": "NUE"
+  },
+  {
+    "Company Name": "Nvidia",
+    "Industry": "Information Technology",
+    "Symbol": "NVDA"
+  },
+  {
+    "Company Name": "NVR, Inc.",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "NVR"
+  },
+  {
+    "Company Name": "NXP Semiconductors",
+    "Industry": "Information Technology",
+    "Symbol": "NXPI"
+  },
+  {
+    "Company Name": "O\u2019Reilly Automotive",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "ORLY"
+  },
+  {
+    "Company Name": "Occidental Petroleum",
+    "Industry": "Energy",
+    "Symbol": "OXY"
+  },
+  {
+    "Company Name": "Old Dominion",
+    "Industry": "Industrials",
+    "Symbol": "ODFL"
+  },
+  {
+    "Company Name": "Omnicom Group",
+    "Industry": "Communication Services",
+    "Symbol": "OMC"
+  },
+  {
+    "Company Name": "ON Semiconductor",
+    "Industry": "Information Technology",
+    "Symbol": "ON"
+  },
+  {
+    "Company Name": "Oneok",
+    "Industry": "Energy",
+    "Symbol": "OKE"
+  },
+  {
+    "Company Name": "Oracle Corporation",
+    "Industry": "Information Technology",
+    "Symbol": "ORCL"
+  },
+  {
+    "Company Name": "Otis Worldwide",
+    "Industry": "Industrials",
+    "Symbol": "OTIS"
+  },
+  {
+    "Company Name": "Paccar",
+    "Industry": "Industrials",
+    "Symbol": "PCAR"
+  },
+  {
+    "Company Name": "Packaging Corporation of America",
+    "Industry": "Materials",
+    "Symbol": "PKG"
+  },
+  {
+    "Company Name": "Palantir Technologies",
+    "Industry": "Information Technology",
+    "Symbol": "PLTR"
+  },
+  {
+    "Company Name": "Palo Alto Networks",
+    "Industry": "Information Technology",
+    "Symbol": "PANW"
+  },
+  {
+    "Company Name": "Paramount Skydance Corporation",
+    "Industry": "Communication Services",
+    "Symbol": "PSKY"
+  },
+  {
+    "Company Name": "Parker Hannifin",
+    "Industry": "Industrials",
+    "Symbol": "PH"
+  },
+  {
+    "Company Name": "Paychex",
+    "Industry": "Industrials",
+    "Symbol": "PAYX"
+  },
+  {
+    "Company Name": "Paycom",
+    "Industry": "Industrials",
+    "Symbol": "PAYC"
+  },
+  {
+    "Company Name": "PayPal",
+    "Industry": "Financials",
+    "Symbol": "PYPL"
+  },
+  {
+    "Company Name": "Pentair",
+    "Industry": "Industrials",
+    "Symbol": "PNR"
+  },
+  {
+    "Company Name": "PepsiCo",
+    "Industry": "Consumer Staples",
+    "Symbol": "PEP"
+  },
+  {
+    "Company Name": "Pfizer",
+    "Industry": "Health Care",
+    "Symbol": "PFE"
+  },
+  {
+    "Company Name": "PG&E Corporation",
+    "Industry": "Utilities",
+    "Symbol": "PCG"
+  },
+  {
+    "Company Name": "Philip Morris International",
+    "Industry": "Consumer Staples",
+    "Symbol": "PM"
+  },
+  {
+    "Company Name": "Phillips 66",
+    "Industry": "Energy",
+    "Symbol": "PSX"
+  },
+  {
+    "Company Name": "Pinnacle West Capital",
+    "Industry": "Utilities",
+    "Symbol": "PNW"
+  },
+  {
+    "Company Name": "PNC Financial Services",
+    "Industry": "Financials",
+    "Symbol": "PNC"
+  },
+  {
+    "Company Name": "Pool Corporation",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "POOL"
+  },
+  {
+    "Company Name": "PPG Industries",
+    "Industry": "Materials",
+    "Symbol": "PPG"
+  },
+  {
+    "Company Name": "PPL Corporation",
+    "Industry": "Utilities",
+    "Symbol": "PPL"
+  },
+  {
+    "Company Name": "Principal Financial Group",
+    "Industry": "Financials",
+    "Symbol": "PFG"
+  },
+  {
+    "Company Name": "Procter & Gamble",
+    "Industry": "Consumer Staples",
+    "Symbol": "PG"
+  },
+  {
+    "Company Name": "Progressive Corporation",
+    "Industry": "Financials",
+    "Symbol": "PGR"
+  },
+  {
+    "Company Name": "Prologis",
+    "Industry": "Real Estate",
+    "Symbol": "PLD"
+  },
+  {
+    "Company Name": "Prudential Financial",
+    "Industry": "Financials",
+    "Symbol": "PRU"
+  },
+  {
+    "Company Name": "Public Service Enterprise Group",
+    "Industry": "Utilities",
+    "Symbol": "PEG"
+  },
+  {
+    "Company Name": "PTC Inc.",
+    "Industry": "Information Technology",
+    "Symbol": "PTC"
+  },
+  {
+    "Company Name": "Public Storage",
+    "Industry": "Real Estate",
+    "Symbol": "PSA"
+  },
+  {
+    "Company Name": "PulteGroup",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "PHM"
+  },
+  {
+    "Company Name": "Quanta Services",
+    "Industry": "Industrials",
+    "Symbol": "PWR"
+  },
+  {
+    "Company Name": "Qualcomm",
+    "Industry": "Information Technology",
+    "Symbol": "QCOM"
+  },
+  {
+    "Company Name": "Quest Diagnostics",
+    "Industry": "Health Care",
+    "Symbol": "DGX"
+  },
+  {
+    "Company Name": "Ralph Lauren Corporation",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "RL"
+  },
+  {
+    "Company Name": "Raymond James Financial",
+    "Industry": "Financials",
+    "Symbol": "RJF"
+  },
+  {
+    "Company Name": "RTX Corporation",
+    "Industry": "Industrials",
+    "Symbol": "RTX"
+  },
+  {
+    "Company Name": "Realty Income",
+    "Industry": "Real Estate",
+    "Symbol": "O"
+  },
+  {
+    "Company Name": "Regency Centers",
+    "Industry": "Real Estate",
+    "Symbol": "REG"
+  },
+  {
+    "Company Name": "Regeneron Pharmaceuticals",
+    "Industry": "Health Care",
+    "Symbol": "REGN"
+  },
+  {
+    "Company Name": "Regions Financial Corporation",
+    "Industry": "Financials",
+    "Symbol": "RF"
+  },
+  {
+    "Company Name": "Republic Services",
+    "Industry": "Industrials",
+    "Symbol": "RSG"
+  },
+  {
+    "Company Name": "ResMed",
+    "Industry": "Health Care",
+    "Symbol": "RMD"
+  },
+  {
+    "Company Name": "Revvity",
+    "Industry": "Health Care",
+    "Symbol": "RVTY"
+  },
+  {
+    "Company Name": "Robinhood Markets",
+    "Industry": "Financials",
+    "Symbol": "HOOD"
+  },
+  {
+    "Company Name": "Rockwell Automation",
+    "Industry": "Industrials",
+    "Symbol": "ROK"
+  },
+  {
+    "Company Name": "Rollins, Inc.",
+    "Industry": "Industrials",
+    "Symbol": "ROL"
+  },
+  {
+    "Company Name": "Roper Technologies",
+    "Industry": "Information Technology",
+    "Symbol": "ROP"
+  },
+  {
+    "Company Name": "Ross Stores",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "ROST"
+  },
+  {
+    "Company Name": "Royal Caribbean Group",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "RCL"
+  },
+  {
+    "Company Name": "S&P Global",
+    "Industry": "Financials",
+    "Symbol": "SPGI"
+  },
+  {
+    "Company Name": "Salesforce",
+    "Industry": "Information Technology",
+    "Symbol": "CRM"
+  },
+  {
+    "Company Name": "SBA Communications",
+    "Industry": "Real Estate",
+    "Symbol": "SBAC"
+  },
+  {
+    "Company Name": "Schlumberger",
+    "Industry": "Energy",
+    "Symbol": "SLB"
+  },
+  {
+    "Company Name": "Seagate Technology",
+    "Industry": "Information Technology",
+    "Symbol": "STX"
+  },
+  {
+    "Company Name": "Sempra",
+    "Industry": "Utilities",
+    "Symbol": "SRE"
+  },
+  {
+    "Company Name": "ServiceNow",
+    "Industry": "Information Technology",
+    "Symbol": "NOW"
+  },
+  {
+    "Company Name": "Sherwin-Williams",
+    "Industry": "Materials",
+    "Symbol": "SHW"
+  },
+  {
+    "Company Name": "Simon Property Group",
+    "Industry": "Real Estate",
+    "Symbol": "SPG"
+  },
+  {
+    "Company Name": "Skyworks Solutions",
+    "Industry": "Information Technology",
+    "Symbol": "SWKS"
+  },
+  {
+    "Company Name": "J.M. Smucker Company (The)",
+    "Industry": "Consumer Staples",
+    "Symbol": "SJM"
+  },
+  {
+    "Company Name": "Smurfit Westrock",
+    "Industry": "Materials",
+    "Symbol": "SW"
+  },
+  {
+    "Company Name": "Snap-on",
+    "Industry": "Industrials",
+    "Symbol": "SNA"
+  },
+  {
+    "Company Name": "Solventum",
+    "Industry": "Health Care",
+    "Symbol": "SOLV"
+  },
+  {
+    "Company Name": "Southern Company",
+    "Industry": "Utilities",
+    "Symbol": "SO"
+  },
+  {
+    "Company Name": "Southwest Airlines",
+    "Industry": "Industrials",
+    "Symbol": "LUV"
+  },
+  {
+    "Company Name": "Stanley Black & Decker",
+    "Industry": "Industrials",
+    "Symbol": "SWK"
+  },
+  {
+    "Company Name": "Starbucks",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "SBUX"
+  },
+  {
+    "Company Name": "State Street Corporation",
+    "Industry": "Financials",
+    "Symbol": "STT"
+  },
+  {
+    "Company Name": "Steel Dynamics",
+    "Industry": "Materials",
+    "Symbol": "STLD"
+  },
+  {
+    "Company Name": "Steris",
+    "Industry": "Health Care",
+    "Symbol": "STE"
+  },
+  {
+    "Company Name": "Stryker Corporation",
+    "Industry": "Health Care",
+    "Symbol": "SYK"
+  },
+  {
+    "Company Name": "Supermicro",
+    "Industry": "Information Technology",
+    "Symbol": "SMCI"
+  },
+  {
+    "Company Name": "Synchrony Financial",
+    "Industry": "Financials",
+    "Symbol": "SYF"
+  },
+  {
+    "Company Name": "Synopsys",
+    "Industry": "Information Technology",
+    "Symbol": "SNPS"
+  },
+  {
+    "Company Name": "Sysco",
+    "Industry": "Consumer Staples",
+    "Symbol": "SYY"
+  },
+  {
+    "Company Name": "T-Mobile US",
+    "Industry": "Communication Services",
+    "Symbol": "TMUS"
+  },
+  {
+    "Company Name": "T. Rowe Price",
+    "Industry": "Financials",
+    "Symbol": "TROW"
+  },
+  {
+    "Company Name": "Take-Two Interactive",
+    "Industry": "Communication Services",
+    "Symbol": "TTWO"
+  },
+  {
+    "Company Name": "Tapestry, Inc.",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "TPR"
+  },
+  {
+    "Company Name": "Targa Resources",
+    "Industry": "Energy",
+    "Symbol": "TRGP"
+  },
+  {
+    "Company Name": "Target Corporation",
+    "Industry": "Consumer Staples",
+    "Symbol": "TGT"
+  },
+  {
+    "Company Name": "TE Connectivity",
+    "Industry": "Information Technology",
+    "Symbol": "TEL"
+  },
+  {
+    "Company Name": "Teledyne Technologies",
+    "Industry": "Information Technology",
+    "Symbol": "TDY"
+  },
+  {
+    "Company Name": "Teradyne",
+    "Industry": "Information Technology",
+    "Symbol": "TER"
+  },
+  {
+    "Company Name": "Tesla, Inc.",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "TSLA"
+  },
+  {
+    "Company Name": "Texas Instruments",
+    "Industry": "Information Technology",
+    "Symbol": "TXN"
+  },
+  {
+    "Company Name": "Texas Pacific Land Corporation",
+    "Industry": "Energy",
+    "Symbol": "TPL"
+  },
+  {
+    "Company Name": "Textron",
+    "Industry": "Industrials",
+    "Symbol": "TXT"
+  },
+  {
+    "Company Name": "Thermo Fisher Scientific",
+    "Industry": "Health Care",
+    "Symbol": "TMO"
+  },
+  {
+    "Company Name": "TJX Companies",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "TJX"
+  },
+  {
+    "Company Name": "TKO Group Holdings",
+    "Industry": "Communication Services",
+    "Symbol": "TKO"
+  },
+  {
+    "Company Name": "Trade Desk (The)",
+    "Industry": "Communication Services",
+    "Symbol": "TTD"
+  },
+  {
+    "Company Name": "Tractor Supply",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "TSCO"
+  },
+  {
+    "Company Name": "Trane Technologies",
+    "Industry": "Industrials",
+    "Symbol": "TT"
+  },
+  {
+    "Company Name": "TransDigm Group",
+    "Industry": "Industrials",
+    "Symbol": "TDG"
+  },
+  {
+    "Company Name": "Travelers Companies (The)",
+    "Industry": "Financials",
+    "Symbol": "TRV"
+  },
+  {
+    "Company Name": "Trimble Inc.",
+    "Industry": "Information Technology",
+    "Symbol": "TRMB"
+  },
+  {
+    "Company Name": "Truist Financial",
+    "Industry": "Financials",
+    "Symbol": "TFC"
+  },
+  {
+    "Company Name": "Tyler Technologies",
+    "Industry": "Information Technology",
+    "Symbol": "TYL"
+  },
+  {
+    "Company Name": "Tyson Foods",
+    "Industry": "Consumer Staples",
+    "Symbol": "TSN"
+  },
+  {
+    "Company Name": "U.S. Bancorp",
+    "Industry": "Financials",
+    "Symbol": "USB"
+  },
+  {
+    "Company Name": "Uber",
+    "Industry": "Industrials",
+    "Symbol": "UBER"
+  },
+  {
+    "Company Name": "UDR, Inc.",
+    "Industry": "Real Estate",
+    "Symbol": "UDR"
+  },
+  {
+    "Company Name": "Ulta Beauty",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "ULTA"
+  },
+  {
+    "Company Name": "Union Pacific Corporation",
+    "Industry": "Industrials",
+    "Symbol": "UNP"
+  },
+  {
+    "Company Name": "United Airlines Holdings",
+    "Industry": "Industrials",
+    "Symbol": "UAL"
+  },
+  {
+    "Company Name": "United Parcel Service",
+    "Industry": "Industrials",
+    "Symbol": "UPS"
+  },
+  {
+    "Company Name": "United Rentals",
+    "Industry": "Industrials",
+    "Symbol": "URI"
+  },
+  {
+    "Company Name": "UnitedHealth Group",
+    "Industry": "Health Care",
+    "Symbol": "UNH"
+  },
+  {
+    "Company Name": "Universal Health Services",
+    "Industry": "Health Care",
+    "Symbol": "UHS"
+  },
+  {
+    "Company Name": "Valero Energy",
+    "Industry": "Energy",
+    "Symbol": "VLO"
+  },
+  {
+    "Company Name": "Ventas",
+    "Industry": "Real Estate",
+    "Symbol": "VTR"
+  },
+  {
+    "Company Name": "Veralto",
+    "Industry": "Industrials",
+    "Symbol": "VLTO"
+  },
+  {
+    "Company Name": "Verisign",
+    "Industry": "Information Technology",
+    "Symbol": "VRSN"
+  },
+  {
+    "Company Name": "Verisk Analytics",
+    "Industry": "Industrials",
+    "Symbol": "VRSK"
+  },
+  {
+    "Company Name": "Verizon",
+    "Industry": "Communication Services",
+    "Symbol": "VZ"
+  },
+  {
+    "Company Name": "Vertex Pharmaceuticals",
+    "Industry": "Health Care",
+    "Symbol": "VRTX"
+  },
+  {
+    "Company Name": "Viatris",
+    "Industry": "Health Care",
+    "Symbol": "VTRS"
+  },
+  {
+    "Company Name": "Vici Properties",
+    "Industry": "Real Estate",
+    "Symbol": "VICI"
+  },
+  {
+    "Company Name": "Visa Inc.",
+    "Industry": "Financials",
+    "Symbol": "V"
+  },
+  {
+    "Company Name": "Vistra Corp.",
+    "Industry": "Utilities",
+    "Symbol": "VST"
+  },
+  {
+    "Company Name": "Vulcan Materials Company",
+    "Industry": "Materials",
+    "Symbol": "VMC"
+  },
+  {
+    "Company Name": "W. R. Berkley Corporation",
+    "Industry": "Financials",
+    "Symbol": "WRB"
+  },
+  {
+    "Company Name": "W. W. Grainger",
+    "Industry": "Industrials",
+    "Symbol": "GWW"
+  },
+  {
+    "Company Name": "Wabtec",
+    "Industry": "Industrials",
+    "Symbol": "WAB"
+  },
+  {
+    "Company Name": "Walmart",
+    "Industry": "Consumer Staples",
+    "Symbol": "WMT"
+  },
+  {
+    "Company Name": "Walt Disney Company (The)",
+    "Industry": "Communication Services",
+    "Symbol": "DIS"
+  },
+  {
+    "Company Name": "Warner Bros. Discovery",
+    "Industry": "Communication Services",
+    "Symbol": "WBD"
+  },
+  {
+    "Company Name": "Waste Management",
+    "Industry": "Industrials",
+    "Symbol": "WM"
+  },
+  {
+    "Company Name": "Waters Corporation",
+    "Industry": "Health Care",
+    "Symbol": "WAT"
+  },
+  {
+    "Company Name": "WEC Energy Group",
+    "Industry": "Utilities",
+    "Symbol": "WEC"
+  },
+  {
+    "Company Name": "Wells Fargo",
+    "Industry": "Financials",
+    "Symbol": "WFC"
+  },
+  {
+    "Company Name": "Welltower",
+    "Industry": "Real Estate",
+    "Symbol": "WELL"
+  },
+  {
+    "Company Name": "West Pharmaceutical Services",
+    "Industry": "Health Care",
+    "Symbol": "WST"
+  },
+  {
+    "Company Name": "Western Digital",
+    "Industry": "Information Technology",
+    "Symbol": "WDC"
+  },
+  {
+    "Company Name": "Weyerhaeuser",
+    "Industry": "Real Estate",
+    "Symbol": "WY"
+  },
+  {
+    "Company Name": "Williams-Sonoma, Inc.",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "WSM"
+  },
+  {
+    "Company Name": "Williams Companies",
+    "Industry": "Energy",
+    "Symbol": "WMB"
+  },
+  {
+    "Company Name": "Willis Towers Watson",
+    "Industry": "Financials",
+    "Symbol": "WTW"
+  },
+  {
+    "Company Name": "Workday, Inc.",
+    "Industry": "Information Technology",
+    "Symbol": "WDAY"
+  },
+  {
+    "Company Name": "Wynn Resorts",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "WYNN"
+  },
+  {
+    "Company Name": "Xcel Energy",
+    "Industry": "Utilities",
+    "Symbol": "XEL"
+  },
+  {
+    "Company Name": "Xylem Inc.",
+    "Industry": "Industrials",
+    "Symbol": "XYL"
+  },
+  {
+    "Company Name": "Yum! Brands",
+    "Industry": "Consumer Discretionary",
+    "Symbol": "YUM"
+  },
+  {
+    "Company Name": "Zebra Technologies",
+    "Industry": "Information Technology",
+    "Symbol": "ZBRA"
+  },
+  {
+    "Company Name": "Zimmer Biomet",
+    "Industry": "Health Care",
+    "Symbol": "ZBH"
+  },
+  {
+    "Company Name": "Zoetis",
+    "Industry": "Health Care",
+    "Symbol": "ZTS"
+  }
+]
