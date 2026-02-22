@@ -1,130 +1,118 @@
-from pathlib import Path
-from dotenv import load_dotenv
-import logging
-import os
-
-# Load .env file from backend folder
-env_path = Path(__file__).parent / ".env"
-load_dotenv(env_path)
-
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-from backend.database.connection import init_db, check_db_connection
-from backend.routes.market import router as market_router
-from backend.routes.peers import router as peers_router
-from backend.routes.fundamentals import router as fundamentals_router
-from backend.routes.sectors import router as sectors_router
-from backend.routes.macro import router as macro_router
-from backend.routes.network import router as network_router
-from backend.routes.backtest import router as backtest_router
-from backend.routes.research import router as research_router
-from backend.routes.social import router as social_router
-from backend.routes.eia_routes import router as eia_router
-from backend.routes.insights_routes import router as insights_router
-from backend.routes.reports_routes import router as reports_router
-from backend.routes.fred_routes import router as fred_router
-from backend.routes.treemap import router as treemap_router
-from backend.routes.sentiment import router as sentiment_router
-from backend.routes.emotion_advisor import router as emotion_advisor_router
-from backend.routes.crowd_insight import router as crowd_insight_router
-from backend.routes.backtest_agent import router as backtest_agent_router
-from backend.finverse_integration.routes.wealth_routes import router as wealth_router
-from backend.routes.chat import router as chat_router
+from backend.routes.super_agent_routes import router as super_agent_router
 from backend.routes.sector_intel import router as sector_intel_router
+from backend.routes.investor_profile import router as investor_profile_router
+from backend.routes.market_pulse import router as market_pulse_router
+from backend.routes.stock_advisor import router as stock_advisor_router
+from backend.routes.backtest import router as backtest_router
+# from backend.routes.long_term_routes import router as long_term_router # Uncomment if needed
 
-logger = logging.getLogger(__name__)
+from backend.engine.pipeline import InvestmentPipeline
+import os
+import json
+import logging
 
-# --- Runtime Config ---
-APP_ENV = os.getenv("APP_ENV", "development").lower()
-ENABLE_DB = os.getenv("ENABLE_DB", "true").lower() == "true"
-DB_REQUIRED = os.getenv("DB_REQUIRED", "false").lower() == "true"
-DISABLE_DOCS = os.getenv("DISABLE_DOCS", "false").lower() == "true"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("websocket")
 
-cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "")
-cors_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
-if not cors_origins and APP_ENV != "production":
-    cors_origins = ["*"]
-elif not cors_origins and APP_ENV == "production":
-    logger.warning("⚠️ CORS_ALLOW_ORIGINS not set in production. CORS will be blocked.")
+app = FastAPI(title="Agentic Investment OS")
 
-trusted_hosts_raw = os.getenv("TRUSTED_HOSTS", "")
-trusted_hosts = [h.strip() for h in trusted_hosts_raw.split(",") if h.strip()]
-if not trusted_hosts and APP_ENV != "production":
-    trusted_hosts = ["*"]
+# CORS Configuration
+origins = [
+    "http://localhost:5173", # Frontend dev server
+    "http://localhost:5174", # Alternative port
+    "http://localhost:5175", # Alternative port
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
+    "http://localhost:3000",
+]
 
-app = FastAPI(
-    title="Boomerang Backend",
-    docs_url=None if DISABLE_DOCS else "/docs",
-    redoc_url=None if DISABLE_DOCS else "/redoc",
-    openapi_url=None if DISABLE_DOCS else "/openapi.json",
-)
-
-# Configure CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-if trusted_hosts:
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
+from backend.routes.fred_routes import router as fred_router
 
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-app.include_router(market_router)
-app.include_router(peers_router)
-app.include_router(fundamentals_router)
-app.include_router(sectors_router)
-app.include_router(macro_router)
-app.include_router(network_router)
-app.include_router(backtest_router)
-app.include_router(research_router)
-app.include_router(social_router)
-app.include_router(eia_router)
-app.include_router(insights_router)
-app.include_router(reports_router)
-app.include_router(fred_router)
-app.include_router(treemap_router)
-app.include_router(sentiment_router)
-app.include_router(emotion_advisor_router)
-app.include_router(crowd_insight_router)
-app.include_router(backtest_agent_router)
-app.include_router(wealth_router)
-app.include_router(chat_router)
+app.include_router(super_agent_router, prefix="/api")
 app.include_router(sector_intel_router)
+app.include_router(investor_profile_router)
+app.include_router(market_pulse_router)
+app.include_router(stock_advisor_router)
+app.include_router(backtest_router)
+app.include_router(fred_router)
+# app.include_router(long_term_router)
 
-@app.on_event("startup")
-def startup_init_db():
-    """Initialize database - non-fatal if DB is unavailable"""
-    if not ENABLE_DB:
-        logger.info("🛑 DB init skipped (ENABLE_DB=false)")
-        return
+# Initialize Database
+from backend.database.connection import init_db, run_init_sql
+try:
+    init_db()
+    run_init_sql()
+except Exception as e:
+    logger.error(f"Database init failed: {e}")
 
-    try:
-        logger.info("🗄️ Attempting database initialization...")
-        init_db()
-        logger.info("✅ Database initialized successfully")
-    except Exception as e:
-        logger.warning(f"⚠️ Database not available: {e}")
-        logger.warning("⚠️ Continuing without DB - agents and APIs remain functional")
-        logger.info("💡 To enable DB: Ensure PostgreSQL is running on configured port")
-        if DB_REQUIRED:
-            raise
+# Initialize Pipeline
+_pipeline: InvestmentPipeline | None = None
 
-@app.get("/")
-def health():
-    return {"status": "ok"}
+
+def _get_pipeline() -> InvestmentPipeline:
+    global _pipeline
+    if _pipeline is None:
+        _pipeline = InvestmentPipeline()
+    return _pipeline
 
 @app.get("/health")
 def health_check():
-    db_ok = check_db_connection() if ENABLE_DB else False
-    return {
-        "status": "ok",
-        "env": APP_ENV,
-        "db_enabled": ENABLE_DB,
-        "db_ok": db_ok,
-    }
+    return {"status": "ok", "app": "Agentic Investment OS"}
+
+@app.websocket("/ws/live")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    logger.info("WebSocket connected")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            logger.info(f"Received WS data: {data}")
+            
+            # Simple parsing
+            query = data
+            ticker = None
+            market = "us"
+            request_id = None
+            
+            # Try parsing as JSON to get explicit ticker
+            try:
+                msg = json.loads(data)
+                if isinstance(msg, dict):
+                    query = msg.get("query", data)
+                    ticker = msg.get("ticker", None)
+                    market = msg.get("market", market) or market
+                    request_id = msg.get("request_id", None)
+            except:
+                pass
+            
+            # If no ticker found in JSON, try to guess from query if short enough? 
+            # Or just pass as is. The pipeline needs a ticker for Strategy Lab.
+            # If ticker is None, pure research mode runs.
+            
+            try:
+                result = await _get_pipeline().run(query=query, ticker=ticker, market=market)
+                if isinstance(result, dict) and request_id:
+                    result["request_id"] = request_id
+                await websocket.send_json(result)
+            except Exception as e:
+                logger.error(f"Pipeline error: {e}")
+                await websocket.send_json({"error": str(e), "request_id": request_id})
+    except WebSocketDisconnect:
+        logger.info("Client disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        try:
+             await websocket.close()
+        except:
+            pass

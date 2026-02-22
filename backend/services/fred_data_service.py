@@ -43,7 +43,8 @@ DEFAULT_COMMODITY_SERIES = {
     'DCOILWTICO': {'type': 'commodity', 'title': 'Crude Oil WTI'},
     'DCOILBRENTEU': {'type': 'commodity', 'title': 'Crude Oil Brent'},
     'GASREGW': {'type': 'commodity', 'title': 'US Regular Gas Price'},
-    'GOLDPMGBD228NLBM': {'type': 'commodity', 'title': 'Gold Price (London)'},
+    'GOLDAMGBD228NLBM': {'type': 'commodity', 'title': 'Gold Price (AM)'},
+    'GOLDPMGBD228NLBM': {'type': 'commodity', 'title': 'Gold Price (PM)'},
     'NASDAQQSLVO': {'type': 'commodity', 'title': 'Silver Index (NASDAQ)'},
 }
 
@@ -70,6 +71,8 @@ ALL_DEFAULT_SERIES = {
 SERIES_ALIASES = {
     "GOLDAMGBD228NLBM": "GOLDPMGBD228NLBM",
     "GOLDPMGBD228NLBM": "GOLDAMGBD228NLBM",
+    "DXY": "DTWEXBGS",
+    "GOLD": "GOLDAMGBD228NLBM",
 }
 
 

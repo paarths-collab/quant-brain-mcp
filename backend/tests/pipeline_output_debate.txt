@@ -1,0 +1,105 @@
+C:\Users\Paarth\Github\Boomerang - agentic\backend\services\duckduckgo_service.py:9: RuntimeWarning: This package (`duckduckgo_search`) has been renamed to `ddgs`! Use `pip install ddgs` instead.
+  with DDGS() as ddgs:
+C:\Users\Paarth\Github\Boomerang - agentic\backend\.venv\Lib\site-packages\urllib3\connection.py:374: DeprecationWarning: ssl.match_hostname() is deprecated
+  match_hostname(cert, asserted_hostname)
+C:\Users\Paarth\Github\Boomerang - agentic\backend\.venv\Lib\site-packages\urllib3\util\ssl_.py:262: DeprecationWarning: ssl.PROTOCOL_TLS is deprecated
+  context = SSLContext(ssl_version or ssl.PROTOCOL_SSLv23)
+C:\Users\Paarth\Github\Boomerang - agentic\backend\.venv\Lib\site-packages\urllib3\connection.py:374: DeprecationWarning: ssl.match_hostname() is deprecated
+  match_hostname(cert, asserted_hostname)
+Running Investment Pipeline for 'AAPL'...
+DDG returned no results for 'Analyze Apple's current market position and tell me if it's a buy given the recent AI news.', falling back to Tavily.
+
+PIPELINE RESULT:
+
+{
+  "emotion": {
+    "status": "normal",
+    "keywords": [],
+    "penalty": 0
+  },
+  "financial": {
+    "ticker": "AAPL",
+    "technicals": {
+      "rsi": 39.58315266811191,
+      "macd": 1.1835136633327465
+    },
+    "fundamentals": {
+      "pe": 32.377216,
+      "market_cap": 3759435415552
+    },
+    "score": 60
+  },
+  "web": {
+    "articles": [
+      {
+        "url": "https://finance.yahoo.com/news/apple-inc-aapl-positioned-ai-184146026.html",
+        "title": "Apple Inc. (AAPL) \u2013 Positioned for the AI Boom, But Is It Enough?",
+        "content": "We recently published a list of 10 Must-Watch AI Stocks Dominating Headlines. In this article we are going to look at where Apple Inc.",
+        "score": 0.9999398,
+        "raw_content": null
+      },
+      {
+        "url": "https://www.nasdaq.com/articles/apple-stock-analysis-are-ai-advancements-next-aapl-catalyst",
+        "title": "Apple Stock Analysis: Are AI Advancements the Next AAPL Catalyst?",
+        "content": "Apple (NASDAQ:AAPL) has been a tech leader in advancement and related financial success. However, recent developments in its AI capabilities may",
+        "score": 0.9998074,
+        "raw_content": null
+      },
+      {
+        "url": "https://seekingalpha.com/article/4689738-apple-stay-away-during-this-ai-make-or-break-moment",
+        "title": "Apple: Stay Away During This AI Make-Or-Break Moment",
+        "content": "Apple's stock performance has lagged behind other Big Tech companies since the launch of ChatGPT. Find out why I rate AAPL stock a hold.",
+        "score": 0.99973875,
+        "raw_content": null
+      },
+      {
+        "url": "https://stocktwits.com/news-articles/markets/equity/apple-stock-posts-worst-day-in-10-months-on-ai-setback-regulatory-heat/cZR5jVGR4sL",
+        "title": "Apple Stock Posts Worst Day In 10 Months On AI Setback ...",
+        "content": "Apple stock dropped 5% on Thursday and a further 0.5% in the after-market session. Shares have long underperformed amid AI rollout delays.",
+        "score": 0.9988305,
+        "raw_content": null
+      },
+      {
+        "url": "https://www.marketwatch.com/story/apple-sees-200-billion-market-cap-wipeout-as-stock-slides-on-ai-fears-88917cc0?gaa_at=eafs&gaa_n=AWEtsqeKytMQdgquwV1V8shldGI6DnN07zpi8K-bUR_ahhOjWQfn5yCBk6dW&gaa_ts=699041cc&gaa_sig=d_44xLRgg72kKGLXJdpS6QqmGHvmSVBXcofXeQvPhypG4AQ6M0U2O5z3_FYLNT0ONdq2nSbMEJLr9Sx9we2X9A%3D%3D",
+        "title": "Apple sees $200 billion market-cap wipeout as stock slides on AI fears",
+        "content": "Apple sees $200 billion market-cap wipeout as stock slides on AI fears. Apple reportedly is facing even more snags in its planned rollout of a",
+        "score": 0.9975656,
+        "raw_content": null
+      }
+    ],
+    "sentiment": "bearish",
+    "score": 30,
+    "reasoning": "I\u2019m ready to evaluate the sentiment, but I\u2019ll need the news headlines or snippets you\u2019d like me to analyze. Please provide the text you\u2019d like assessed, and I\u2019ll return a bullish\u202f/\u202fbearish\u202f/\u202fneutral c..."
+  },
+  "sector": {
+    "sector_etf": "SMH",
+    "momentum": 0.002994877212471104,
+    "score": 70
+  },
+  "macro": {
+    "macro_data": {
+      "gdp_latest": 31098.027,
+      "inflation_latest": 326.588,
+      "fed_rate": 3.64
+    },
+    "market_bias": "risk_on",
+    "score": 70,
+    "analysis": "Market is in risk_on mode. Fed rate at 3.64%."
+  },
+  "insider": {
+    "recent_activity": "Simulated/Raw Data",
+    "buy_count_last_5": 0,
+    "score": 40,
+    "raw_data_snippet": "{'Shares': {0: 1255, 1: 1255, 2: 1255, 3: 1255, 4: 1255}, 'URL': {0: '', 1: '', 2: '', 3: '', 4: ''}, 'Text': {0: '', 1: '', 2: '', 3: '', 4: ''}, 'Insider': {0: 'AUSTIN WANDA M', 1: 'GORSKY ALEX', 2:"
+  },
+  "risk": {
+    "concentration": 0.5,
+    "risk_score": 50.0,
+    "analysis": "Max concentration is 50.0%."
+  },
+  "divergence": [],
+  "confidence": 50.0,
+  "report": "**Investment Brief \u2013 Apple Inc. (AAPL)**  \n*Prepared by: Chief Investment Officer*  \n*Date: 14\u202fFeb\u202f2026*  \n\n---\n\n## 1. Executive Summary  \n\nApple sits at the intersection of two powerful forces: a mature, cash\u2011rich hardware ecosystem and a nascent AI\u2011driven growth narrative.  \n\n* **Technicals** \u2013 RSI\u202f\u2248\u202f39 (oversold) and MACD\u202f\u2248\u202f+1.18 suggest short\u2011term upside potential, but the modest MACD width offers limited defensive strength.  \n* **Fundamentals** \u2013 Forward P/E\u202f\u2248\u202f32\u00d7 earnings, well above the S&P average, reflecting a premium valuation that must be justified by new growth streams. Apple holds >\u202f$90\u202fbn of cash and generates >\u202f$70\u202fbn of free cash flow annually, supporting aggressive share\u2011repurchase and dividend policies.  \n* **Sector Context** \u2013 Apple is the largest constituent of the semiconductor\u2011heavy SMH ETF. The sector\u2011momentum score is 70 (strong relative rating) but the absolute momentum figure (\u2248\u202f0.003) is essentially flat, indicating no clear tailwind from the broader hardware cycle.  \n* **Sentiment** \u2013 Web\u2011sentiment engines rate the story **bearish** (score\u202f30). Headlines are split: several outlets tout Apple\u2019s AI\u2011ready hardware, while others warn of a $200\u202fbn market\u2011cap erosion after AI\u2011rollout delays and regulatory pressure.  \n\n**Bottom line:** The stock is priced for modest upside if Apple can translate its AI and services initiatives into incremental revenue, yet the premium valuation, execution risk, and a weakening macro\u2011consumer backdrop create a sizable downside floor.  \n\n**Verdict:** **Hold** \u2013 maintain exposure while monitoring key catalysts and risk triggers.\n\n---\n\n## 2. Bull vs. Bear Debate (Synthesis)\n\n| **Bull Argument** | **Bear Argument** |\n|-------------------|-------------------|\n| **Technical bounce** \u2013 RSI in oversold territory and MACD above zero signal a near\u2011term price rebound. | **Technical weakness** \u2013 RSI still below 40 and a modest MACD provide limited momentum; recent 5\u202f% intraday drop shows vulnerability. |\n| **AI leadership** \u2013 Apple Silicon, Vision Pro, and on\u2011device AI services position the company to capture a share of the generative\u2011AI market, potentially unlocking new premium pricing and subscription revenue. | **AI execution risk** \u2013 Delays in AI rollout have already triggered a $200\u202fbn market\u2011cap wipe\u2011out; the market doubts Apple can keep pace with pure\u2011play AI peers. |\n| **Services & Wearables growth** \u2013 Double\u2011digit expansion in Services and health\u2011tech delivers high\u2011margin cash flow, supporting buy\u2011backs and dividend hikes. | **Maturing product line** \u2013 iPhone upgrade cycles are flattening; competition from lower\u2011priced Android flagships erodes handset margins. |\n| **Balance\u2011sheet strength** \u2013 $90\u202fbn+ cash and strong free\u2011cash\u2011flow generation give Apple flexibility to invest, repurchase shares, and weather macro shocks. | **Valuation premium** \u2013 Forward P/E\u202f\u2248\u202f32\u00d7 is well above the S&P average, implying the market is already pricing in future growth that may not materialise. |\n| **Sector positioning** \u2013 Apple\u2019s weight in SMH gives it a relative advantage in a sector that still enjoys a 70\u2011point momentum rating. | **Sector flatness** \u2013 The absolute momentum of SMH (\u2248\u202f0.003) is essentially flat, offering no systemic boost; semiconductor supply\u2011chain constraints in China add headwinds. |\n| **Regulatory resilience** \u2013 Apple\u2019s ecosystem lock\u2011in and diversified revenue streams provide some buffer against privacy\u2011centric regulation. | **Regulatory pressure** \u2013 Ongoing scrutiny of App Store practices and data\u2011privacy rules could compress Services margins. |\n\n**Synthesis:** The bullish case hinges on Apple successfully monetising AI and services to justify its premium, while the bearish case stresses that the same premium is already baked into the price, leaving little room for error. Recent market reaction to AI\u2011related news (sharp sell\u2011off, bearish sentiment) tilts the balance toward caution, but the technical oversold signal and cash cushion keep the downside risk from being catastrophic.\n\n---\n\n## 3. Key Risks  \n\n| **Risk** | **Impact** | **Monitoring Indicators** |\n|----------|------------|---------------------------|\n| **AI execution & competitive lag** | Failure to launch compelling AI features could stall revenue uplift and trigger further market\u2011cap erosion. | Product launch timelines, AI\u2011related patents, analyst upgrades/downgrades, quarterly guidance on Services/AI revenue. |\n| **Valuation compression** | A sustained P/E >\u202f30 in a higher\u2011interest\u2011rate environment may force a price correction. | P/E relative to S&P and peers, forward earnings revisions, macro\u2011rate outlook. |\n| **iPhone demand slowdown** | Saturated upgrade cycles could depress top\u2011line growth. | Unit shipments, average selling price (ASP) trends, market share data vs. Android competitors. |\n| **Regulatory headwinds** | Antitrust or privacy rulings could limit Services revenue or increase compliance costs. | SEC/FTC filings, EU/App Store rulings, changes in privacy legislation. |\n| **Supply\u2011chain & geopolitical tension** | Disruptions in China/Taiwan could affect component availability and margins. | Supplier earnings, inventory levels, geopolitical risk indices. |\n| **Sector momentum flattening** | A stagnant semiconductor market reduces ancillary demand for Apple\u2019s hardware. | SMH ETF performance, semiconductor fab capacity utilisation, global chip demand forecasts. |\n\n---\n\n## 4. Final Verdict  \n\n**Recommendation:** **Hold**  \n\n- **Rationale:** Apple\u2019s balance sheet, services franchise, and emerging AI capabilities provide a solid foundation for medium\u2011term growth, but the current premium valuation and recent bearish sentiment signal that the upside is already largely priced in. The technical oversold reading offers a modest near\u2011term bounce, yet the risk of AI execution delays, regulatory pressure, and a slowing iPhone cycle could quickly erode that gain. Maintaining the position allows investors to benefit from any upside from successful AI roll\u2011outs while limiting exposure to downside through Apple\u2019s cash generation and dividend yield.  \n\n- **Action Plan:**  \n  1. **Maintain current allocation** (no additional purchases, no sales).  \n  2. **Re\u2011evaluate** after Apple\u2019s next earnings release (Q2\u202f2026) \u2013 focus on Services and AI\u2011related revenue guidance.  \n  3. **Set stop\u2011loss** at ~\u202f10\u202f% below current price to protect against a further AI\u2011related sell\u2011off.  \n  4. **Upside target**: +15\u202f% over the next 12\u201118\u202fmonths if AI integration accelerates and Services growth exceeds 12\u202f% YoY.  \n\n--- \n\n*Prepared by the Chief Investment Office \u2013 Apple (AAPL) analysis, 14\u202fFeb\u202f2026.*\n\n**Institutional Intelligence:**\n- Market Regime: risk_on\n- Insider Sentiment: Unknown\n- Portfolio Risk Score: 50.0",
+  "discovery": null
+}
+sys:1: ResourceWarning: unclosed <ssl.SSLSocket fd=2516, family=2, type=1, proto=0, laddr=('192.168.29.89', 55860), raddr=('52.3.30.168', 443)>

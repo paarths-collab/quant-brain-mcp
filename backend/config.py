@@ -37,6 +37,7 @@ ALPACA_KEY_ID = os.getenv("ALPACA_KEY_ID", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_API_KEY_1 = os.getenv("OPENROUTER_API_KEY_1", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # RapidAPI Hosts
 RAPIDAPI_HOSTS = {

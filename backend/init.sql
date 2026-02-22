@@ -1,11 +1,11 @@
 -- Initialize FRED data table for storing index prices
 CREATE TABLE IF NOT EXISTS fred_data (
-    series_id VARCHAR(50) NOT NULL,
-    series_type VARCHAR(30) NOT NULL,
-    date DATE NOT NULL,
-    value DOUBLE PRECISION,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    series_id TEXT NOT NULL,
+    series_type TEXT NOT NULL,
+    date TEXT NOT NULL,
+    value REAL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (series_id, date)
 );
 
@@ -23,62 +23,54 @@ CREATE INDEX IF NOT EXISTS idx_fred_series_date ON fred_data(series_id, date DES
 
 -- Insert some metadata about common series
 CREATE TABLE IF NOT EXISTS fred_series_metadata (
-    series_id VARCHAR(50) PRIMARY KEY,
-    series_type VARCHAR(30) NOT NULL,
-    title VARCHAR(200),
-    frequency VARCHAR(20),
-    units VARCHAR(100),
-    last_updated TIMESTAMP
+    series_id TEXT PRIMARY KEY,
+    series_type TEXT NOT NULL,
+    title TEXT,
+    frequency TEXT,
+    units TEXT,
+    last_updated TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Common index series
-INSERT INTO fred_series_metadata (series_id, series_type, title, frequency, units) VALUES
-    ('SP500', 'index', 'S&P 500', 'Daily', 'Index'),
-    ('DJIA', 'index', 'Dow Jones Industrial Average', 'Daily', 'Index'),
-    ('NASDAQ100', 'index', 'NASDAQ 100 Index', 'Daily', 'Index'),
-    ('WILL5000IND', 'index', 'Wilshire 5000 Total Market Index', 'Daily', 'Index'),
-    ('VIXCLS', 'index', 'CBOE Volatility Index: VIX', 'Daily', 'Index'),
-    ('DGS10', 'rate', '10-Year Treasury Constant Maturity Rate', 'Daily', 'Percent'),
-    ('DGS2', 'rate', '2-Year Treasury Constant Maturity Rate', 'Daily', 'Percent'),
-    ('FEDFUNDS', 'rate', 'Federal Funds Effective Rate', 'Daily', 'Percent'),
-    ('CPIAUCSL', 'economic', 'Consumer Price Index for All Urban Consumers', 'Monthly', 'Index'),
-    ('UNRATE', 'economic', 'Unemployment Rate', 'Monthly', 'Percent'),
-    ('GDP', 'economic', 'Gross Domestic Product', 'Quarterly', 'Billions of Dollars'),
-    ('DCOILWTICO', 'commodity', 'Crude Oil Prices: WTI', 'Daily', 'Dollars per Barrel'),
-    ('GOLDAMGBD228NLBM', 'commodity', 'Gold Fixing Price', 'Daily', 'Dollars per Troy Ounce')
-ON CONFLICT (series_id) DO NOTHING;
+INSERT OR IGNORE INTO fred_series_metadata (series_id, series_type, title, frequency, units, last_updated) VALUES
+    ('SP500', 'index', 'S&P 500', 'Daily', 'Index', CURRENT_TIMESTAMP),
+    ('DJIA', 'index', 'Dow Jones Industrial Average', 'Daily', 'Index', CURRENT_TIMESTAMP),
+    ('NASDAQ100', 'index', 'NASDAQ 100 Index', 'Daily', 'Index', CURRENT_TIMESTAMP),
+    ('WILL5000IND', 'index', 'Wilshire 5000 Total Market Index', 'Daily', 'Index', CURRENT_TIMESTAMP),
+    ('VIXCLS', 'index', 'CBOE Volatility Index: VIX', 'Daily', 'Index', CURRENT_TIMESTAMP),
+    ('DGS10', 'rate', '10-Year Treasury Constant Maturity Rate', 'Daily', 'Percent', CURRENT_TIMESTAMP),
+    ('DGS2', 'rate', '2-Year Treasury Constant Maturity Rate', 'Daily', 'Percent', CURRENT_TIMESTAMP),
+    ('FEDFUNDS', 'rate', 'Federal Funds Effective Rate', 'Daily', 'Percent', CURRENT_TIMESTAMP),
+    ('CPIAUCSL', 'economic', 'Consumer Price Index for All Urban Consumers', 'Monthly', 'Index', CURRENT_TIMESTAMP),
+    ('UNRATE', 'economic', 'Unemployment Rate', 'Monthly', 'Percent', CURRENT_TIMESTAMP),
+    ('GDP', 'economic', 'Gross Domestic Product', 'Quarterly', 'Billions of Dollars', CURRENT_TIMESTAMP),
+    ('DCOILWTICO', 'commodity', 'Crude Oil Prices: WTI', 'Daily', 'Dollars per Barrel', CURRENT_TIMESTAMP),
+    ('GOLDAMGBD228NLBM', 'commodity', 'Gold Fixing Price', 'Daily', 'Dollars per Troy Ounce', CURRENT_TIMESTAMP);
 
--- Function to update the updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Trigger for auto-updating updated_at
-DROP TRIGGER IF EXISTS update_fred_data_updated_at ON fred_data;
+-- SQLite trigger for auto-updating updated_at on fred_data
+DROP TRIGGER IF EXISTS update_fred_data_updated_at;
 CREATE TRIGGER update_fred_data_updated_at
-    BEFORE UPDATE ON fred_data
+    AFTER UPDATE ON fred_data
     FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+    BEGIN
+        UPDATE fred_data SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
+    END;
 
 -- =====================================================
 -- SECTOR INTELLIGENCE (NEWS + SNAPSHOTS)
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS sector_news_item (
-    id SERIAL PRIMARY KEY,
-    sector VARCHAR(120) NOT NULL,
-    market VARCHAR(10) NOT NULL,
-    title VARCHAR(600) NOT NULL,
-    url VARCHAR(1200),
-    source VARCHAR(200),
-    published_at TIMESTAMP,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sector TEXT NOT NULL,
+    market TEXT NOT NULL,
+    title TEXT NOT NULL,
+    url TEXT,
+    source TEXT,
+    published_at TEXT,
     snippet TEXT,
-    hash VARCHAR(64) NOT NULL,
-    ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    hash TEXT NOT NULL,
+    ingested_at TEXT DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_sector_news_hash UNIQUE (market, sector, hash)
 );
 
@@ -86,35 +78,66 @@ CREATE INDEX IF NOT EXISTS idx_sector_news_market_sector_date
     ON sector_news_item (market, sector, published_at);
 
 CREATE TABLE IF NOT EXISTS sector_snapshot (
-    id SERIAL PRIMARY KEY,
-    sector VARCHAR(120) NOT NULL,
-    market VARCHAR(10) NOT NULL,
-    as_of TIMESTAMP NOT NULL,
-    news_item_ids JSONB,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sector TEXT NOT NULL,
+    market TEXT NOT NULL,
+    as_of TEXT NOT NULL,
+    news_item_ids TEXT,
     sector_summary TEXT,
-    momentum VARCHAR(40),
+    momentum TEXT,
     risk_notes TEXT,
     who_should_invest TEXT,
-    suitable_profiles JSONB,
-    top_stocks JSONB,
-    score DOUBLE PRECISION,
-    llm_model VARCHAR(80),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    suitable_profiles TEXT,
+    top_stocks TEXT,
+    score REAL,
+    llm_model TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_sector_snapshot_market_sector_asof
     ON sector_snapshot (market, sector, as_of);
 
 CREATE TABLE IF NOT EXISTS sector_score (
-    id SERIAL PRIMARY KEY,
-    sector VARCHAR(120) NOT NULL,
-    market VARCHAR(10) NOT NULL,
-    as_of TIMESTAMP NOT NULL,
-    score DOUBLE PRECISION,
-    suitable_profiles JSONB,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sector TEXT NOT NULL,
+    market TEXT NOT NULL,
+    as_of TEXT NOT NULL,
+    score REAL,
+    suitable_profiles TEXT,
     rationale TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_sector_score_market_sector_asof
     ON sector_score (market, sector, as_of);
+
+-- =====================================================
+-- USER PROFILES
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT UNIQUE NOT NULL DEFAULT 'default',
+    name TEXT,
+    age INTEGER,
+    monthly_income REAL,
+    monthly_savings REAL,
+    risk_tolerance TEXT DEFAULT 'moderate',
+    horizon_years INTEGER DEFAULT 5,
+    primary_goal TEXT,
+    existing_investments TEXT,
+    market TEXT DEFAULT 'US',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
+
+-- SQLite trigger for auto-updating updated_at on user_profiles
+DROP TRIGGER IF EXISTS update_user_profiles_updated_at;
+CREATE TRIGGER update_user_profiles_updated_at
+    AFTER UPDATE ON user_profiles
+    FOR EACH ROW
+    BEGIN
+        UPDATE user_profiles SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
+    END;

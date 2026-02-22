@@ -35,6 +35,8 @@ class RSIMomentumStrategy(Strategy):
         self.trend_window = trend_window
         self.use_trend_filter = use_trend_filter
 
+
+    @property
     def parameters(self) -> dict:
         return {
             "rsi_window": self.rsi_window,
@@ -43,6 +45,7 @@ class RSIMomentumStrategy(Strategy):
             "trend_window": self.trend_window,
             "use_trend_filter": self.use_trend_filter,
         }
+
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         """

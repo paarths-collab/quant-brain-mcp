@@ -31,6 +31,11 @@ except Exception:
     DDGS = None
 
 try:
+    from gnews import GNews
+except Exception:
+    GNews = None
+
+try:
     from groq import Groq
 except Exception:
     Groq = None
@@ -51,7 +56,7 @@ class Config:
 
     # Groq
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()
     
     # Data sources (all free)
@@ -154,6 +159,48 @@ def _fetch_ddg_news(ddg: Any, query: str, max_results: int) -> List[Dict[str, An
     return [_normalize_news_item(r) for r in results if isinstance(r, dict)]
 
 
+def _fetch_gnews_news(query: str, max_results: int, market: str) -> List[Dict[str, Any]]:
+    if not GNews:
+        return []
+
+    q = (query or "").strip()
+    if not q:
+        return []
+
+    market_code = (market or Config.DEFAULT_MARKET).upper()
+    country = "IN" if market_code in ["IN", "INDIA"] else "US"
+
+    try:
+        google_news = GNews(language="en", country=country, max_results=max_results, period="7d")
+        articles = google_news.get_news(q) or []
+    except Exception:
+        return []
+
+    normalized: List[Dict[str, Any]] = []
+    for a in articles:
+        if not isinstance(a, dict):
+            continue
+        publisher = a.get("publisher")
+        source = publisher.get("title") if isinstance(publisher, dict) else (publisher or "")
+        normalized.append(
+            {
+                "title": a.get("title") or "",
+                "snippet": a.get("description") or "",
+                "url": a.get("url") or "",
+                "source": source or "",
+                "date": a.get("published date") or a.get("published") or "",
+            }
+        )
+    return normalized
+
+
+def _fetch_free_news(ddg: Any, query: str, max_results: int, market: str) -> List[Dict[str, Any]]:
+    # Prefer GNews; fallback to DDG.
+    results = _fetch_gnews_news(query, max_results, market)
+    if results:
+        return results
+    return _fetch_ddg_news(ddg, query, max_results)
+
 def _strip_asterisks(value: Any) -> Any:
     if isinstance(value, str):
         return value.replace("*", "").strip()
@@ -200,7 +247,7 @@ def _fetch_yf_price_metrics(symbols: List[str], period: str) -> Dict[str, Dict[s
         if hasattr(data, "columns") and isinstance(data.columns, pd.MultiIndex):
             for sym in symbols:
                 try:
-                    if sym in data.columns.levels[0]:
+                    if sym in data.columns.levels[0]: # type: ignore
                         close = data[sym]["Close"]
                         metrics[sym] = _compute(close)
                 except Exception:
@@ -514,7 +561,7 @@ Return ONLY a single number between 1 and 10.
         
         try:
             response = self.llm.invoke(prompt)
-            score = int(response.content.strip())
+            score = int(response.content.strip()) # type: ignore
             state.risk_score = max(1, min(10, score))  # Clamp to 1-10
             state.execution_log.append(f"✅ Risk score: {state.risk_score}/10")
         except:
@@ -542,7 +589,7 @@ class FreeMarketDataAgent:
                 news_query = "US stock market today S&P 500"
             else:
                 news_query = "India stock market today NSE Nifty"
-            news_results = _fetch_ddg_news(self.ddg, news_query, Config.MAX_NEWS_RESULTS)
+            news_results = _fetch_free_news(self.ddg, news_query, Config.MAX_NEWS_RESULTS, market_code)
             
             state.news_context["market_news"] = [
                 {
@@ -558,7 +605,7 @@ class FreeMarketDataAgent:
                 sector_news = {}
                 for sector in state.recommended_sectors[:3]:  # Limit to avoid rate limits
                     sector_query = f"India {sector} stocks news today"
-                    sector_results = _fetch_ddg_news(self.ddg, sector_query, Config.MAX_NEWS_RESULTS)
+                    sector_results = _fetch_free_news(self.ddg, sector_query, Config.MAX_NEWS_RESULTS, market_code)
                     sector_news[sector] = [r.get("title", "") for r in sector_results]
                 
                 state.news_context["sector_news"] = sector_news
@@ -604,11 +651,12 @@ class SmartSectorDiscovery:
         self.ddg = DDGS() if DDGS else None
         self._news_cache: Dict[str, List[Dict[str, Any]]] = {}
 
-    def _get_news(self, query: str) -> List[Dict[str, Any]]:
-        if query in self._news_cache:
-            return self._news_cache[query]
-        results = _fetch_ddg_news(self.ddg, query, Config.MAX_NEWS_RESULTS)
-        self._news_cache[query] = results
+    def _get_news(self, query: str, market_code: str) -> List[Dict[str, Any]]:
+        cache_key = f"{(market_code or Config.DEFAULT_MARKET).upper()}::{query}"
+        if cache_key in self._news_cache:
+            return self._news_cache[cache_key]
+        results = _fetch_free_news(self.ddg, query, Config.MAX_NEWS_RESULTS, market_code)
+        self._news_cache[cache_key] = results
         return results
 
     def run(self, state: WealthState) -> WealthState:
@@ -654,7 +702,7 @@ class SmartSectorDiscovery:
         sector_targets = _limit_list(sector_list, Config.MAX_SECTOR_NEWS_SECTORS)
         for sector in sector_targets:
             query = f"{market_label} {sector} sector stocks news"
-            sector_news[sector] = self._get_news(query)
+            sector_news[sector] = self._get_news(query, market_code)
 
         state.news_context["sector_news"] = sector_news
         state.market_data["sector_profiles"] = sector_profiles
@@ -824,11 +872,12 @@ class SmartStockSelector:
         self.ddg = DDGS() if DDGS else None
         self._news_cache: Dict[str, List[Dict[str, Any]]] = {}
 
-    def _get_news(self, query: str) -> List[Dict[str, Any]]:
-        if query in self._news_cache:
-            return self._news_cache[query]
-        results = _fetch_ddg_news(self.ddg, query, Config.MAX_NEWS_RESULTS)
-        self._news_cache[query] = results
+    def _get_news(self, query: str, market_code: str) -> List[Dict[str, Any]]:
+        cache_key = f"{(market_code or Config.DEFAULT_MARKET).upper()}::{query}"
+        if cache_key in self._news_cache:
+            return self._news_cache[cache_key]
+        results = _fetch_free_news(self.ddg, query, Config.MAX_NEWS_RESULTS, market_code)
+        self._news_cache[cache_key] = results
         return results
 
     def run(self, state: WealthState) -> WealthState:
@@ -886,7 +935,7 @@ class SmartStockSelector:
         news_targets = _limit_list(candidate_records, Config.MAX_STOCK_NEWS_STOCKS)
         for rec in news_targets:
             query = f"{rec['name']} {rec['symbol']} stock news"
-            stock_news[rec["symbol"]] = self._get_news(query)
+            stock_news[rec["symbol"]] = self._get_news(query, market_code)
 
         state.news_context["stock_news"] = stock_news
 

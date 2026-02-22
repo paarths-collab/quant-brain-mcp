@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001').replace(/\/$/, '');
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8001').replace(/\/$/, '');
 const API_BASE = `${API_ROOT}/api`;
 
 const api = axios.create({
@@ -29,8 +29,8 @@ api.interceptors.response.use(
 // Market Data API
 export const marketAPI = {
   getOverview: () => api.get('/market/overview'),
-  getCandles: (symbol: string, interval = '1d', range = '1y') =>
-    api.get(`/market/candles/${symbol}`, { params: { interval, range } }),
+  getCandles: (symbol: string, interval = '1d', range = '1y', market = 'US') =>
+    api.get(`/market/candles/${symbol}`, { params: { interval, range, market } }),
   getIndicators: (symbol: string, interval = '1d', range = '1y') =>
     api.get(`/market/indicators/${symbol}`, { params: { interval, range } }),
 };
@@ -220,6 +220,91 @@ export const getCurrencySymbol = (market = 'US') => {
   return (market === 'IN' || market === 'NSE' || market === 'BSE') ? '₹' : '$';
 };
 
+// Investor Profile API
+export const investorProfileAPI = {
+  save: (profile: any) => api.post('/investor-profile/save', profile),
+  load: (userId = 'default') => api.get(`/investor-profile/load`, { params: { user_id: userId } }),
+  trade: (payload: { symbol: string; side: 'buy' | 'sell'; quantity?: number; amount?: number; user_id?: string }) =>
+    api.post('/investor-profile/trade', payload),
+  getPortfolio: (userId = 'default') => api.get('/investor-profile/portfolio', { params: { user_id: userId } }),
+};
+
+// Stock Advisor API (Multi-POV + Auto-Recommend)
+export const stockAdvisorAPI = {
+  recommend: (payload: { user_input: string; user_id?: string; market?: string }) =>
+    api.post('/stock-advisor/recommend', payload),
+  multiPov: (payload: { symbol: string; market?: string; context?: string }) =>
+    api.post('/stock-advisor/multi-pov', payload),
+};
+
+// Market Pulse API (Sentiment + Sector News)
+export const marketPulseAPI = {
+  sentiment: (payload: { message: string; tickers?: string[]; market?: string }) =>
+    api.post('/market-pulse/sentiment', payload),
+  getSectorNews: (market = 'US', sector?: string, limit = 20) =>
+    api.get('/market-pulse/sector-news', { params: { market, sector, limit } }),
+};
+
+// Sector Intelligence API
+export const sectorIntelAPI = {
+  getLatest: (market?: string, sector?: string) =>
+    api.get('/sector-intel/latest', { params: { market, sector } }),
+
+  refresh: (sector?: string, market?: string, force = false) =>
+    api.post('/sector-intel/refresh', { sector, market, force }),
+
+  recommend: (payload: {
+    market?: string;
+    risk_score?: number;
+    risk_tolerance?: string;
+    time_horizon_years?: number;
+    goal?: string;
+    limit?: number;
+  }) => api.post('/sector-intel/recommend', payload),
+
+  getSectorStocks: (
+    sector: string,
+    market = 'US',
+    limit = 10,
+    include_fundamentals = true,
+    include_technicals = false,
+    include_news = true
+  ) =>
+    api.get(`/sector-intel/sector/${encodeURIComponent(sector)}/stocks`, {
+      params: {
+        market,
+        limit,
+        include_fundamentals,
+        include_technicals,
+        include_news,
+      },
+    }),
+};
+
+// Long Term Strategy API
+export const longTermAPI = {
+  analyze: (payload: {
+    ticker: string;
+    market?: string;
+    risk_profile?: string;
+    capital?: number;
+    monthly_investment?: number
+  }) => api.post('/long-term/analyze', payload),
+};
+
+// Technical Analysis API
+export const technicalAPI = {
+  getStrategies: () => api.get('/technical/strategies'),
+  analyze: (payload: {
+    symbol: string;
+    strategy: string;
+    period?: string;
+    interval?: string;
+    market?: string;
+    params?: string;
+  }) => api.get('/technical/analyze', { params: payload }),
+};
+
 // Format large numbers (for market cap, volume etc)
 export const formatLargeNumber = (value: number | string | null | undefined, market = 'US') => {
   if (value === null || value === undefined) return '-';
@@ -233,7 +318,7 @@ export const formatLargeNumber = (value: number | string | null | undefined, mar
   if (absNum >= 1e9) return `${currSymbol}${(num / 1e9).toFixed(2)}B`;
   if (absNum >= 1e6) return `${currSymbol}${(num / 1e6).toFixed(2)}M`;
   if (absNum >= 1e3) return `${currSymbol}${(num / 1e3).toFixed(2)}K`;
-  
+
   return `${currSymbol}${num.toFixed(2)}`;
 };
 

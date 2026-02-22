@@ -335,30 +335,38 @@ class LangChainTools:
         import pandas as pd
         
         try:
-            end_date = pd.Timestamp.now().strftime('%Y-%m-%d')
-            start_date = (pd.Timestamp.now() - pd.DateOffset(years=1)).strftime('%Y-%m-%d')
+            from backend.services.backtest_service import run_backtest_service
             
-            # Run short-term analysis which includes backtesting
-            results_df = self.orchestrator.run_short_term_analysis(
-                tickers=[ticker],
-                start_date=start_date,
-                end_date=end_date,
+            # Default parameters
+            initial_capital = 10000.0
+            
+            # Run backtest
+            results = run_backtest_service(
+                symbol=ticker,
+                strategy_name=strategy,
+                range_period="1y",
+                interval="1d",
+                initial_capital=initial_capital,
                 market=market
             )
             
-            if results_df.empty:
-                return {"error": "No backtest results available", "ticker": ticker}
+            if "error" in results:
+                return results
+                
+            # Summarize for the agent (it can't handle the full equity curve JSON easily)
+            metrics = results.get("metrics", {})
             
-            # Filter for the requested strategy
-            strategy_results = results_df[
-                results_df['Strategy'].str.lower().str.contains(strategy.lower())
-            ]
-            
-            if not strategy_results.empty:
-                return strategy_results.iloc[0].to_dict()
-            else:
-                # Return all strategies
-                return {"strategies": results_df.to_dict(orient='records')}
+            return {
+                "ticker": ticker,
+                "strategy": strategy,
+                "total_return": f"{metrics.get('totalReturn', 0)}%",
+                "max_drawdown": f"{metrics.get('maxDrawdown', 0)}%",
+                "sharpe_ratio": metrics.get("sharpeRatio", 0),
+                "win_rate": f"{metrics.get('winRate', 0)}%",
+                "total_trades": metrics.get("totalTrades", 0),
+                "final_equity": metrics.get("finalEquity", 0),
+                "summary": f"Backtest of {strategy} on {ticker} returned {metrics.get('totalReturn', 0)}% over the last year with a max drawdown of {metrics.get('maxDrawdown', 0)}%."
+            }
                 
         except Exception as e:
             return {"error": str(e), "ticker": ticker}
@@ -511,7 +519,7 @@ Be specific and cite the data. Format your response clearly in markdown."""
         try:
             response = self.llm.run(
                 prompt=prompt, 
-                model_name="xiaomi/mimo-v2-flash:free"
+                model_name="llama-3.3-70b-versatile"
             )
             return response
         except Exception as e:

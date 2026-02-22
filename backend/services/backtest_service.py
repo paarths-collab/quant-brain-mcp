@@ -189,22 +189,112 @@ def _extract_trades(res_df: pd.DataFrame, strategy_name: str) -> List[Dict[str, 
     return trades
 
 
-def _run_monte_carlo(returns: pd.Series, simulations: int = 300) -> Dict[str, Any]:
+def _compute_advanced_trade_metrics(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Compute advanced trade-level metrics."""
+    if not trades:
+        return {
+            "profitFactor": None, "expectancy": None, "sqn": None,
+            "avgWin": None, "avgLoss": None,
+            "maxConsecutiveWins": 0, "maxConsecutiveLosses": 0,
+            "bestTrade": None, "worstTrade": None,
+        }
+
+    pnls = [t.get('pnlPct', 0) or 0 for t in trades]
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p < 0]
+
+    gross_profit = sum(wins) if wins else 0
+    gross_loss = abs(sum(losses)) if losses else 0
+    profit_factor = _safe_number(gross_profit / gross_loss) if gross_loss > 0 else None
+
+    avg_win = _safe_number(np.mean(wins)) if wins else 0
+    avg_loss = _safe_number(np.mean(losses)) if losses else 0
+    n = len(pnls)
+    win_rate = len(wins) / n if n > 0 else 0
+    loss_rate = 1 - win_rate
+    expectancy = _safe_number(win_rate * avg_win + loss_rate * avg_loss)
+
+    std_pnl = float(np.std(pnls)) if len(pnls) > 1 else 0
+    sqn = _safe_number((np.mean(pnls) / std_pnl) * np.sqrt(n)) if std_pnl > 0 else None
+
+    # Max consecutive wins / losses
+    max_con_w, max_con_l, cur_w, cur_l = 0, 0, 0, 0
+    for p in pnls:
+        if p > 0:
+            cur_w += 1; cur_l = 0
+            max_con_w = max(max_con_w, cur_w)
+        elif p < 0:
+            cur_l += 1; cur_w = 0
+            max_con_l = max(max_con_l, cur_l)
+        else:
+            cur_w = 0; cur_l = 0
+
+    return {
+        "profitFactor": round(profit_factor, 2) if profit_factor is not None else None,
+        "expectancy": round(expectancy, 2) if expectancy is not None else None,
+        "sqn": round(sqn, 2) if sqn is not None else None,
+        "avgWin": round(avg_win, 2) if avg_win else None,
+        "avgLoss": round(avg_loss, 2) if avg_loss else None,
+        "maxConsecutiveWins": max_con_w,
+        "maxConsecutiveLosses": max_con_l,
+        "bestTrade": round(max(pnls), 2) if pnls else None,
+        "worstTrade": round(min(pnls), 2) if pnls else None,
+    }
+
+
+def _run_monte_carlo(returns: pd.Series, simulations: int = 1000, initial_capital: float = 100000) -> Dict[str, Any]:
+    """Run Monte Carlo simulation with VaR, CVaR, and full simulation paths."""
     if returns.empty:
-        return {"simulations": 0, "histogram": [], "percentiles": {}}
+        return {"simulations": 0, "histogram": [], "percentiles": {}, "riskMetrics": {}, "simulationPaths": [], "percentilePaths": {}}
 
     clean = returns.dropna().values
     if len(clean) == 0:
-        return {"simulations": 0, "histogram": [], "percentiles": {}}
+        return {"simulations": 0, "histogram": [], "percentiles": {}, "riskMetrics": {}, "simulationPaths": [], "percentilePaths": {}}
+
+    n_steps = len(clean)
+    # Downsample to max 50 points for charting
+    max_points = 50
+    step_size = max(1, n_steps // max_points)
+    sample_indices = list(range(0, n_steps, step_size))
+    if sample_indices[-1] != n_steps - 1:
+        sample_indices.append(n_steps - 1)
 
     sim_returns = []
+    sim_max_drawdowns = []
+    all_equity_curves = []  # Store all simulation paths
+
     for _ in range(simulations):
-        sample = np.random.choice(clean, size=len(clean), replace=True)
+        sample = np.random.choice(clean, size=n_steps, replace=True)
         total = (1 + sample).prod() - 1
         sim_returns.append(total * 100)
 
-    bins = 20
-    counts, edges = np.histogram(sim_returns, bins=bins)
+        # Full equity curve for this simulation
+        equity = np.cumprod(1 + sample)
+        peak = np.maximum.accumulate(equity)
+        dd = ((equity - peak) / peak).min() * 100
+        sim_max_drawdowns.append(dd)
+
+        # Downsample the equity curve
+        sampled = equity[sample_indices]
+        all_equity_curves.append(sampled)
+
+    sim_arr = np.array(sim_returns)
+    equity_matrix = np.array(all_equity_curves)  # shape: (simulations, n_sample_points)
+
+    # Build simulation paths for charting (all paths) — in dollar values
+    simulation_paths = []
+    for i in range(simulations):
+        path = [round(float(equity_matrix[i, j]) * initial_capital, 2) for j in range(len(sample_indices))]
+        simulation_paths.append(path)
+
+    # Compute percentile paths across all simulations at each time step — in dollar values
+    percentile_paths = {}
+    for pct_name, pct_val in [("p5", 5), ("p25", 25), ("p50", 50), ("p75", 75), ("p95", 95)]:
+        pct_curve = np.percentile(equity_matrix, pct_val, axis=0)
+        percentile_paths[pct_name] = [round(float(v) * initial_capital, 2) for v in pct_curve]
+
+    bins = 30
+    counts, edges = np.histogram(sim_arr, bins=bins)
     histogram = []
     for i in range(len(counts)):
         mid = (edges[i] + edges[i + 1]) / 2
@@ -214,15 +304,37 @@ def _run_monte_carlo(returns: pd.Series, simulations: int = 300) -> Dict[str, An
         })
 
     percentiles = {
-        "p5": _safe_number(np.percentile(sim_returns, 5)),
-        "p50": _safe_number(np.percentile(sim_returns, 50)),
-        "p95": _safe_number(np.percentile(sim_returns, 95)),
+        "p5": _safe_number(np.percentile(sim_arr, 5)),
+        "p10": _safe_number(np.percentile(sim_arr, 10)),
+        "p25": _safe_number(np.percentile(sim_arr, 25)),
+        "p50": _safe_number(np.percentile(sim_arr, 50)),
+        "p75": _safe_number(np.percentile(sim_arr, 75)),
+        "p90": _safe_number(np.percentile(sim_arr, 90)),
+        "p95": _safe_number(np.percentile(sim_arr, 95)),
     }
+
+    # VaR and CVaR at 95% confidence
+    var_95 = float(np.percentile(sim_arr, 5))  # 5th percentile = 95% VaR
+    cvar_95 = float(sim_arr[sim_arr <= var_95].mean()) if (sim_arr <= var_95).any() else var_95
+    ruin_count = int((sim_arr < -50).sum())  # Ruin = losing > 50%
+    median_dd = float(np.median(sim_max_drawdowns))
 
     return {
         "simulations": simulations,
         "histogram": histogram,
-        "percentiles": percentiles
+        "percentiles": percentiles,
+        "riskMetrics": {
+            "var95": _safe_number(round(var_95, 2)),
+            "cvar95": _safe_number(round(cvar_95, 2)),
+            "ruinProbability": round((ruin_count / simulations) * 100, 2),
+            "medianMaxDrawdown": _safe_number(round(median_dd, 2)),
+            "worstCase": _safe_number(round(float(sim_arr.min()), 2)),
+            "bestCase": _safe_number(round(float(sim_arr.max()), 2)),
+            "meanReturn": _safe_number(round(float(sim_arr.mean()), 2)),
+        },
+        "simulationPaths": simulation_paths,
+        "percentilePaths": percentile_paths,
+        "pathSteps": len(sample_indices),
     }
 
 def run_backtest_service(
@@ -305,11 +417,16 @@ def run_backtest_service(
     sharpe_ratio = (returns.mean() / returns.std()) * np.sqrt(252) if returns.std() != 0 else 0
     downside = returns[returns < 0]
     sortino_ratio = (returns.mean() / downside.std()) * np.sqrt(252) if downside.std() != 0 else 0
+    annual_volatility = float(returns.std() * np.sqrt(252) * 100) if returns.std() != 0 else 0
 
     periods = max(len(res_df), 1)
     annual_return = (res_df['equity'].iloc[-1] / initial_capital) ** (252 / periods) - 1 if periods > 1 else 0
     calmar_ratio = annual_return / abs(res_df['drawdown'].min()) if res_df['drawdown'].min() != 0 else 0
     max_dd_duration = _compute_drawdown_duration(res_df['drawdown'])
+
+    # Time in market
+    positions = res_df['position'].fillna(0)
+    time_in_market = round((positions != 0).sum() / len(positions) * 100, 1) if len(positions) > 0 else 0
 
     trades = _extract_trades(res_df, strategy_name)
     total_trades = len(trades)
@@ -317,6 +434,9 @@ def run_backtest_service(
     if total_trades > 0:
         wins = len([t for t in trades if (t.get('pnl') or 0) > 0])
         win_rate = (wins / total_trades) * 100
+
+    # Advanced trade metrics
+    adv = _compute_advanced_trade_metrics(trades)
     
     return {
         "symbol": symbol,
@@ -331,12 +451,23 @@ def run_backtest_service(
             "winRate": round(win_rate, 1),
             "totalTrades": total_trades,
             "initialCapital": initial_capital,
-            "finalEquity": round(res_df['equity'].iloc[-1], 2)
+            "finalEquity": round(res_df['equity'].iloc[-1], 2),
+            "annualVolatility": round(annual_volatility, 2),
+            "timeInMarket": time_in_market,
+            "profitFactor": adv["profitFactor"],
+            "expectancy": adv["expectancy"],
+            "sqn": adv["sqn"],
+            "avgWin": adv["avgWin"],
+            "avgLoss": adv["avgLoss"],
+            "maxConsecutiveWins": adv["maxConsecutiveWins"],
+            "maxConsecutiveLosses": adv["maxConsecutiveLosses"],
+            "bestTrade": adv["bestTrade"],
+            "worstTrade": adv["worstTrade"],
         },
         "chartData": chart_data,
         "trades": trades,
         "equity_curve": [{**d, "value": d["equity"], "benchmark": d["close"]} for d in chart_data],
-        "monteCarlo": _run_monte_carlo(returns)
+        "monteCarlo": _run_monte_carlo(returns, initial_capital=initial_capital)
     }
 
 
@@ -393,11 +524,16 @@ def run_multi_strategy_backtest(
             sharpe_ratio = (returns.mean() / returns.std()) * np.sqrt(252) if returns.std() != 0 else 0
             downside = returns[returns < 0]
             sortino_ratio = (returns.mean() / downside.std()) * np.sqrt(252) if downside.std() != 0 else 0
+            annual_volatility = float(returns.std() * np.sqrt(252) * 100) if returns.std() != 0 else 0
 
             periods = max(len(res_df), 1)
             annual_return = (res_df['equity'].iloc[-1] / initial_capital) ** (252 / periods) - 1 if periods > 1 else 0
             calmar_ratio = annual_return / abs(res_df['drawdown'].min()) if res_df['drawdown'].min() != 0 else 0
             max_dd_duration = _compute_drawdown_duration(res_df['drawdown'])
+
+            # Time in market
+            positions = res_df['position'].fillna(0)
+            time_in_market = round((positions != 0).sum() / len(positions) * 100, 1) if len(positions) > 0 else 0
 
             trades = _extract_trades(res_df, strategy_name)
             total_trades = len(trades)
@@ -405,6 +541,9 @@ def run_multi_strategy_backtest(
             if total_trades > 0:
                 wins = len([t for t in trades if (t.get('pnl') or 0) > 0])
                 win_rate = (wins / total_trades) * 100
+
+            # Advanced trade metrics
+            adv = _compute_advanced_trade_metrics(trades)
             
             strategy_results[strategy_name] = {
                 "name": strategy_name,
@@ -418,10 +557,21 @@ def run_multi_strategy_backtest(
                     "maxDrawdownDuration": max_dd_duration,
                     "winRate": round(win_rate, 1),
                     "totalTrades": total_trades,
-                    "finalEquity": round(res_df['equity'].iloc[-1], 2)
+                    "finalEquity": round(res_df['equity'].iloc[-1], 2),
+                    "annualVolatility": round(annual_volatility, 2),
+                    "timeInMarket": time_in_market,
+                    "profitFactor": adv["profitFactor"],
+                    "expectancy": adv["expectancy"],
+                    "sqn": adv["sqn"],
+                    "avgWin": adv["avgWin"],
+                    "avgLoss": adv["avgLoss"],
+                    "maxConsecutiveWins": adv["maxConsecutiveWins"],
+                    "maxConsecutiveLosses": adv["maxConsecutiveLosses"],
+                    "bestTrade": adv["bestTrade"],
+                    "worstTrade": adv["worstTrade"],
                 },
                 "trades": trades,
-                "monteCarlo": _run_monte_carlo(returns),
+                "monteCarlo": _run_monte_carlo(returns, initial_capital=initial_capital),
                 "equityCurve": [
                     {"date": str(row['Date']), "value": round(row['equity'], 2)}
                     for _, row in res_df.iterrows()

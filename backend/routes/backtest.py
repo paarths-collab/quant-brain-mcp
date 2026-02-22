@@ -1,5 +1,5 @@
 import math
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
 from backend.services.backtest_service import run_backtest_service, run_multi_strategy_backtest, generate_backtest_report, prepare_candles_df, run_backtest_on_df
 from backend.services.strategies.strategy_adapter import STRATEGY_REGISTRY
@@ -8,10 +8,90 @@ from typing import Dict, Any, List
 from datetime import datetime
 from pathlib import Path
 import numpy as np
+import json
+import asyncio
 
 router = APIRouter(prefix="/api/backtest", tags=["Backtest"])
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
+
+
+@router.websocket("/ws")
+async def backtest_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time backtest updates.
+    Client sends: {"symbol": "AAPL", "strategy": "ema_crossover", "range": "1y", "params": {...}}
+    Server sends progress updates and final result.
+    """
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            payload = json.loads(data)
+            
+            symbol = payload.get("symbol")
+            if not symbol:
+                await websocket.send_json({"error": "Symbol is required"})
+                continue
+            
+            # Send starting notification
+            await websocket.send_json({
+                "status": "starting",
+                "message": f"Running backtest for {symbol}..."
+            })
+            
+            # Run backtest in thread pool to avoid blocking
+            try:
+                strategy = payload.get("strategy") or payload.get("strategies", [None])[0]
+                if not strategy:
+                    await websocket.send_json({"error": "Strategy is required"})
+                    continue
+                
+                # Send data fetching status
+                await websocket.send_json({
+                    "status": "fetching",
+                    "message": "Fetching market data..."
+                })
+                
+                # Run backtest
+                result = await asyncio.to_thread(
+                    run_backtest_service,
+                    symbol=symbol,
+                    strategy_name=strategy,
+                    range_period=payload.get("range", "1y"),
+                    start_date=payload.get("start"),
+                    end_date=payload.get("end"),
+                    **payload.get("params", {})
+                )
+                
+                if "error" in result:
+                    await websocket.send_json({"error": result["error"]})
+                else:
+                    # Send progress update
+                    await websocket.send_json({
+                        "status": "processing",
+                        "message": "Calculating metrics..."
+                    })
+                    
+                    # Send final result
+                    await websocket.send_json({
+                        "status": "complete",
+                        "data": _sanitize_floats(result)
+                    })
+                    
+            except Exception as e:
+                await websocket.send_json({
+                    "status": "error",
+                    "error": str(e)
+                })
+                
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        try:
+            await websocket.send_json({"error": str(e)})
+        except:
+            pass
 
 
 def _sanitize_floats(obj):

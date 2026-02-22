@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, RefreshCw, DollarSign, IndianRupee, Activity, Globe2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, DollarSign, IndianRupee, Activity, Globe2, Briefcase } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatCurrency, getCurrencySymbol, treemapAPI, fredAPI } from '@/api';
+import { formatCurrency, getCurrencySymbol, treemapAPI, fredAPI, investorProfileAPI } from '@/api';
 
 const watchlistSymbols = {
   IN: ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS'],
@@ -66,6 +66,7 @@ export default function Dashboard() {
   const [indices, setIndices] = useState<Index[]>([]);
   const [globalMarkets, setGlobalMarkets] = useState<GlobalMarketPoint[]>([]);
   const [portfolioData, setPortfolioData] = useState<any[]>([]);
+  const [realPortfolio, setRealPortfolio] = useState<any>(null); // New state for real portfolio
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -86,9 +87,9 @@ export default function Dashboard() {
         .map(r => ({
           symbol: r.data.symbol,
           name: r.data.name || r.data.symbol,
-          price: r.data.price || 0,
-          change: r.data.change_percent || 0,
-          value: (r.data.price || 0) * 100,
+          price: r.data.price?.current || 0,
+          change: r.data.price?.change_percent || 0,
+          value: (r.data.price?.current || 0) * 100, // Dummy value calculation for watchlist
         }));
 
       setHoldings(validResults);
@@ -97,16 +98,32 @@ export default function Dashboard() {
     }
   };
 
+  const fetchRealPortfolio = async () => {
+    try {
+      const { data } = await investorProfileAPI.getPortfolio();
+      setRealPortfolio(data);
+    } catch (e) {
+      console.error('Failed to fetch portfolio', e);
+    }
+  };
+
   const fetchIndices = async () => {
     try {
       const symbols = indexSymbols[market];
       const promises = symbols.map(idx =>
         treemapAPI.getStockDetails(idx, market === 'IN' ? 'india' : 'us')
-          .then(r => ({
-            name: indexNames[idx] || idx,
-            value: r.data?.price || 0,
-            change: r.data?.change_percent || 0,
-          }))
+          .then(r => {
+            // Handle case where price is a nested object (from get_stock_details)
+            const priceData = r.data?.price;
+            const priceVal = typeof priceData === 'object' ? priceData?.current : priceData;
+            const changeVal = typeof priceData === 'object' ? priceData?.change_percent : r.data?.change_percent;
+
+            return {
+              name: indexNames[idx] || idx,
+              value: priceVal || 0,
+              change: changeVal || 0,
+            };
+          })
           .catch(() => ({ name: indexNames[idx] || idx, value: 0, change: 0 }))
       );
 
@@ -144,8 +161,12 @@ export default function Dashboard() {
   const generatePortfolioData = () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     let baseValue = market === 'IN' ? 1000000 : 100000;
-    const data = months.map((month) => {
-      const change = 1 + (Math.random() * 0.08 - 0.02);
+    const prand = (n: number) => {
+      const x = Math.sin(n * 9999.123) * 10000;
+      return x - Math.floor(x);
+    };
+    const data = months.map((month, i) => {
+      const change = 1 + (prand(i) * 0.08 - 0.02);
       baseValue = baseValue * change;
       return { date: month, value: Math.round(baseValue) };
     });
@@ -156,7 +177,7 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      await Promise.all([fetchHoldings(), fetchIndices(), fetchGlobalMarkets()]);
+      await Promise.all([fetchHoldings(), fetchIndices(), fetchGlobalMarkets(), fetchRealPortfolio()]);
       generatePortfolioData();
     } catch (err) {
       setError('Failed to load data. Make sure backend is running on port 8000.');
@@ -169,11 +190,10 @@ export default function Dashboard() {
     fetchData();
   }, [market]);
 
-  const totalValue = holdings.reduce((sum, h) => sum + h.value, 0);
-  const todayChange = holdings.reduce((sum, h) => sum + (h.value * h.change / 100), 0);
-  const totalReturn = portfolioData.length > 1 
-    ? ((portfolioData[portfolioData.length - 1]?.value - portfolioData[0]?.value) / portfolioData[0]?.value * 100)
-    : 0;
+  // Use Real Portfolio Data if available, else fallbacks
+  const totalValue = realPortfolio ? realPortfolio.total_value : 0;
+  const totalPL = realPortfolio ? realPortfolio.total_pl : 0;
+  const totalPLPct = realPortfolio ? realPortfolio.total_pl_pct : 0;
 
   return (
     <div className="space-y-6">
@@ -200,37 +220,40 @@ export default function Dashboard() {
       {error && <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400">{error}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Total Value Card */}
         <div className="p-6 bg-white/5 border border-white/10 rounded-xl">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-orange-500/20 rounded-lg">
-              {market === 'IN' ? <IndianRupee className="text-orange-400" size={20} /> : <DollarSign className="text-orange-400" size={20} />}
+              <Briefcase className="text-orange-400" size={20} />
             </div>
-            <span className="text-sm text-white/60">Total Value</span>
+            <span className="text-sm text-white/60">Portfolio Value</span>
           </div>
           <div className="text-3xl font-bold text-white mb-1">{formatCurrency(totalValue, market)}</div>
         </div>
 
+        {/* Total P&L Card (Replaces Daily Change) */}
         <div className="p-6 bg-white/5 border border-white/10 rounded-xl">
           <div className="flex items-center gap-3 mb-3">
-            <div className={`p-2 rounded-lg ${todayChange >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-              {todayChange >= 0 ? <TrendingUp className="text-green-500" size={20} /> : <TrendingDown className="text-red-500" size={20} />}
+            <div className={`p-2 rounded-lg ${totalPL >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+              {totalPL >= 0 ? <TrendingUp className="text-green-500" size={20} /> : <TrendingDown className="text-red-500" size={20} />}
             </div>
-            <span className="text-sm text-white/60">Today's {todayChange >= 0 ? 'Gain' : 'Loss'}</span>
+            <span className="text-sm text-white/60">Total P&L</span>
           </div>
-          <div className={`text-3xl font-bold ${todayChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {todayChange >= 0 ? '+' : ''}{formatCurrency(Math.abs(todayChange), market)}
+          <div className={`text-3xl font-bold ${totalPL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {totalPL >= 0 ? '+' : ''}{formatCurrency(Math.abs(totalPL), market)}
           </div>
         </div>
 
+        {/* Total Return % Card */}
         <div className="p-6 bg-white/5 border border-white/10 rounded-xl">
           <div className="flex items-center gap-3 mb-3">
-            <div className={`p-2 rounded-lg ${totalReturn >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-              <Activity className={totalReturn >= 0 ? 'text-green-500' : 'text-red-500'} size={20} />
+            <div className={`p-2 rounded-lg ${totalPLPct >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+              <Activity className={totalPLPct >= 0 ? 'text-green-500' : 'text-red-500'} size={20} />
             </div>
-            <span className="text-sm text-white/60">Total Return</span>
+            <span className="text-sm text-white/60">Return %</span>
           </div>
-          <div className={`text-3xl font-bold ${totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(1)}%
+          <div className={`text-3xl font-bold ${totalPLPct >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {totalPLPct >= 0 ? '+' : ''}{totalPLPct.toFixed(2)}%
           </div>
         </div>
       </div>
@@ -242,13 +265,13 @@ export default function Dashboard() {
             <AreaChart data={portfolioData}>
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#FF9500" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#FF9500" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#FF9500" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#FF9500" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} tickFormatter={(v) => `${symbol}${(v/1000).toFixed(0)}K`} />
-              <Tooltip 
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`} />
+              <Tooltip
                 contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
                 formatter={(value: any) => [formatCurrency(value, market), 'Value']}
               />

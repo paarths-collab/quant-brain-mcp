@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import os
+import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -61,6 +62,22 @@ class WealthAnalysisResponse(BaseModel):
 _wealth_manager: Optional[WealthOrchestrator] = None
 
 
+def sanitize_floats(obj: Any) -> Any:
+    """
+    Recursively walk a data structure and replace inf, -inf, and NaN
+    with None, as they are not JSON compliant.
+    """
+    if isinstance(obj, dict):
+        return {k: sanitize_floats(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_floats(elem) for elem in obj]
+    elif isinstance(obj, float):
+        if math.isinf(obj) or math.isnan(obj):
+            return None
+        return obj
+    return obj
+
+
 def get_wealth_manager() -> WealthOrchestrator:
     global _wealth_manager
     if _wealth_manager is None:
@@ -76,7 +93,7 @@ def map_wealth_state_to_response(state: Dict[str, Any]) -> Dict[str, Any]:
     primary_stock = state.get("selected_stock") or (selected_stocks[0] if selected_stocks else None)
     errors = state.get("errors", []) or []
 
-    return {
+    return sanitize_floats({
         "success": not errors,
         "report": state.get("investment_report", ""),
         "profile": state.get("user_profile"),
@@ -93,7 +110,7 @@ def map_wealth_state_to_response(state: Dict[str, Any]) -> Dict[str, Any]:
         "execution_log": state.get("execution_log", []) or [],
         "errors": errors,
         "timestamp": datetime.now().isoformat(),
-    }
+    })
 
 
 @router.post("/analyze", response_model=WealthAnalysisResponse)

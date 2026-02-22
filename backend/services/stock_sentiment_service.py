@@ -267,16 +267,16 @@ def fetch_duckduckgo_news(company_name: str, symbol: str, limit: int = 8) -> Dic
     Fetch recent news articles via DuckDuckGo News.
     Returns a dict with query + articles.
     """
-    if not DDGS_AVAILABLE or DDGSClient is None:
-        return {"source": "duckduckgo", "query": None, "articles": []}
+    from backend.services.news_service import news_service
 
     clean_symbol = symbol.replace(".NS", "").replace(".BO", "")
     company = company_name or clean_symbol
     query = f"\"{company}\" {clean_symbol} stock news"
 
     try:
-        with DDGSClient() as ddgs:
-            results = list(ddgs.news(keywords=query, max_results=limit))
+        # Use centralized news service
+        results = news_service.get_news(query, limit)
+        
         articles = []
         for r in results:
             articles.append({

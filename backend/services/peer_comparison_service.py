@@ -347,15 +347,29 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
     if premium_enabled and not FINNHUB_API_KEY and not FMP_API_KEY:
         raise RuntimeError("FINNHUB_API_KEY or FMP_API_KEY must be configured")
 
-    if not premium_enabled and not _is_demo_allowed(sym):
-        return {
-            "symbol": sym,
-            "count": 0,
-            "rows": [],
-            "restricted": True,
-            "message": "Peer comparison is a premium feature. Demo symbols are limited to select Indian stocks.",
-            "allowed_symbols": INDIA_FALLBACK_UNIVERSE,
-        }
+    # Logic Update:
+    # 1. Premium users: All allowed.
+    # 2. Non-premium:
+    #    - India (.NS/.BO): Restricted to INDIA_FALLBACK_UNIVERSE.
+    #    - US/Global: All allowed (Bypass premium check).
+
+    is_india = _is_india_symbol(sym)
+    
+    if not premium_enabled:
+        # If India, enforce strict list
+        if is_india and not _is_demo_allowed(sym):
+             return {
+                "symbol": sym,
+                "count": 0,
+                "rows": [],
+                "restricted": True,
+                "message": (
+                    "Indian peer comparison is limited to specific demo stocks. "
+                    "Please try RELIANCE, TCS, HDFCBANK, etc."
+                ),
+                "allowed_symbols": INDIA_FALLBACK_UNIVERSE,
+            }
+        # If NOT India (US/Global), we allow it! (Unlock feature)
 
     symbols: List[str] = []
     peers_from_fmp: List[str] = []
@@ -363,23 +377,28 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
     
     # Finnhub peers + company names (preferred)
     peers_from_finnhub: List[str] = []
-    if premium_enabled and fh_sym:
-        fh_peers = _finnhub_peers(fh_sym)
-        for p in fh_peers:
-            if p not in symbols:
-                symbols.append(p)
-        peers_from_finnhub = fh_peers
-        base_name = _finnhub_company_name(fh_sym)
-        if base_name:
-            name_map[sym] = base_name
-        for p in fh_peers[: max(1, limit)]:
-            name = _finnhub_company_name(p)
-            if name:
-                name_map[p] = name
+    
+    # Attempt Finnhub if key present (regardless of premium, if we have key)
+    if FINNHUB_API_KEY and fh_sym:
+        try:
+            fh_peers = _finnhub_peers(fh_sym)
+            for p in fh_peers:
+                if p not in symbols:
+                    symbols.append(p)
+            peers_from_finnhub = fh_peers
+            base_name = _finnhub_company_name(fh_sym)
+            if base_name:
+                name_map[sym] = base_name
+            for p in fh_peers[: max(1, limit)]:
+                name = _finnhub_company_name(p)
+                if name:
+                    name_map[p] = name
+        except Exception:
+            pass
 
     # Fallback: FMP peers if Finnhub returned none
     peers_data = None
-    if premium_enabled and not symbols and FMP_API_KEY:
+    if not symbols and FMP_API_KEY:
         peers_urls = [
             f"https://financialmodelingprep.com/stable/stock-peers?symbol={sym}&apikey={FMP_API_KEY}",
             f"https://financialmodelingprep.com/api/v4/stock_peers?symbol={sym}&apikey={FMP_API_KEY}",
@@ -412,21 +431,24 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
 
     # Try screener as additional source
     peers_from_screener: List[str] = []
-    if premium_enabled and not symbols and FMP_API_KEY:
+    if not symbols and FMP_API_KEY:
         screener_peers = _fmp_screener_peers(sym, limit=limit)
         for p in screener_peers:
             if p not in symbols:
                 symbols.append(p)
         peers_from_screener = screener_peers
 
-    # India fallback: manual overrides + NIFTY universe
+    # India fallback: STRICTLY enforce list for Indian stocks if they are in the universe
     india_fallback: List[str] = []
-    if _is_india_symbol(sym) and len(symbols) <= 1:
-        fallback_peers = _india_peer_fallback(sym, limit=limit)
-        for p in fallback_peers:
+    # If it's an India stock, we want to ensure we get good peers.
+    # Even if APIs returned something, if it's garbage, we prefer our list.
+    # But for now, let's append our list if symbols are few.
+    if is_india and (len(symbols) <= 2 or sym in INDIA_FALLBACK_UNIVERSE):
+         fallback_peers = _india_peer_fallback(sym, limit=limit)
+         for p in fallback_peers:
             if p not in symbols:
                 symbols.append(p)
-        india_fallback = fallback_peers
+         india_fallback = fallback_peers
 
     # Ensure the original symbol is first
     if sym not in symbols:

@@ -1,0 +1,123 @@
+Initializing Orchestrator...
+Running analysis for: Technology
+Resolving sector: Technology
+≡ƒöì Resolving Sector: technology
+Γ£à Found partial index match: 'technology select sector'
+Analyzing 20 stocks: ['MSFT', 'AAPL', 'NVDA', 'AVGO', 'AMD', 'ADBE', 'CRM', 'CSCO', 'QCOM', 'ACN', 'INTU', 'TXN', 'IBM', 'ORCL', 'AMAT', 'MU', 'NOW', 'LRCX', 'PANW', 'ADI']
+Detected Region: US. Fetching Market Context...
+Market P/E: {'trailing_pe': 27.451393, 'forward_pe': None}
+Deciding best stock...
+Generating Strategy Report for: ['AVGO', 'NVDA', 'MSFT', 'AAPL', 'AMD']
+Generating Strategy Report for: ['AVGO', 'NVDA', 'MSFT', 'AAPL', 'AMD']
+   -> Analyzing strategy for AVGO...
+≡ƒôë Backtesting portfolio: ['AVGO']...
+   -> Analyzing strategy for NVDA...
+≡ƒôë Backtesting portfolio: ['NVDA']...
+   -> Analyzing strategy for MSFT...
+≡ƒôë Backtesting portfolio: ['MSFT']...
+   -> Analyzing strategy for AAPL...
+≡ƒôë Backtesting portfolio: ['AAPL']...
+   -> Analyzing strategy for AMD...
+≡ƒôë Backtesting portfolio: ['AMD']...
+
+--- DECISION RESULT ---
+Top Pick: AVGO
+Explanation:
+Based on the provided data, I recommend AVGO (Broadcom Inc.) as the top investment candidate. Here's a comparison with the runner-up, NVDA (NVIDIA Corporation):
+
+**Key similarities:**
+
+1. Both AVGO and NVDA have a "rich valuation" with a P/E ratio of 100.0, indicating a potential risk of overvaluation.
+2. Both have a similar technical score of 6.5, driven by a positive MACD crossover, which is a bullish indicator.
+3. Both have an aggressive risk profile and medium to high volatility.
+
+**Key differences:**
+
+1. **News score:** AVGO has a higher news score (5.7) compared to NVDA (3.2), driven by strong Q4 FY25 earnings, data-center networking growth, and potential catalysts like the Marvell acquisition and AI-X silicon-photonic accelerator.
+2. **Catalysts:** AVGO has more diverse catalysts, including the Marvell acquisition, AI-X silicon-photonic accelerator, and growth in Infrastructure Software, whereas NVDA's catalysts are primarily focused on the launch and adoption of the Blackwell B2 GPU series.
+3. **Risk flags:** Both companies have similar risk flags, including antitrust clearance risk, execution risk, and potential macroeconomic slowdown. However, AVGO's risk flags are more specific to its pending Marvell acquisition and AI-X product scaling.
+
+**Confidence level:**
+The confidence level in the relative ranking is low, with a score spread of 0.50 between AVGO and NVDA. This indicates that the ranking is not definitive, and NVDA could potentially outperform AVGO.
+
+**Recommendation:**
+Given the analysis, I recommend AVGO as the top investment candidate due to its stronger news score, diverse catalysts, and potential for growth in data-center networking and AI-X silicon-photonic accelerator. However, investors should be aware of the potential risks, including antitrust clearance, execution, and macroeconomic slowdown. The low confidence level in the relative ranking suggests that NVDA is still a viable investment option, and investors should closely monitor both companies' performance and adjust their portfolios accordingly.
+
+Rankings:
+- AVGO: 4.54 (Fund: 2, Tech: 6.5)
+- NVDA: 4.04 (Fund: 2, Tech: 6.5)
+- MSFT: 3.12 (Fund: 2, Tech: 3.5)
+- AAPL: 2.9 (Fund: 2, Tech: 3.5)
+- AMD: 2.6 (Fund: 2, Tech: 3.0)
+
+Strategy Engine Report (Portfolio: AVGO, NVDA, MSFT, AAPL, AMD)
+
+≡ƒö╣ AVGO Strategy Analysis:
+   Period: 3Y
+     [Backtest] Return: 464.7%, Sharpe: 1.45, Max DD: -41.1%
+     [Monte Carlo] Exp Ret: 107.0%, 5% Worst: -25.5%, 95% Best: 309.5%
+   Period: 1Y
+     [Backtest] Return: 38.8%, Sharpe: 0.90, Max DD: -37.8%
+     [Monte Carlo] Exp Ret: 62.6%, 5% Worst: -41.2%, 95% Best: 227.9%
+   Period: 6M
+     [Backtest] Return: 4.9%, Sharpe: 0.43, Max DD: -25.3%
+     [Monte Carlo] Exp Ret: 22.4%, 5% Worst: -51.7%, 95% Best: 142.8%
+   Period: 1M
+     [Backtest] Return: -4.3%, Sharpe: -0.99, Max DD: -12.4%
+     [Monte Carlo] Exp Ret: -36.7%, 5% Worst: -74.8%, 95% Best: 27.5%
+
+≡ƒö╣ NVDA Strategy Analysis:
+   Period: 3Y
+     [Backtest] Return: 696.6%, Sharpe: 1.65, Max DD: -36.9%
+     [Monte Carlo] Exp Ret: 116.8%, 5% Worst: -18.8%, 95% Best: 325.9%
+   Period: 1Y
+     [Backtest] Return: 39.4%, Sharpe: 0.97, Max DD: -32.7%
+     [Monte Carlo] Exp Ret: 50.0%, 5% Worst: -33.1%, 95% Best: 190.0%
+   Period: 6M
+     [Backtest] Return: 0.4%, Sharpe: 0.20, Max DD: -17.4%
+     [Monte Carlo] Exp Ret: 9.7%, 5% Worst: -42.2%, 95% Best: 82.2%
+   Period: 1M
+     [Backtest] Return: -0.2%, Sharpe: 0.15, Max DD: -10.7%
+     [Monte Carlo] Exp Ret: 8.2%, 5% Worst: -52.8%, 95% Best: 105.4%
+
+≡ƒö╣ MSFT Strategy Analysis:
+   Period: 3Y
+     [Backtest] Return: 51.0%, Sharpe: 0.70, Max DD: -27.2%
+     [Monte Carlo] Exp Ret: 16.8%, 5% Worst: -21.6%, 95% Best: 67.3%
+   Period: 1Y
+     [Backtest] Return: -1.2%, Sharpe: 0.09, Max DD: -27.2%
+     [Monte Carlo] Exp Ret: 1.6%, 5% Worst: -33.7%, 95% Best: 44.5%
+   Period: 6M
+     [Backtest] Return: -22.9%, Sharpe: -1.96, Max DD: -27.2%
+     [Monte Carlo] Exp Ret: -37.9%, 5% Worst: -59.9%, 95% Best: -9.7%
+   Period: 1M
+     [Backtest] Return: -12.6%, Sharpe: -3.23, Max DD: -18.3%
+     [Monte Carlo] Exp Ret: -77.2%, 5% Worst: -90.5%, 95% Best: -53.7%
+
+≡ƒö╣ AAPL Strategy Analysis:
+   Period: 3Y
+     [Backtest] Return: 69.4%, Sharpe: 0.81, Max DD: -33.4%
+     [Monte Carlo] Exp Ret: 22.2%, 5% Worst: -22.7%, 95% Best: 79.6%
+   Period: 1Y
+     [Backtest] Return: 8.5%, Sharpe: 0.41, Max DD: -30.2%
+     [Monte Carlo] Exp Ret: 16.8%, 5% Worst: -36.8%, 95% Best: 89.1%
+   Period: 6M
+     [Backtest] Return: 10.1%, Sharpe: 0.98, Max DD: -13.8%
+     [Monte Carlo] Exp Ret: 23.9%, 5% Worst: -14.5%, 95% Best: 75.2%
+   Period: 1M
+     [Backtest] Return: -1.5%, Sharpe: -0.42, Max DD: -7.9%
+     [Monte Carlo] Exp Ret: -11.4%, 5% Worst: -49.0%, 95% Best: 40.7%
+
+≡ƒö╣ AMD Strategy Analysis:
+   Period: 3Y
+     [Backtest] Return: 141.2%, Sharpe: 0.82, Max DD: -63.0%
+     [Monte Carlo] Exp Ret: 52.8%, 5% Worst: -47.5%, 95% Best: 202.6%
+   Period: 1Y
+     [Backtest] Return: 85.6%, Sharpe: 1.28, Max DD: -31.9%
+     [Monte Carlo] Exp Ret: 118.8%, 5% Worst: -38.3%, 95% Best: 453.8%
+   Period: 6M
+     [Backtest] Return: 14.6%, Sharpe: 0.73, Max DD: -27.2%
+     [Monte Carlo] Exp Ret: 63.6%, 5% Worst: -60.0%, 95% Best: 275.7%
+   Period: 1M
+     [Backtest] Return: -7.3%, Sharpe: -0.67, Max DD: -25.9%
+     [Monte Carlo] Exp Ret: -41.7%, 5% Worst: -88.9%, 95% Best: 63.4%

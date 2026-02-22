@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, RefreshCw, SlidersHorizontal, Search } from 'lucide-react';
+import { ArrowUpRight, RefreshCw, Search } from 'lucide-react';
 import { peersAPI } from '@/api';
 import { Link } from 'react-router-dom';
 
@@ -17,25 +17,13 @@ type PeerRow = {
   roce: number | null;
 };
 
-const defaultColumns = [
-  { key: 'price', label: 'CMP' },
-  { key: 'pe', label: 'P/E' },
-  { key: 'market_cap', label: 'Market Cap' },
-  { key: 'div_yield', label: 'Div Yield %' },
-  { key: 'net_profit_q', label: 'NP Qtr' },
-  { key: 'profit_q_var', label: 'Qtr Profit Var %' },
-  { key: 'sales_q', label: 'Sales Qtr' },
-  { key: 'sales_q_var', label: 'Qtr Sales Var %' },
-  { key: 'roce', label: 'ROCE %' },
-];
-
 export default function Relationships() {
+  const [market, setMarket] = useState<'US' | 'IN'>('US');
   const [symbol, setSymbol] = useState('AAPL');
   const [query, setQuery] = useState('AAPL');
   const [rows, setRows] = useState<PeerRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [visibleColumns, setVisibleColumns] = useState(defaultColumns.map((c) => c.key));
 
   const fetchPeers = async (sym: string) => {
     setLoading(true);
@@ -55,6 +43,20 @@ export default function Relationships() {
   useEffect(() => {
     fetchPeers(symbol);
   }, []);
+
+  const handleMarketChange = (newMarket: 'US' | 'IN') => {
+    if (newMarket === market) return;
+    setMarket(newMarket);
+    if (newMarket === 'IN') {
+      setSymbol('RELIANCE.NS');
+      setQuery('RELIANCE.NS');
+      fetchPeers('RELIANCE.NS');
+    } else {
+      setSymbol('AAPL');
+      setQuery('AAPL');
+      fetchPeers('AAPL');
+    }
+  };
 
   const formatNumber = (value: number | null, digits = 2) => {
     if (value === null || value === undefined || Number.isNaN(value)) return '—';
@@ -76,25 +78,21 @@ export default function Relationships() {
     return value.toFixed(2);
   };
 
-  const hasColumn = (key: string) => visibleColumns.includes(key);
-
   const sortedRows = useMemo(() => {
     const copy = [...rows];
     return copy;
   }, [rows]);
 
-  const toggleColumn = (key: string) => {
-    if (visibleColumns.includes(key)) {
-      setVisibleColumns(visibleColumns.filter((c) => c !== key));
-    } else {
-      setVisibleColumns([...visibleColumns, key]);
-    }
-  };
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-    fetchPeers(query.trim().toUpperCase());
+
+    let searchTicker = query.trim().toUpperCase();
+    if (market === 'IN' && !searchTicker.endsWith('.NS') && !searchTicker.endsWith('.BO')) {
+      searchTicker += '.NS';
+    }
+
+    fetchPeers(searchTicker);
   };
 
   return (
@@ -115,39 +113,43 @@ export default function Relationships() {
           </div>
         </div>
 
-        <form onSubmit={handleSearch} className="mt-6 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/40 px-4 py-3 flex-1 min-w-[260px]">
-            <Search size={18} className="text-white/40" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Enter ticker (e.g., AAPL, MSFT, TSLA)"
-              className="flex-1 bg-transparent text-white outline-none"
-            />
-          </div>
-          <button type="submit" className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-400">
-            Compare
-          </button>
-          <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60">
-            <SlidersHorizontal size={14} />
-            Columns
-          </div>
-        </form>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {defaultColumns.map((col) => (
+        <div className="mt-6 flex flex-col md:flex-row gap-4 items-start md:items-center">
+          {/* Market Toggle */}
+          <div className="flex p-1 bg-black/40 border border-white/10 rounded-xl">
             <button
-              key={col.key}
-              onClick={() => toggleColumn(col.key)}
-              className={`rounded-full border px-3 py-1 text-xs ${
-                visibleColumns.includes(col.key)
-                  ? 'border-orange-500/60 bg-orange-500/20 text-orange-200'
-                  : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'
-              }`}
+              onClick={() => handleMarketChange('US')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${market === 'US'
+                ? 'bg-orange-500 text-white shadow-lg'
+                : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`}
             >
-              {col.label}
+              US Market
             </button>
-          ))}
+            <button
+              onClick={() => handleMarketChange('IN')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${market === 'IN'
+                ? 'bg-orange-500 text-white shadow-lg'
+                : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`}
+            >
+              Indian Market
+            </button>
+          </div>
+
+          <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-3 flex-1 w-full">
+            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/40 px-4 py-3 flex-1 min-w-[260px]">
+              <Search size={18} className="text-white/40" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={market === 'IN' ? "Enter ticker (e.g., RELIANCE, TCS, INFY)" : "Enter ticker (e.g., AAPL, MSFT, TSLA)"}
+                className="flex-1 bg-transparent text-white outline-none"
+              />
+            </div>
+            <button type="submit" className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-400">
+              Compare
+            </button>
+          </form>
         </div>
       </div>
 
@@ -170,15 +172,15 @@ export default function Relationships() {
                 <tr>
                   <th className="px-4 py-3 text-left">S.No.</th>
                   <th className="px-4 py-3 text-left">Name</th>
-                  {hasColumn('price') && <th className="px-4 py-3 text-right">CMP</th>}
-                  {hasColumn('pe') && <th className="px-4 py-3 text-right">P/E</th>}
-                  {hasColumn('market_cap') && <th className="px-4 py-3 text-right">Market Cap</th>}
-                  {hasColumn('div_yield') && <th className="px-4 py-3 text-right">Div Yield %</th>}
-                  {hasColumn('net_profit_q') && <th className="px-4 py-3 text-right">NP Qtr</th>}
-                  {hasColumn('profit_q_var') && <th className="px-4 py-3 text-right">Qtr Profit Var %</th>}
-                  {hasColumn('sales_q') && <th className="px-4 py-3 text-right">Sales Qtr</th>}
-                  {hasColumn('sales_q_var') && <th className="px-4 py-3 text-right">Qtr Sales Var %</th>}
-                  {hasColumn('roce') && <th className="px-4 py-3 text-right">ROCE %</th>}
+                  <th className="px-4 py-3 text-right">CMP</th>
+                  <th className="px-4 py-3 text-right">P/E</th>
+                  <th className="px-4 py-3 text-right">Market Cap</th>
+                  <th className="px-4 py-3 text-right">Div Yield %</th>
+                  <th className="px-4 py-3 text-right">NP Qtr</th>
+                  <th className="px-4 py-3 text-right">Qtr Profit Var %</th>
+                  <th className="px-4 py-3 text-right">Sales Qtr</th>
+                  <th className="px-4 py-3 text-right">Qtr Sales Var %</th>
+                  <th className="px-4 py-3 text-right">ROCE %</th>
                   <th className="px-4 py-3 text-right">Details</th>
                 </tr>
               </thead>
@@ -190,23 +192,19 @@ export default function Relationships() {
                       <div className="text-white font-semibold">{row.name}</div>
                       <div className="text-xs text-white/40">{row.symbol}</div>
                     </td>
-                    {hasColumn('price') && <td className="px-4 py-3 text-right text-white">{formatNumber(row.price)}</td>}
-                    {hasColumn('pe') && <td className="px-4 py-3 text-right text-white">{formatNumber(row.pe)}</td>}
-                    {hasColumn('market_cap') && <td className="px-4 py-3 text-right text-white">{formatCompact(row.market_cap)}</td>}
-                    {hasColumn('div_yield') && <td className="px-4 py-3 text-right text-white">{formatPercent(row.div_yield)}</td>}
-                    {hasColumn('net_profit_q') && <td className="px-4 py-3 text-right text-white">{formatCompact(row.net_profit_q)}</td>}
-                    {hasColumn('profit_q_var') && (
-                      <td className={`px-4 py-3 text-right ${row.profit_q_var !== null && row.profit_q_var >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {formatPercent(row.profit_q_var)}
-                      </td>
-                    )}
-                    {hasColumn('sales_q') && <td className="px-4 py-3 text-right text-white">{formatCompact(row.sales_q)}</td>}
-                    {hasColumn('sales_q_var') && (
-                      <td className={`px-4 py-3 text-right ${row.sales_q_var !== null && row.sales_q_var >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {formatPercent(row.sales_q_var)}
-                      </td>
-                    )}
-                    {hasColumn('roce') && <td className="px-4 py-3 text-right text-white">{formatPercent(row.roce)}</td>}
+                    <td className="px-4 py-3 text-right text-white">{formatNumber(row.price)}</td>
+                    <td className="px-4 py-3 text-right text-white">{formatNumber(row.pe)}</td>
+                    <td className="px-4 py-3 text-right text-white">{formatCompact(row.market_cap)}</td>
+                    <td className="px-4 py-3 text-right text-white">{formatPercent(row.div_yield)}</td>
+                    <td className="px-4 py-3 text-right text-white">{formatCompact(row.net_profit_q)}</td>
+                    <td className={`px-4 py-3 text-right ${row.profit_q_var !== null && row.profit_q_var >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {formatPercent(row.profit_q_var)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-white">{formatCompact(row.sales_q)}</td>
+                    <td className={`px-4 py-3 text-right ${row.sales_q_var !== null && row.sales_q_var >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {formatPercent(row.sales_q_var)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-white">{formatPercent(row.roce)}</td>
                     <td className="px-4 py-3 text-right">
                       <Link
                         to={`/research?symbol=${row.symbol}`}

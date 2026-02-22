@@ -522,26 +522,25 @@ def _build_news_context(ticker: str) -> Dict[str, Any]:
     if not _NEWS_FETCHER:
         # Fallback to DuckDuckGo directly
         try:
-            from duckduckgo_search import DDGS
-            with DDGS() as ddgs:
-                results = list(ddgs.news(keywords=f"{ticker} stock", max_results=6))
-                headlines = [r.get("title", "") for r in results]
-                score = calculate_headline_sentiment(headlines)
-                sentiment_label = "neutral"
-                if score >= 0.2:
-                    sentiment_label = "positive"
-                elif score <= -0.2:
-                    sentiment_label = "negative"
-                return {
-                    "available": True,
-                    "type": "market_sentiment",
-                    "scope": "market_sentiment",
-                    "source": "duckduckgo",
-                    "sentiment_score": round(float(score), 3),
-                    "sentiment_label": sentiment_label,
-                    "headlines": headlines[:5],
-                    "items": results[:5],
-                }
+            from backend.services.news_service import news_service
+            results = news_service.get_news(f"{ticker} stock", 6)
+            headlines = [r.get("title", "") for r in results]
+            score = calculate_headline_sentiment(headlines)
+            sentiment_label = "neutral"
+            if score >= 0.2:
+                sentiment_label = "positive"
+            elif score <= -0.2:
+                sentiment_label = "negative"
+            return {
+                "available": True,
+                "type": "market_sentiment",
+                "scope": "market_sentiment",
+                "source": "duckduckgo",
+                "sentiment_score": round(float(score), 3),
+                "sentiment_label": sentiment_label,
+                "headlines": headlines[:5],
+                "items": results[:5],
+            }
         except Exception as e:
             return {"available": False, "reason": f"DDG fallback failed: {e}"}
 

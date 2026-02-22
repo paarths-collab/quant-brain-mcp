@@ -16,12 +16,13 @@ def get_overview():
 def get_candles(
     symbol: str, 
     interval: str = "1d", 
-    range: str = "1y"
+    range: str = "1y",
+    market: str = "US"
 ):
     """
     Returns OHLCV data formatted for D3 charts.
     """
-    data = fetch_candles(symbol, interval, range)
+    data = fetch_candles(symbol, interval, range, market=market)
     if not data:
         raise HTTPException(status_code=404, detail="Data not found")
     return {"symbol": symbol, "data": data}

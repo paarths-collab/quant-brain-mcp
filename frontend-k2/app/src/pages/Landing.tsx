@@ -152,7 +152,7 @@ const HeroSection = () => {
             key={index}
             className={`absolute ${candle.className}`}
             style={{
-              animation: `float ${4 + Math.random() * 2}s ease-in-out infinite`,
+              animation: `float ${4 + (index % 7) * 0.28}s ease-in-out infinite`,
               animationDelay: `${candle.delay}s`,
             }}
           >

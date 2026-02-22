@@ -21,11 +21,14 @@ class SMACrossoverStrategy(Strategy):
         self.short_window = short_window
         self.long_window = long_window
 
+
+    @property
     def parameters(self) -> dict:
         return {
             "short_window": self.short_window,
             "long_window": self.long_window,
         }
+
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         """

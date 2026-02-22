@@ -1,0 +1,27 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\Paarth\Github\Boomerang - agentic
+plugins: anyio-4.12.1, langsmith-0.6.6
+collected 1 item
+
+backend\tests\test_confidence.py F                                       [100%]
+
+================================== FAILURES ===================================
+_________________________ test_confidence_calculation _________________________
+
+    def test_confidence_calculation():
+        # Standard case
+        score = calculate_confidence(
+            financial_score=70,
+            sentiment_score=60,
+            sector_score=65,
+            emotion_penalty=0
+        )
+        # Calculation: (0.4*70) + (0.3*60) + (0.2*65) - 0 = 28 + 18 + 13 = 59
+>       assert score == 59.0
+E       assert 65.0 == 59.0
+
+backend\tests\test_confidence.py:12: AssertionError
+=========================== short test summary info ===========================
+FAILED backend/tests/test_confidence.py::test_confidence_calculation - assert...
+============================== 1 failed in 0.25s ==============================

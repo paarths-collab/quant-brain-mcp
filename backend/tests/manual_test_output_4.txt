@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "C:\Users\Paarth\Github\Boomerang - agentic\test_system_manual.py", line 8, in <module>
+    from backend.engine.pipeline import InvestmentPipeline
+  File "C:\Users\Paarth\Github\Boomerang - agentic\backend\engine\pipeline.py", line 2, in <module>
+    from backend.agents.super_agent import SuperAgent
+  File "C:\Users\Paarth\Github\Boomerang - agentic\backend\agents\super_agent.py", line 1, in <module>
+    from backend.memory.vector_store import VectorStore
+  File "C:\Users\Paarth\Github\Boomerang - agentic\backend\memory\vector_store.py", line 1, in <module>
+    import chromadb
+ModuleNotFoundError: No module named 'chromadb'

@@ -1,7 +1,161 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, TrendingUp, TrendingDown, DollarSign, IndianRupee, Activity, Zap, Target, BarChart3, Layers, ArrowUpDown, Crosshair, GitBranch, Shield } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Scatter, BarChart, Bar, CartesianGrid, ComposedChart } from 'recharts';
 import { formatCurrency, getCurrencySymbol, backtestAPI } from '@/api';
+
+/* ---- Canvas-based Monte Carlo Simulation Paths Chart ---- */
+function MonteCarloCanvas({ monteCarlo }: { monteCarlo: any }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !monteCarlo?.simulationPaths?.length) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const W = rect.width;
+    const H = rect.height;
+
+    const pad = { top: 20, right: 16, bottom: 30, left: 72 };
+    const plotW = W - pad.left - pad.right;
+    const plotH = H - pad.top - pad.bottom;
+
+    const paths: number[][] = monteCarlo.simulationPaths;
+    const steps = paths[0]?.length || 0;
+    if (steps < 2) return;
+
+    // Find min/max across all paths
+    let yMin = Infinity, yMax = -Infinity;
+    for (const p of paths) {
+      for (const v of p) {
+        if (v < yMin) yMin = v;
+        if (v > yMax) yMax = v;
+      }
+    }
+    const yPad = (yMax - yMin) * 0.05;
+    yMin -= yPad; yMax += yPad;
+
+    const xScale = (i: number) => pad.left + (i / (steps - 1)) * plotW;
+    const yScale = (v: number) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+    // Helper to format dollar values compactly
+    const fmtDollar = (v: number) => {
+      if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+      if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
+      return `$${v.toFixed(0)}`;
+    };
+
+    // Background
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    const nGridY = 5;
+    for (let i = 0; i <= nGridY; i++) {
+      const y = pad.top + (i / nGridY) * plotH;
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    }
+
+    // Draw all simulation paths
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.04;
+    ctx.strokeStyle = '#f59e0b';
+    for (const p of paths) {
+      ctx.beginPath();
+      for (let i = 0; i < steps; i++) {
+        const x = xScale(i), y = yScale(p[i]);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Draw percentile paths
+    const pctPaths = monteCarlo.percentilePaths;
+    if (pctPaths) {
+      const pctColors: [string, string, number][] = [
+        ['p5', '#ef4444', 1.5],
+        ['p25', '#f97316', 1.2],
+        ['p50', '#22c55e', 2.5],
+        ['p75', '#3b82f6', 1.2],
+        ['p95', '#8b5cf6', 1.5],
+      ];
+      for (const [key, color, width] of pctColors) {
+        const curve = pctPaths[key];
+        if (!curve) continue;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        for (let i = 0; i < curve.length; i++) {
+          const x = xScale(i), y = yScale(curve[i]);
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // Initial capital baseline (dashed)
+    const initCap = paths[0]?.[0] ?? 0;
+    const baseY = yScale(initCap);
+    if (baseY > pad.top && baseY < pad.top + plotH) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(pad.left, baseY); ctx.lineTo(W - pad.right, baseY); ctx.stroke();
+      ctx.setLineDash([]);
+      // Label the baseline
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(fmtDollar(initCap), W - pad.right + 2, baseY + 3);
+    }
+
+    // Y-axis labels (dollar values)
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= nGridY; i++) {
+      const val = yMax - (i / nGridY) * (yMax - yMin);
+      const y = pad.top + (i / nGridY) * plotH;
+      ctx.fillText(fmtDollar(val), pad.left - 6, y + 4);
+    }
+
+    // X-axis labels
+    ctx.textAlign = 'center';
+    ctx.fillText('Start', xScale(0), H - 6);
+    ctx.fillText('End', xScale(steps - 1), H - 6);
+  }, [monteCarlo]);
+
+  useEffect(() => {
+    draw();
+    const handler = () => draw();
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [draw]);
+
+  if (!monteCarlo?.simulationPaths?.length) return null;
+
+  return (
+    <div className="space-y-2">
+      <canvas ref={canvasRef} className="w-full rounded-lg" style={{ height: 280 }} />
+      <div className="flex flex-wrap items-center gap-4 text-xs">
+        <span className="text-red-400">● P5</span>
+        <span className="text-orange-400">● P25</span>
+        <span className="text-emerald-400 font-semibold">● P50 (Median)</span>
+        <span className="text-blue-400">● P75</span>
+        <span className="text-purple-400">● P95</span>
+        <span className="text-amber-400/40">── All Paths</span>
+      </div>
+    </div>
+  );
+}
 
 const strategies = [
   {
@@ -528,7 +682,7 @@ export default function Backtest() {
                       </div>
 
                       <div className="space-y-3">
-                        <div className="text-sm text-white/60">Risk Metrics</div>
+                        <div className="text-sm text-white/60">Core Metrics</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Total Return</div><div className="text-xl font-bold text-white">{s.metrics?.totalReturn}%</div></div>
                           <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Sharpe</div><div className="text-xl font-bold text-white">{s.metrics?.sharpeRatio}</div></div>
@@ -538,6 +692,22 @@ export default function Backtest() {
                           <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Max DD Duration</div><div className="text-xl font-bold text-white">{s.metrics?.maxDrawdownDuration}</div></div>
                           <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Win Rate</div><div className="text-xl font-bold text-white">{s.metrics?.winRate}%</div></div>
                           <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Total Trades</div><div className="text-xl font-bold text-white">{s.metrics?.totalTrades}</div></div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="text-sm text-white/60">Advanced Metrics</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Profit Factor</div><div className="text-xl font-bold text-white">{s.metrics?.profitFactor ?? '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Expectancy</div><div className="text-xl font-bold text-white">{s.metrics?.expectancy != null ? `${s.metrics.expectancy}%` : '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">SQN</div><div className="text-xl font-bold text-white">{s.metrics?.sqn ?? '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Volatility (Ann.)</div><div className="text-xl font-bold text-white">{s.metrics?.annualVolatility != null ? `${s.metrics.annualVolatility}%` : '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Time in Market</div><div className="text-xl font-bold text-white">{s.metrics?.timeInMarket != null ? `${s.metrics.timeInMarket}%` : '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Avg Win</div><div className="text-xl font-bold text-emerald-400">{s.metrics?.avgWin != null ? `${s.metrics.avgWin}%` : '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Avg Loss</div><div className="text-xl font-bold text-red-400">{s.metrics?.avgLoss != null ? `${s.metrics.avgLoss}%` : '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Best Trade</div><div className="text-xl font-bold text-emerald-400">{s.metrics?.bestTrade != null ? `${s.metrics.bestTrade}%` : '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Worst Trade</div><div className="text-xl font-bold text-red-400">{s.metrics?.worstTrade != null ? `${s.metrics.worstTrade}%` : '-'}</div></div>
+                          <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Max Consec. Wins</div><div className="text-xl font-bold text-white">{s.metrics?.maxConsecutiveWins ?? '-'}</div></div>
                         </div>
                       </div>
 
@@ -597,9 +767,16 @@ export default function Backtest() {
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                          <h3 className="text-lg font-semibold text-white mb-3">Monte Carlo Simulation Paths <span className="text-xs font-normal text-white/40">({s.monteCarlo?.simulations || 0} paths)</span></h3>
+                          <MonteCarloCanvas monteCarlo={s.monteCarlo} />
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                          <h3 className="text-lg font-semibold text-white mb-3">Monte Carlo Robustness</h3>
+                          <h3 className="text-lg font-semibold text-white mb-3">Monte Carlo Robustness <span className="text-xs font-normal text-white/40">({s.monteCarlo?.simulations || 0} simulations)</span></h3>
                           {s.monteCarlo?.histogram?.length ? (
                             <div>
                               <ResponsiveContainer width="100%" height={220}>
@@ -611,11 +788,24 @@ export default function Backtest() {
                                   <Bar dataKey="count" fill="#f59e0b" />
                                 </BarChart>
                               </ResponsiveContainer>
-                              <div className="flex items-center gap-6 text-xs text-white/60 mt-3">
+                              <div className="flex flex-wrap items-center gap-4 text-xs text-white/60 mt-3">
                                 <div>P5: {s.monteCarlo.percentiles?.p5?.toFixed ? `${s.monteCarlo.percentiles.p5.toFixed(2)}%` : '-'}</div>
-                                <div>P50: {s.monteCarlo.percentiles?.p50?.toFixed ? `${s.monteCarlo.percentiles.p50.toFixed(2)}%` : '-'}</div>
+                                <div>P25: {s.monteCarlo.percentiles?.p25?.toFixed ? `${s.monteCarlo.percentiles.p25.toFixed(2)}%` : '-'}</div>
+                                <div className="font-semibold text-white/80">P50: {s.monteCarlo.percentiles?.p50?.toFixed ? `${s.monteCarlo.percentiles.p50.toFixed(2)}%` : '-'}</div>
+                                <div>P75: {s.monteCarlo.percentiles?.p75?.toFixed ? `${s.monteCarlo.percentiles.p75.toFixed(2)}%` : '-'}</div>
                                 <div>P95: {s.monteCarlo.percentiles?.p95?.toFixed ? `${s.monteCarlo.percentiles.p95.toFixed(2)}%` : '-'}</div>
                               </div>
+                              {s.monteCarlo.riskMetrics && (
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/10">
+                                  <div><div className="text-xs text-white/40">VaR (95%)</div><div className="text-sm font-bold text-red-400">{s.monteCarlo.riskMetrics.var95}%</div></div>
+                                  <div><div className="text-xs text-white/40">CVaR (95%)</div><div className="text-sm font-bold text-red-400">{s.monteCarlo.riskMetrics.cvar95}%</div></div>
+                                  <div><div className="text-xs text-white/40">Ruin Prob.</div><div className="text-sm font-bold text-red-400">{s.monteCarlo.riskMetrics.ruinProbability}%</div></div>
+                                  <div><div className="text-xs text-white/40">Median Max DD</div><div className="text-sm font-bold text-white">{s.monteCarlo.riskMetrics.medianMaxDrawdown}%</div></div>
+                                  <div><div className="text-xs text-white/40">Best Case</div><div className="text-sm font-bold text-emerald-400">{s.monteCarlo.riskMetrics.bestCase}%</div></div>
+                                  <div><div className="text-xs text-white/40">Worst Case</div><div className="text-sm font-bold text-red-400">{s.monteCarlo.riskMetrics.worstCase}%</div></div>
+                                  <div><div className="text-xs text-white/40">Mean Return</div><div className="text-sm font-bold text-white">{s.monteCarlo.riskMetrics.meanReturn}%</div></div>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="text-white/40 text-sm">Monte Carlo simulation unavailable.</div>
@@ -717,7 +907,7 @@ export default function Backtest() {
               </div>
 
               <div className="space-y-3">
-                <div className="text-sm text-white/60">Risk Metrics</div>
+                <div className="text-sm text-white/60">Core Metrics</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Total Return</div><div className="text-xl font-bold text-white">{results.metrics.totalReturn}%</div></div>
                   <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Sharpe</div><div className="text-xl font-bold text-white">{results.metrics.sharpeRatio}</div></div>
@@ -727,6 +917,22 @@ export default function Backtest() {
                   <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Max DD Duration</div><div className="text-xl font-bold text-white">{results.metrics.maxDrawdownDuration}</div></div>
                   <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Win Rate</div><div className="text-xl font-bold text-white">{results.metrics.winRate}%</div></div>
                   <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Total Trades</div><div className="text-xl font-bold text-white">{results.metrics.totalTrades}</div></div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-sm text-white/60">Advanced Metrics</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Profit Factor</div><div className="text-xl font-bold text-white">{results.metrics.profitFactor ?? '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Expectancy</div><div className="text-xl font-bold text-white">{results.metrics.expectancy != null ? `${results.metrics.expectancy}%` : '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">SQN</div><div className="text-xl font-bold text-white">{results.metrics.sqn ?? '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Volatility (Ann.)</div><div className="text-xl font-bold text-white">{results.metrics.annualVolatility != null ? `${results.metrics.annualVolatility}%` : '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Time in Market</div><div className="text-xl font-bold text-white">{results.metrics.timeInMarket != null ? `${results.metrics.timeInMarket}%` : '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Avg Win</div><div className="text-xl font-bold text-emerald-400">{results.metrics.avgWin != null ? `${results.metrics.avgWin}%` : '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Avg Loss</div><div className="text-xl font-bold text-red-400">{results.metrics.avgLoss != null ? `${results.metrics.avgLoss}%` : '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Best Trade</div><div className="text-xl font-bold text-emerald-400">{results.metrics.bestTrade != null ? `${results.metrics.bestTrade}%` : '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Worst Trade</div><div className="text-xl font-bold text-red-400">{results.metrics.worstTrade != null ? `${results.metrics.worstTrade}%` : '-'}</div></div>
+                  <div className="p-4 bg-white/5 rounded-lg"><div className="text-xs text-white/40">Max Consec. Wins</div><div className="text-xl font-bold text-white">{results.metrics.maxConsecutiveWins ?? '-'}</div></div>
                 </div>
               </div>
 
@@ -786,9 +992,14 @@ export default function Backtest() {
                 </div>
               </div>
 
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-white mb-3">Monte Carlo Simulation Paths <span className="text-xs font-normal text-white/40">({results.monteCarlo?.simulations || 0} paths)</span></h3>
+                <MonteCarloCanvas monteCarlo={results.monteCarlo} />
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                  <h3 className="text-lg font-semibold text-white mb-3">Monte Carlo Robustness</h3>
+                  <h3 className="text-lg font-semibold text-white mb-3">Monte Carlo Robustness <span className="text-xs font-normal text-white/40">({results.monteCarlo?.simulations || 0} simulations)</span></h3>
                   {results.monteCarlo?.histogram?.length ? (
                     <div>
                       <ResponsiveContainer width="100%" height={220}>
@@ -800,11 +1011,24 @@ export default function Backtest() {
                           <Bar dataKey="count" fill="#f59e0b" />
                         </BarChart>
                       </ResponsiveContainer>
-                      <div className="flex items-center gap-6 text-xs text-white/60 mt-3">
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-white/60 mt-3">
                         <div>P5: {results.monteCarlo.percentiles?.p5?.toFixed ? `${results.monteCarlo.percentiles.p5.toFixed(2)}%` : '-'}</div>
-                        <div>P50: {results.monteCarlo.percentiles?.p50?.toFixed ? `${results.monteCarlo.percentiles.p50.toFixed(2)}%` : '-'}</div>
+                        <div>P25: {results.monteCarlo.percentiles?.p25?.toFixed ? `${results.monteCarlo.percentiles.p25.toFixed(2)}%` : '-'}</div>
+                        <div className="font-semibold text-white/80">P50: {results.monteCarlo.percentiles?.p50?.toFixed ? `${results.monteCarlo.percentiles.p50.toFixed(2)}%` : '-'}</div>
+                        <div>P75: {results.monteCarlo.percentiles?.p75?.toFixed ? `${results.monteCarlo.percentiles.p75.toFixed(2)}%` : '-'}</div>
                         <div>P95: {results.monteCarlo.percentiles?.p95?.toFixed ? `${results.monteCarlo.percentiles.p95.toFixed(2)}%` : '-'}</div>
                       </div>
+                      {results.monteCarlo.riskMetrics && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/10">
+                          <div><div className="text-xs text-white/40">VaR (95%)</div><div className="text-sm font-bold text-red-400">{results.monteCarlo.riskMetrics.var95}%</div></div>
+                          <div><div className="text-xs text-white/40">CVaR (95%)</div><div className="text-sm font-bold text-red-400">{results.monteCarlo.riskMetrics.cvar95}%</div></div>
+                          <div><div className="text-xs text-white/40">Ruin Prob.</div><div className="text-sm font-bold text-red-400">{results.monteCarlo.riskMetrics.ruinProbability}%</div></div>
+                          <div><div className="text-xs text-white/40">Median Max DD</div><div className="text-sm font-bold text-white">{results.monteCarlo.riskMetrics.medianMaxDrawdown}%</div></div>
+                          <div><div className="text-xs text-white/40">Best Case</div><div className="text-sm font-bold text-emerald-400">{results.monteCarlo.riskMetrics.bestCase}%</div></div>
+                          <div><div className="text-xs text-white/40">Worst Case</div><div className="text-sm font-bold text-red-400">{results.monteCarlo.riskMetrics.worstCase}%</div></div>
+                          <div><div className="text-xs text-white/40">Mean Return</div><div className="text-sm font-bold text-white">{results.monteCarlo.riskMetrics.meanReturn}%</div></div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-white/40 text-sm">Monte Carlo simulation unavailable.</div>

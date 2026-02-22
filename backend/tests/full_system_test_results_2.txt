@@ -1,0 +1,62 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Paarth\Github\Boomerang - agentic\backend\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Paarth\Github\Boomerang - agentic
+plugins: anyio-4.12.1, langsmith-0.6.6, asyncio-1.3.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+backend/tests/test_full_system.py::test_full_pipeline_bullish_case 
+--- Running Test Case 1: NVDA (Bullish) ---
+DDG returned no results for 'Analyze NVDA and tell me if I should buy.', falling back to Tavily.
+Best Strategy: EMA_Crossover
+Action: BUY
+Risk VaR: -0.04234202301362965
+PASSED
+backend/tests/test_full_system.py::test_full_pipeline_bearish_case 
+--- Running Test Case 2: PFE (Defensive/Bearish) ---
+DDG returned no results for 'Is Pfizer a buy right now?', falling back to Tavily.
+Best Strategy: Breakout
+Max Drawdown: -0.19259539388167493
+PASSED
+backend/tests/test_full_system.py::test_full_pipeline_optimization 
+--- Running Test Case 3: Optimization ---
+DDG returned no results for 'Optimize my portfolio', falling back to Tavily.
+Optimal Weights: {}
+Expected Sharpe: 0.0
+PASSED
+backend/tests/test_full_system.py::test_full_pipeline_rl_learning 
+--- Running Test Case 4: RL Agent Learning ---
+DDG returned no results for 'Run execution', falling back to Tavily.
+DDG returned no results for 'Run execution again', falling back to Tavily.
+Q-Table 1: {'EMA_Crossover': 11.33326231341058, 'RSI_Reversion': 0.0, 'Breakout': 0.0}
+Q-Table 2: {'EMA_Crossover': 13.31992303254982, 'RSI_Reversion': 0.0, 'Breakout': 0.0}
+PASSED
+
+============================== warnings summary ===============================
+backend/tests/test_full_system.py::test_full_pipeline_bullish_case
+backend/tests/test_full_system.py::test_full_pipeline_bearish_case
+backend/tests/test_full_system.py::test_full_pipeline_optimization
+backend/tests/test_full_system.py::test_full_pipeline_rl_learning
+backend/tests/test_full_system.py::test_full_pipeline_rl_learning
+  C:\Users\Paarth\Github\Boomerang - agentic\backend\services\duckduckgo_service.py:9: RuntimeWarning: This package (`duckduckgo_search`) has been renamed to `ddgs`! Use `pip install ddgs` instead.
+    with DDGS() as ddgs:
+
+backend/tests/test_full_system.py::test_full_pipeline_bullish_case
+backend/tests/test_full_system.py::test_full_pipeline_bearish_case
+backend/tests/test_full_system.py::test_full_pipeline_optimization
+backend/tests/test_full_system.py::test_full_pipeline_rl_learning
+backend/tests/test_full_system.py::test_full_pipeline_rl_learning
+  C:\Users\Paarth\Github\Boomerang - agentic\backend\.venv\Lib\site-packages\urllib3\util\ssl_.py:262: DeprecationWarning: ssl.PROTOCOL_TLS is deprecated
+    context = SSLContext(ssl_version or ssl.PROTOCOL_SSLv23)
+
+backend/tests/test_full_system.py::test_full_pipeline_bullish_case
+backend/tests/test_full_system.py::test_full_pipeline_bearish_case
+backend/tests/test_full_system.py::test_full_pipeline_optimization
+backend/tests/test_full_system.py::test_full_pipeline_rl_learning
+backend/tests/test_full_system.py::test_full_pipeline_rl_learning
+  C:\Users\Paarth\Github\Boomerang - agentic\backend\.venv\Lib\site-packages\urllib3\connection.py:374: DeprecationWarning: ssl.match_hostname() is deprecated
+    match_hostname(cert, asserted_hostname)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 4 passed, 15 warnings in 519.30s (0:08:39) ==================

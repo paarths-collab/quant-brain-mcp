@@ -1,18 +1,53 @@
-# services/strategy_registry.py
-
 from backend.services.strategies.sma_crossover import SMACrossoverStrategy
-from backend.services.strategies.ema_crossover import EMACrossoverStrategy
-from backend.services.strategies.support_resistance import SupportResistanceStrategy
-# import others…
+from backend.services.strategies.rsi_momentum import RSIMomentumStrategy
+from backend.services.strategies.breakout_strategy import BreakoutStrategy
+# from backend.services.strategies.supertrend import SupertrendStrategy # TODO: Implement later
+# from backend.services.strategies.bollinger import BollingerStrategy # TODO: Implement later
 
 STRATEGY_REGISTRY = {
     "sma_crossover": SMACrossoverStrategy,
-    "ema_crossover": EMACrossoverStrategy,
-    "support_resistance": SupportResistanceStrategy,
-    # add others
+    "rsi_momentum": RSIMomentumStrategy,
+    "breakout": BreakoutStrategy,
 }
 
 def get_strategy(name: str, **params):
+    """
+    Factory function to get a strategy instance.
+    """
     if name not in STRATEGY_REGISTRY:
-        raise ValueError(f"Strategy '{name}' not registered")
-    return STRATEGY_REGISTRY[name](**params)
+        # Fallback or error? For now, raise error.
+        # Check if we have a loose match?
+        available = ", ".join(STRATEGY_REGISTRY.keys())
+        raise ValueError(f"Strategy '{name}' not found. Available: {available}")
+    
+    strategy_class = STRATEGY_REGISTRY[name]
+    # Filter params to only those accepted by the init? 
+    # For now, assume dynamic kwargs are passed safely or we let Python raise TypeError if invalid args
+    return strategy_class(**params)
+
+def get_available_strategies():
+    """
+    Return a list of available strategies with default parameters.
+    This helps the frontend build the dropdowns dynamically.
+    """
+    strategies = []
+    for name, cls in STRATEGY_REGISTRY.items():
+        # Instantiate with defaults to get parameters
+        # valid assumption? Most inits have defaults.
+        try:
+            instance = cls()
+            strategies.append({
+                "id": name,
+                "name": cls.name,
+                "parameters": instance.parameters 
+            })
+        except Exception:
+            # If init fails without args, we might need a workaround.
+            # For now, skip or manually define.
+            strategies.append({
+                "id": name,
+                "name": cls.name,
+                "parameters": {} # Placeholder
+            })
+            
+    return strategies

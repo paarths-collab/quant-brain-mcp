@@ -9,9 +9,10 @@ import {
   BarChart3,
   Search,
   Network,
-  Settings,
   MessagesSquare,
-  Bot
+  User,
+  Zap,
+  Settings,
 } from 'lucide-react';
 
 const navigation = [
@@ -25,6 +26,8 @@ const navigation = [
   { name: 'Peer Comparison', to: '/relationships', icon: Network },
   { name: 'Investment AI', to: '/ai', icon: Brain },
   { name: 'AI Chat', to: '/chat', icon: MessageSquare },
+  { name: 'Quant Lab', to: '/quant', icon: Zap },
+  { name: 'Profile', to: '/profile', icon: User },
   { name: 'Settings', to: '/settings', icon: Settings },
 ];
 
@@ -37,7 +40,7 @@ export default function Sidebar() {
           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
             <span className="text-black font-display font-bold text-lg">B</span>
           </div>
-          <span className="font-display font-bold text-lg text-white">Bloomberg</span>
+          <span className="font-display font-bold text-lg text-white">Boomerang</span>
         </div>
       </div>
 
@@ -50,10 +53,9 @@ export default function Sidebar() {
               key={item.name}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                  isActive
-                    ? 'bg-purple/20 text-white border border-purple/50'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${isActive
+                  ? 'bg-purple/20 text-white border border-purple/50'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`
               }
             >
@@ -67,7 +69,7 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="p-4 border-t border-white/10">
         <p className="text-white/40 text-xs text-center">
-          © 2026 Bloomberg
+          © 2026 Boomerang
         </p>
       </div>
     </aside>

@@ -198,7 +198,7 @@ if __name__ == "__main__":
 #             # Call the LLM
 #             response = self.llm_agent.run(
 #                 prompt=prompt,
-#                 model_name="xiaomi/mimo-v2-flash:free"
+#                 model_name="llama-3.3-70b-versatile"
 #             )
             
 #             # Parse the response

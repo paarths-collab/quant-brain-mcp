@@ -1,60 +1,107 @@
-# useless for now
+from backend.core.llm_client import LLMClient
 
-# import os
-# import json
-# import streamlit as st
-# from typing import Dict, Any
+class ReportAgent:
 
-# # --- Import the master analyst agent ---
-# # Ensure this import is correct and points to the right file
-# from agents.llm_analyst_agent import LLMAnalystAgent
+    def __init__(self):
+        self.llm = LLMClient()
 
-# class ReportAgent:
-#     def __init__(self, gemini_key: str):
-#         """
-#         Initializes the ReportAgent.
-#         It uses the Master LLM Analyst Agent as its core engine.
-#         """
-#         # --- THIS IS THE FIX ---
-#         # The Master LLMAnalystAgent only needs the Gemini key.
-#         # We only accept and pass the gemini_key now.
-#         self.llm_analyst = LLMAnalystAgent(gemini_api_key=gemini_key)
-#         # --- END OF FIX ---
-#         print("[SUCCESS] ReportAgent: Initialized with LLM Analyst engine.")
+    def _fallback_memo(self, financial, web, sector, emotion) -> str:
+        ticker = (financial or {}).get("ticker", "UNKNOWN")
+        price = (financial or {}).get("price")
+        score = (financial or {}).get("score")
+        technicals = (financial or {}).get("technicals") or {}
+        fundamentals = (financial or {}).get("fundamentals") or {}
 
-#     def generate_investment_report(self, analysis_context: Dict[str, Any], user_query: str) -> str:
-#         """
-#         Synthesizes a comprehensive analysis into a professional report.
-#         """
-#         # The 'generate_brokerage_report' method is the correct one from our Master Analyst
-#         return self.llm_analyst.generate_brokerage_report(analysis_context, user_query)
+        web_sent = (web or {}).get("sentiment")
+        web_score = (web or {}).get("score")
+        sector_summary = (sector or {}).get("summary") if isinstance(sector, dict) else None
 
-# # --- Streamlit Visualization ---
-# if __name__ == "__main__":
-#     st.set_page_config(page_title="Report Generation Agent", layout="wide")
-#     st.title("📑 AI-Powered Report Generator")
+        rsi = technicals.get("rsi")
+        pe = fundamentals.get("pe")
+        mcap = fundamentals.get("market_cap")
 
-#     # For standalone testing, we only need the Gemini key
-#     GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+        def fmt_num(v, digits=2):
+            try:
+                return f"{float(v):.{digits}f}"
+            except Exception:
+                return "N/A"
 
-#     if not GEMINI_KEY:
-#         st.error("LLM API key (GEMINI_API_KEY) not found in secrets.")
-#     else:
-#         # --- FIX: Only pass the gemini_key ---
-#         agent = ReportAgent(gemini_key=GEMINI_KEY)
-        
-#         st.info("This showcase demonstrates how the ReportAgent synthesizes data.")
-        
-#         # ... (The rest of the Streamlit UI for testing can remain the same)
-#         mock_data = { "ticker": "AAPL", "technicals": {"SMA Signal": "BUY"} }
-#         context_json = st.text_area("Analysis Context (JSON)", value=json.dumps(mock_data, indent=2), height=300)
-#         user_query = "Provide a summary."
-        
-#         if st.button("📝 Generate Report", use_container_width=True):
-#             try:
-#                 context = json.loads(context_json)
-#                 with st.spinner("AI Analyst is writing the report..."):
-#                     report = agent.generate_investment_report(context, user_query)
-#                     st.markdown(report)
-#             except Exception as e:
-#                 st.error(f"An error occurred: {e}")
+        verdict = "HOLD"
+        conviction = 5
+        if isinstance(score, (int, float)):
+            if score >= 55:
+                verdict = "BUY"
+                conviction = 6
+            elif score <= 25:
+                verdict = "SELL"
+                conviction = 6
+
+        return (
+            "# Executive Summary\n"
+            f"- Ticker: **{ticker}**\n"
+            f"- Price: **{fmt_num(price)}**\n"
+            f"- Technical Score: **{score if isinstance(score, (int, float)) else 'N/A'}**\n"
+            f"- Sentiment: **{web_sent or 'unknown'}** (score {web_score if isinstance(web_score, (int, float)) else 'N/A'})\n"
+            f"- Verdict: **{verdict}** (Conviction **{conviction}/10**)\n"
+            "\n"
+            "# Bull Case (Key Points)\n"
+            "- If price trend stabilizes and momentum improves, risk/reward can improve.\n"
+            "- If macro/sector tailwinds strengthen, upside asymmetry increases.\n"
+            "\n"
+            "# Bear Case (Key Risks)\n"
+            "- Data gaps: some fundamentals/news may be unavailable in this environment.\n"
+            "- Volatility/regime shifts can invalidate signals quickly.\n"
+            "\n"
+            "# Synthesis & Pivot Variable\n"
+            f"- Pivot: **RSI + earnings quality + macro backdrop** (RSI={fmt_num(rsi, 1)}, PE={pe if pe is not None else 'N/A'}).\n"
+            "\n"
+            "# Final Verdict & Strategy\n"
+            f"- **{verdict}** with staged sizing; re-evaluate on material price move or macro shift.\n"
+            "\n"
+            "## Raw Inputs Snapshot\n"
+            f"- Fundamentals: PE={pe if pe is not None else 'N/A'}, MarketCap={mcap if mcap is not None else 'N/A'}\n"
+            f"- Sector: {sector_summary or 'N/A'}\n"
+            f"- Emotion: {emotion or 'N/A'}\n"
+        )
+
+    def generate(self, financial, web, sector, emotion):
+        # Prepare context data
+        context = f"""
+        Financial Data: {financial}
+        Web Sentiment: {web}
+        Sector Context: {sector}
+        Emotion Analysis: {emotion}
+        """
+
+        try:
+            # One-shot report to avoid 3 separate LLM calls (reduces 429s dramatically on Groq free tier).
+            prompt = [
+                {"role": "system", "content": "You are the CIO of a Multi-Strategy Hedge Fund writing an Investment Committee memo. Be concise, data-backed, and structured."},
+                {"role": "user", "content": f"""
+                Using the raw data below, produce a structured memo with BOTH sides and a final decision.
+
+                Raw Data:
+                {context}
+
+                Requirements:
+                - Max 650 words total.
+                - Avoid hallucinating; if a datapoint is missing, say it's unavailable.
+                - Include a Conviction Rating (1-10) and Final Verdict (BUY / SELL / HOLD).
+
+                Structure:
+                # Executive Summary
+                # Bull Case (Key Points)
+                # Bear Case (Key Risks)
+                # Synthesis & Pivot Variable
+                # Final Verdict & Strategy
+                """},
+            ]
+
+            return self.llm.deep_reason(prompt).choices[0].message.content
+        except Exception as e:
+            # Don't fail the entire response on LLM connectivity/rate-limit issues.
+            # Return a deterministic memo so the UI stays usable.
+            return (
+                f"**LLM Unavailable** (reason: {e}). Using a deterministic fallback memo.\n\n"
+                + self._fallback_memo(financial, web, sector, emotion)
+            )

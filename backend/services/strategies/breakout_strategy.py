@@ -13,8 +13,11 @@ class BreakoutStrategy(Strategy):
     def __init__(self, lookback: int = 20):
         self.lookback = lookback
 
+
+    @property
     def parameters(self):
         return {"lookback": self.lookback}
+
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         df = data.copy()

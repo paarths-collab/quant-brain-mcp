@@ -1,183 +1,268 @@
 import yfinance as yf
 import pandas as pd
-import ta
-import math
-from typing import List, Dict, Optional
+import numpy as np
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional
+from backend.services.data_loader import get_history
 
-def fetch_candles(symbol: str, interval: str = "1d", period: str = "1y", start: Optional[str] = None, end: Optional[str] = None) -> List[Dict]:
+def fetch_candles(
+    symbol: str,
+    interval: str = "1d",
+    period: str = "1mo",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    market: str = "us"
+) -> List[Dict[str, Any]]:
     """
-    Fetches OHLCV data from yfinance and formats it for D3 charts.
+    Fetch OHLCV candle data and return as list of dictionaries.
+    
+    Args:
+        symbol: Stock ticker symbol
+        interval: Data interval (1m, 5m, 15m, 1h, 1d, 1wk, 1mo)
+        period: Time period (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max)
+        start: Start date (YYYY-MM-DD) - overrides period if provided
+        end: End date (YYYY-MM-DD)
+        market: Market identifier (us, india)
+        
+    Returns:
+        List of candle dictionaries with keys: date, open, high, low, close, volume
     """
     try:
-        ticker = yf.Ticker(symbol)
-        # yfinance period options: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
+        # Use start/end if provided, otherwise use period
         if start and end:
-            df = ticker.history(start=start, end=end, interval=interval)
+            df = get_history(
+                ticker=symbol,
+                start=start,
+                end=end,
+                market=market,
+                interval=interval
+            )
         else:
-            df = ticker.history(period=period, interval=interval)
+            # Convert period to date range
+            end_date = pd.Timestamp.now()
+            
+            if period == "1d":
+                start_date = end_date - pd.DateOffset(days=1)
+            elif period == "5d":
+                start_date = end_date - pd.DateOffset(days=5)
+            elif period == "1mo":
+                start_date = end_date - pd.DateOffset(months=1)
+            elif period == "3mo":
+                start_date = end_date - pd.DateOffset(months=3)
+            elif period == "6mo":
+                start_date = end_date - pd.DateOffset(months=6)
+            elif period == "1y":
+                start_date = end_date - pd.DateOffset(years=1)
+            elif period == "2y":
+                start_date = end_date - pd.DateOffset(years=2)
+            elif period == "5y":
+                start_date = end_date - pd.DateOffset(years=5)
+            else:
+                start_date = end_date - pd.DateOffset(months=1)  # default
+            
+            df = get_history(
+                ticker=symbol,
+                start=start_date.strftime('%Y-%m-%d'),
+                end=end_date.strftime('%Y-%m-%d'),
+                market=market,
+                interval=interval
+            )
         
         if df.empty:
             return []
-
-        # Reset index to get Date as a column
-        df.reset_index(inplace=True)
         
-        if pd.api.types.is_datetime64_any_dtype(df['Date']):
-            df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
-        else:
-            df['Date'] = df['Date'].astype(str).str[:10]
-
-        records = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].to_dict(orient="records")
-        
-        # Rename keys to lower case if needed or keep Title Case. 
-        # D3 usually likes clear properties. Let's standardize to lowercase.
-        cleaned_records = []
-        for r in records:
-            cleaned_records.append({
-                "date": r['Date'],
-                "open": r['Open'],
-                "high": r['High'],
-                "low": r['Low'],
-                "close": r['Close'],
-                "volume": r['Volume']
+        # Convert DataFrame to list of dictionaries
+        candles = []
+        for idx, row in df.iterrows():
+            candles.append({
+                "date": idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx),
+                "open": float(row.get('Open', 0)),
+                "high": float(row.get('High', 0)),
+                "low": float(row.get('Low', 0)),
+                "close": float(row.get('Close', 0)),
+                "volume": int(row.get('Volume', 0))
             })
-            
-        return cleaned_records
+        
+        return candles
+        
     except Exception as e:
         print(f"Error fetching candles for {symbol}: {e}")
         return []
 
-def calculate_indicators(symbol: str, period: str = "1y", interval: str = "1d") -> Dict:
+
+def get_market_overview() -> Dict[str, Any]:
     """
-    Calculates technical indicators: RSI, MACD, EMA(20, 50, 200), ATR.
+    Get overview of major market indices.
+    
+    Returns:
+        Dictionary with major index data
     """
     try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period=period, interval=interval)
+        indices = {
+            "SPY": "S&P 500",
+            "QQQ": "NASDAQ",
+            "DIA": "Dow Jones",
+            "^NSEI": "NIFTY 50",
+            "^BSESN": "SENSEX"
+        }
+        
+        overview = {}
+        for symbol, name in indices.items():
+            try:
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                hist = ticker.history(period="5d")
+                
+                if not hist.empty:
+                    current = hist['Close'].iloc[-1]
+                    previous = hist['Close'].iloc[-2] if len(hist) > 1 else current
+                    change_pct = ((current - previous) / previous * 100) if previous else 0
+                    
+                    overview[symbol] = {
+                        "name": name,
+                        "price": float(current),
+                        "change_pct": float(change_pct),
+                        "volume": int(hist['Volume'].iloc[-1])
+                    }
+            except Exception:
+                continue
+        
+        return overview
+        
+    except Exception as e:
+        print(f"Error fetching market overview: {e}")
+        return {}
+
+
+def get_current_price(ticker: str) -> float:
+    try:
+        if not ticker: return 0.0
+        # Simple normalization for common cases if needed, but relying on yf for now
+        ticker = ticker.upper().strip()
+        stock = yf.Ticker(ticker)
+        price = stock.info.get('currentPrice') or stock.info.get('regularMarketPrice') or stock.info.get('previousClose')
+        return float(price) if price else 0.0
+    except Exception:
+        return 0.0
+
+# Standalone function as expected by sector_intel.py
+def calculate_indicators(ticker: str, range: str = "6mo", interval: str = "1d") -> dict:
+    try:
+        # Calculate dates based on range
+        end_date = pd.Timestamp.now()
+        start_date = end_date - pd.DateOffset(months=6) # default
+        
+        if range == "1mo": 
+            start_date = end_date - pd.DateOffset(months=1)
+        elif range == "3mo": 
+            start_date = end_date - pd.DateOffset(months=3)
+        elif range == "1y": 
+            start_date = end_date - pd.DateOffset(years=1)
+        elif range == "2y":
+            start_date = end_date - pd.DateOffset(years=2)
+        elif range == "5y":
+            start_date = end_date - pd.DateOffset(years=5)
+            
+        # Add buffer for indicators warmup (e.g. 200 EMA needs 200+ days)
+        start_with_buffer = start_date - pd.DateOffset(days=300) 
+        
+        # Fetch data
+        df = get_history(
+            ticker, 
+            start=start_with_buffer.strftime('%Y-%m-%d'), 
+            end=end_date.strftime('%Y-%m-%d'), 
+            market="US", # Defaulting to US for now, or infer from ticker
+            interval=interval
+        )
         
         if df.empty:
             return {}
 
-        # Fill NaN data if any
-        close = df['Close']
-        high = df['High']
-        low = df['Low']
-
-        # RSI
-        df['RSI'] = ta.momentum.RSIIndicator(close, window=14).rsi()
-
-        # MACD
-        macd = ta.trend.MACD(close)
-        df['MACD'] = macd.macd()
-        df['MACD_Signal'] = macd.macd_signal()
-        df['MACD_Hist'] = macd.macd_diff()
-
-        # EMA
-        df['EMA_20'] = ta.trend.EMAIndicator(close, window=20).ema_indicator()
-        df['EMA_50'] = ta.trend.EMAIndicator(close, window=50).ema_indicator()
-        df['EMA_200'] = ta.trend.EMAIndicator(close, window=200).ema_indicator()
-
-        # ATR
-        df['ATR'] = ta.volatility.AverageTrueRange(high, low, close, window=14).average_true_range()
+        # --- Indicators ---
         
-        # VWAP (Need Volume)
-        df['VWAP'] = ta.volume.VolumeWeightedAveragePrice(high, low, close, df['Volume'], window=14).volume_weighted_average_price()
-
-        # Format for frontend response
-        # We need to align the indicators with dates
-        df.reset_index(inplace=True)
-        df['Date'] = df['Date'].astype(str)
+        # RSI (14)
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['rsi'] = 100 - (100 / (1 + rs))
         
-        # Handle NaNs and infinities (replace with None)
-        df = df.where(pd.notnull(df), None)
-        df = df.replace([float("inf"), float("-inf")], None)
+        # EMAs
+        df['ema_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+        df['ema_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+        df['ema_200'] = df['Close'].ewm(span=200, adjust=False).mean()
+        
+        # MACD (12, 26, 9)
+        ema12 = df['Close'].ewm(span=12, adjust=False).mean()
+        ema26 = df['Close'].ewm(span=26, adjust=False).mean()
+        df['macd_line'] = ema12 - ema26
+        df['macd_signal'] = df['macd_line'].ewm(span=9, adjust=False).mean()
+        df['macd_hist'] = df['macd_line'] - df['macd_signal']
+        
+        # ATR (14)
+        high_low = df['High'] - df['Low']
+        high_close = np.abs(df['High'] - df['Close'].shift())
+        low_close = np.abs(df['Low'] - df['Close'].shift())
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = np.max(ranges, axis=1)
+        df['atr'] = true_range.rolling(14).mean()
+        
+        # VWAP
+        # Simple cumulative VWAP from start of data
+        df['vwap'] = (df['Volume'] * (df['High'] + df['Low'] + df['Close']) / 3).cumsum() / df['Volume'].cumsum()
 
-        def _clean_list(values):
-            cleaned = []
-            for v in values:
-                if v is None:
-                    cleaned.append(None)
-                else:
-                    try:
-                        fv = float(v)
-                        cleaned.append(fv if math.isfinite(fv) else None)
-                    except Exception:
-                        cleaned.append(None)
-            return cleaned
-
-        indicators = {
-            "dates": df['Date'].tolist(),
-            "rsi": _clean_list(df['RSI'].tolist()),
+        # Trim to requested range
+        mask = (df.index >= start_date)
+        result_df = df.loc[mask].copy() # Copy to avoid SettingWithCopy
+        
+        # Replace NaNs with None for JSON serialization
+        result_df = result_df.replace({np.nan: None})
+        
+        dates = result_df.index.strftime('%Y-%m-%d').tolist()
+        
+        return {
+            "dates": dates,
+            "rsi": result_df['rsi'].tolist(),
             "macd": {
-                "line": _clean_list(df['MACD'].tolist()),
-                "signal": _clean_list(df['MACD_Signal'].tolist()),
-                "histogram": _clean_list(df['MACD_Hist'].tolist())
+                "line": result_df['macd_line'].tolist(),
+                "signal": result_df['macd_signal'].tolist(),
+                "histogram": result_df['macd_hist'].tolist()
             },
             "ema": {
-                "20": _clean_list(df['EMA_20'].tolist()),
-                "50": _clean_list(df['EMA_50'].tolist()),
-                "200": _clean_list(df['EMA_200'].tolist())
+                "20": result_df['ema_20'].tolist(),
+                "50": result_df['ema_50'].tolist(),
+                "200": result_df['ema_200'].tolist()
             },
-            "atr": _clean_list(df['ATR'].tolist()),
-            "vwap": _clean_list(df['VWAP'].tolist())
+            "atr": result_df['atr'].tolist(),
+            "vwap": result_df['vwap'].tolist()
         }
-        
-        return indicators
-
+            
     except Exception as e:
-        print(f"Error calculating indicators for {symbol}: {e}")
+        print(f"Error calculating indicators for {ticker}: {e}")
         return {}
 
-def get_market_overview() -> List[Dict]:
-    """
-    Fetches real-time(ish) data for major indices: S&P 500, Nasdaq, Dow, Russell 2000.
-    """
-    indices = {
-        "^GSPC": "S&P 500",
-        "^IXIC": "Nasdaq",
-        "^DJI": "Dow Jones",
-        "^RUT": "Russell 2000"
-    }
-    
-    overview_data = []
-    
-    try:
-        # Fetch data for all tickers at once (efficient)
-        tickers = list(indices.keys())
-        # period="5d" to ensure we get enough data for previous close calculation even over weekends
-        data = yf.download(tickers, period="5d", interval="1d", progress=False, group_by='ticker')
+
+class MarketDataService:
+
+    def normalize_ticker(self, ticker: str, market: str = "us") -> str:
+        """
+        Normalizes ticker based on market.
+        - India: Appends .NS if missing
+        - USA: returns as is
+        """
+        if not ticker:
+            return ticker
+            
+        ticker = ticker.upper().strip()
         
-        for ticker, name in indices.items():
-            try:
-                # Access ticker data safely
-                ticker_df = data[ticker] if len(tickers) > 1 else data
+        if market.lower() == "india":
+            if not (ticker.endswith(".NS") or ticker.endswith(".BO")):
+                return f"{ticker}.NS"
                 
-                if ticker_df.empty or len(ticker_df) < 2:
-                    continue
+        return ticker
 
-                # Get latest two rows (today/latest close, and previous close)
-                latest = ticker_df.iloc[-1]
-                prev = ticker_df.iloc[-2]
-                
-                current_price = float(latest['Close'])
-                prev_close = float(prev['Close'])
-                change = current_price - prev_close
-                change_percent = (change / prev_close) * 100
-                
-                overview_data.append({
-                    "name": name,
-                    "symbol": ticker,
-                    "price": current_price,
-                    "change": change,
-                    "changePercent": change_percent,
-                    "isPositive": change >= 0
-                })
-            except Exception as inner_e:
-                print(f"Error processing {ticker}: {inner_e}")
-                continue
-                
-        return overview_data
+    def get_history(self, ticker):
+        return yf.Ticker(ticker).history(period="6mo")
 
-    except Exception as e:
-        print(f"Error fetching market overview: {e}")
-        return []
+    def get_fundamentals(self, ticker):
+        return yf.Ticker(ticker).info

@@ -1,0 +1,9 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\Paarth\Github\Boomerang - agentic
+plugins: anyio-4.12.1, langsmith-0.6.6
+collected 1 item
+
+backend\tests\test_confidence.py .                                       [100%]
+
+============================== 1 passed in 0.07s ==============================

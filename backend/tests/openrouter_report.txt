@@ -1,0 +1,6 @@
+Testing 2 keys against model: qwen/qwen3-235b-a22b-thinking-2507
+
+Key #1: ✅ Working
+--------------------------------------------------
+Key #2: ✅ Working
+--------------------------------------------------

@@ -20,4 +20,21 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  // Ensure these severities win even if a preset config changes.
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      // This repo is early-stage and intentionally experimental; keep lint actionable.
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-unused-expressions': 'warn',
+
+      // Avoid blocking dev on Fast Refresh + advanced hooks heuristics.
+      'react-refresh/only-export-components': 'warn',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+    },
+  },
 ])

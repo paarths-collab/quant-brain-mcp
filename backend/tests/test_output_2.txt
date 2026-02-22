@@ -1,0 +1,37 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\Paarth\Github\Boomerang - agentic
+plugins: anyio-4.12.1, langsmith-0.6.6
+collected 2 items
+
+backend\tests\test_divergence.py .                                       [ 50%]
+backend\tests\test_confidence.py F                                       [100%]
+
+================================== FAILURES ===================================
+_________________________ test_confidence_calculation _________________________
+
+    def test_confidence_calculation():
+        # Standard case
+        score = calculate_confidence(
+            financial_score=70,
+            sentiment_score=60,
+            sector_score=65,
+            emotion_penalty=0
+        )
+        # Calculation: (0.4*70) + (0.3*60) + (0.2*65) - 0 = 28 + 18 + 13 = 59
+        assert score == 59.0
+    
+        # With Penalty
+        score_penalty = calculate_confidence(70, 60, 65, 20)
+        # 59 - (0.1 * 20) = 57
+        assert score_penalty == 57.0
+    
+        # Boundary checks
+        score_high = calculate_confidence(120, 100, 100, 0) # Should cap at 100
+>       assert score_high == 100.0
+E       assert 98.0 == 100.0
+
+backend\tests\test_confidence.py:21: AssertionError
+=========================== short test summary info ===========================
+FAILED backend/tests/test_confidence.py::test_confidence_calculation - assert...
+========================= 1 failed, 1 passed in 0.26s =========================

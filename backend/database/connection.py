@@ -100,6 +100,60 @@ def init_db():
     from backend.database import models  # noqa: F401
     Base.metadata.create_all(bind=get_engine())
 
+def run_init_sql():
+    """Run init.sql to create tables that might not be in ORM (like user_profiles)"""
+    init_sql_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "init.sql")
+    if os.path.exists(init_sql_path):
+        print(f"Running init.sql from {init_sql_path}...")
+        with open(init_sql_path, "r") as f:
+            sql_script = f.read()
+        
+        with get_engine().connect() as connection:
+            try:
+                # Smart split that handles BEGIN...END blocks in triggers
+                statements = []
+                current_statement = []
+                in_trigger_block = False
+                
+                for line in sql_script.split('\n'):
+                    stripped = line.strip()
+                    current_statement.append(line)
+                    
+                    # Track if we're inside a trigger BEGIN...END block
+                    if 'CREATE TRIGGER' in stripped.upper():
+                        in_trigger_block = True
+                    
+                    if in_trigger_block and stripped.upper() == 'END;':
+                        # End of trigger block
+                        statements.append('\n'.join(current_statement))
+                        current_statement = []
+                        in_trigger_block = False
+                    elif not in_trigger_block and stripped.endswith(';'):
+                        # Regular statement end
+                        statements.append('\n'.join(current_statement))
+                        current_statement = []
+                
+                # Add any remaining statement
+                if current_statement:
+                    stmt = '\n'.join(current_statement).strip()
+                    if stmt:
+                        statements.append(stmt)
+                
+                # Execute each statement
+                for statement in statements:
+                    statement = statement.strip()
+                    if statement and not statement.startswith('--'):
+                        try:
+                            connection.execute(text(statement))
+                        except Exception as e:
+                            print(f"Warning executing statement: {e}")
+                            print(f"[SQL: {statement[:200]}]")
+                
+                connection.commit()
+                print("init.sql executed successfully.")
+            except Exception as e:
+                print(f"Error running init.sql: {e}")
+
 # =====================================================
 # HEALTH CHECK
 # =====================================================

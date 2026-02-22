@@ -18,7 +18,7 @@ router = APIRouter(
     tags=["FRED Data"]
 )
 
-GOLD_SERIES_IDS = {"GOLDPMGBD228NLBM", "GOLDAMGBD228NLBM"}
+GOLD_SERIES_IDS = {"GOLDAMGBD228NLBM"}
 
 
 def _fetch_gold_price_from_yf(max_age_hours: int = 12) -> Optional[Dict[str, Any]]:
@@ -416,11 +416,8 @@ async def get_trending_news(
 ):
     """Fetch DuckDuckGo news for the most volatile index."""
     try:
-        try:
-            from duckduckgo_search import DDGS
-            ddg_available = True
-        except Exception:
-            ddg_available = False
+        # NewsService handles availability checks
+
 
         ids = series_ids.split(",") if series_ids else [
             k for k, v in ALL_DEFAULT_SERIES.items() if v.get("type") == "index"
@@ -511,32 +508,23 @@ async def get_trending_news(
                 "articles": [],
             }
 
-        if not ddg_available:
-            return {
-                "status": "error",
-                "message": "DuckDuckGo search library not available.",
-                "trending": trending,
-                "articles": [],
-            }
-
+        from backend.services.news_service import news_service
+        
         query = f"{trending['title']} index news"
-        articles = []
-        def _ddg_news(ddgs, q: str, max_results: int):
-            try:
-                return list(ddgs.news(keywords=q, max_results=max_results))
-            except TypeError:
-                return list(ddgs.news(query=q, max_results=max_results))
-
+        
         try:
-            with DDGS() as ddgs:  # type: ignore[name-defined]
-                for item in _ddg_news(ddgs, query, limit):
-                    articles.append({
-                        "title": item.get("title"),
-                        "url": item.get("url"),
-                        "source": item.get("source"),
-                        "date": item.get("date"),
-                        "summary": item.get("body"),
-                    })
+            # Use centralized news service
+            results = news_service.get_news(query, limit)
+            
+            articles = []
+            for item in results:
+                articles.append({
+                    "title": item.get("title"),
+                    "url": item.get("url"),
+                    "source": item.get("source"),
+                    "date": item.get("date"),
+                    "summary": item.get("body"),
+                })
         except Exception as e:
             if cached_payload:
                 payload = cached_payload.get("payload") or {}
@@ -574,11 +562,8 @@ async def get_index_news(
 ):
     """Fetch DuckDuckGo news for each index."""
     try:
-        try:
-            from duckduckgo_search import DDGS
-            ddg_available = True
-        except Exception:
-            ddg_available = False
+        # NewsService handles availability checks
+
 
         ids = series_ids.split(",") if series_ids else [
             k for k, v in ALL_DEFAULT_SERIES.items() if v.get("type") == "index"
@@ -606,22 +591,17 @@ async def get_index_news(
             return None
 
         def fetch_and_cache(title: str, query: str, cache_path: Path):
+            from backend.services.news_service import news_service
+            results = news_service.get_news(query, limit)
             articles = []
-            with DDGS() as ddgs:  # type: ignore[name-defined]
-                def _ddg_news(ddg, q: str, max_results: int):
-                    try:
-                        return list(ddg.news(keywords=q, max_results=max_results))
-                    except TypeError:
-                        return list(ddg.news(query=q, max_results=max_results))
-
-                for item in _ddg_news(ddgs, query, limit):
-                    articles.append({
-                        "title": item.get("title"),
-                        "url": item.get("url"),
-                        "source": item.get("source"),
-                        "date": item.get("date"),
-                        "summary": item.get("body"),
-                    })
+            for item in results:
+                articles.append({
+                    "title": item.get("title"),
+                    "url": item.get("url"),
+                    "source": item.get("source"),
+                    "date": item.get("date"),
+                    "summary": item.get("body"),
+                })
             payload = {
                 "status": "success",
                 "title": title,
@@ -645,35 +625,22 @@ async def get_index_news(
                 results[series_id] = cached
                 continue
 
-            if not ddg_available:
-                results[series_id] = {
-                    "status": "error",
-                    "message": "DuckDuckGo search library not available.",
-                    "title": title,
-                    "query": f"{title} index news",
-                    "articles": [],
-                }
-                continue
-
-            query = f"{title} index news"
-            articles = []
             try:
-                if refresh:
-                    with DDGS() as ddgs:  # type: ignore[name-defined]
-                        def _ddg_news(ddg, q: str, max_results: int):
-                            try:
-                                return list(ddg.news(keywords=q, max_results=max_results))
-                            except TypeError:
-                                return list(ddg.news(query=q, max_results=max_results))
-
-                        for item in _ddg_news(ddgs, query, limit):
-                            articles.append({
-                                "title": item.get("title"),
-                                "url": item.get("url"),
-                                "source": item.get("source"),
-                                "date": item.get("date"),
-                                "summary": item.get("body"),
-                            })
+                query = f"{title} index news"
+                from backend.services.news_service import news_service
+                
+                # Use centralized news service
+                results = news_service.get_news(query, limit)
+                
+                articles = []
+                for item in results:
+                    articles.append({
+                        "title": item.get("title"),
+                        "url": item.get("url"),
+                        "source": item.get("source"),
+                        "date": item.get("date"),
+                        "summary": item.get("body"),
+                    })
                     payload = {
                         "status": "success",
                         "title": title,

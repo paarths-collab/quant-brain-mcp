@@ -1,0 +1,465 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  Send,
+  User,
+  Loader2,
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Check,
+  TrendingUp,
+  BarChart3,
+  Brain,
+  Shield,
+  Zap,
+  AlertTriangle,
+  Activity,
+  Globe2,
+  Briefcase,
+  ArrowDown,
+} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const WS_URL = `${API_BASE.replace('http', 'ws')}/ws/live`;
+
+// ─── Types ──────────────────────────────────────────────────────────────────────
+
+interface AgentStep {
+  tool: string;
+  args: any;
+  description: string;
+  result?: string;
+  status?: 'pending' | 'running' | 'done' | 'error';
+}
+
+interface StrategyData {
+  regime?: { state: string; volatility: string };
+  best_strategy?: { strategy: string; return: number; win_rate: number };
+  trade_levels?: { action: string; entry_price: number; stop_loss: number; take_profit: number };
+  monte_carlo?: { expected_return: number; worst_case_5pct: number; best_case_95pct: number };
+  position_sizing?: { position_size_shares: number; risk_amount: number };
+}
+
+interface FinancialData {
+  ticker?: string;
+  price?: number;
+  score?: number;
+}
+
+interface RiskData {
+  VaR?: number;
+  CVaR?: number;
+  Max_Drawdown?: number;
+}
+
+interface AgentResponse {
+  report?: string;
+  response?: string;
+  financial?: FinancialData;
+  strategy?: StrategyData;
+  risk_engine?: RiskData;
+  confidence?: number;
+  divergence?: string[];
+  plan?: { thought: string; steps: AgentStep[] };
+  execution_log?: AgentStep[];
+  status?: string;
+}
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  agentData?: AgentResponse;
+  isStreaming?: boolean;
+}
+
+let _idCounter = 0;
+function uid() { return `msg-${Date.now()}-${++_idCounter}`; }
+
+const presetPrompts = [
+  { icon: TrendingUp, label: 'Analyze NVDA', query: 'Analyze NVDA for short-term trading' },
+  { icon: Brain, label: 'Best AI stocks', query: 'What are the best AI stocks to buy right now?' },
+  { icon: Globe2, label: 'India market', query: 'Analyze the Indian IT sector for investment' },
+  { icon: Shield, label: 'Risk analysis', query: 'Perform risk analysis on my portfolio: AAPL, MSFT, GOOGL' },
+  { icon: BarChart3, label: 'Backtest', query: 'Backtest a momentum strategy on TSLA for the last 2 years' },
+  { icon: Briefcase, label: 'Portfolio', query: 'Build an optimal portfolio for moderate risk tolerance' },
+];
+
+// ─── Signal Badge ───────────────────────────────────────────────────────────────
+
+function SignalBadge({ action }: { action?: string }) {
+  if (!action) return null;
+  const colors: Record<string, string> = {
+    BUY: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    SELL: 'bg-red-500/20 text-red-400 border-red-500/30',
+    HOLD: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  };
+  return (
+    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase border tracking-wider ${colors[action] || colors.HOLD}`}>
+      {action}
+    </span>
+  );
+}
+
+// ─── Strategy Card ──────────────────────────────────────────────────────────────
+
+function StrategyCard({ strategy }: { strategy: StrategyData }) {
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 mt-4 space-y-4">
+      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-purple-400">
+        <Zap size={14} /> Strategy Intelligence
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {strategy.regime && (
+          <div className="bg-black/40 rounded-xl p-3 border border-white/5">
+            <div className="text-[10px] text-white/40 uppercase mb-1">Regime</div>
+            <div className="text-sm font-bold text-white">{strategy.regime.state}</div>
+            <div className="text-[10px] text-white/50">{strategy.regime.volatility}</div>
+          </div>
+        )}
+        {strategy.best_strategy && (
+          <div className="bg-black/40 rounded-xl p-3 border border-white/5">
+            <div className="text-[10px] text-white/40 uppercase mb-1">Best Strategy</div>
+            <div className="text-sm font-bold text-white">{strategy.best_strategy.strategy}</div>
+            <div className="text-[10px] text-emerald-400">
+              {(strategy.best_strategy.return * 100).toFixed(1)}% return · {(strategy.best_strategy.win_rate * 100).toFixed(0)}% win
+            </div>
+          </div>
+        )}
+        {strategy.trade_levels && (
+          <div className="bg-black/40 rounded-xl p-3 border border-white/5">
+            <div className="text-[10px] text-white/40 uppercase mb-1">Levels</div>
+            <div className="flex items-center gap-2 mb-1"><SignalBadge action={strategy.trade_levels.action} /></div>
+            <div className="text-[10px] text-white/50 space-y-0.5">
+              <div>Entry: ${strategy.trade_levels.entry_price?.toFixed(2)}</div>
+              <div>SL: ${strategy.trade_levels.stop_loss?.toFixed(2)}</div>
+              <div>TP: ${strategy.trade_levels.take_profit?.toFixed(2)}</div>
+            </div>
+          </div>
+        )}
+        {strategy.monte_carlo && (
+          <div className="bg-black/40 rounded-xl p-3 border border-white/5">
+            <div className="text-[10px] text-white/40 uppercase mb-1">Monte Carlo</div>
+            <div className="text-sm font-bold text-white">{(strategy.monte_carlo.expected_return * 100).toFixed(1)}%</div>
+            <div className="text-[10px] text-white/50">5% VaR: {(strategy.monte_carlo.worst_case_5pct * 100).toFixed(1)}%</div>
+            <div className="text-[10px] text-white/50">95%: {(strategy.monte_carlo.best_case_95pct * 100).toFixed(1)}%</div>
+          </div>
+        )}
+      </div>
+      {strategy.position_sizing && (
+        <div className="flex items-center gap-4 pt-2 border-t border-white/5">
+          <div className="text-xs text-white/40">Position Size:</div>
+          <div className="text-sm font-mono font-bold text-white">{strategy.position_sizing.position_size_shares} shares</div>
+          <div className="text-xs text-red-400 font-mono">Risk: -${strategy.position_sizing.risk_amount?.toFixed(2)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Risk Engine Card ───────────────────────────────────────────────────────────
+
+function RiskCard({ risk }: { risk: RiskData }) {
+  const riskLevel = (risk.VaR ?? 0) > 0.05 ? 'HIGH' : (risk.VaR ?? 0) > 0.02 ? 'MODERATE' : 'LOW';
+  const riskColor = riskLevel === 'HIGH' ? 'text-red-400' : riskLevel === 'MODERATE' ? 'text-amber-400' : 'text-emerald-400';
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 mt-3">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-red-400"><Shield size={14} /> Risk Engine</div>
+        <span className={`text-xs font-bold ${riskColor}`}>{riskLevel} RISK</span>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="text-center">
+          <div className="text-[10px] text-white/40 uppercase">VaR (95%)</div>
+          <div className="text-lg font-mono font-bold text-white">{((risk.VaR ?? 0) * 100).toFixed(2)}%</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] text-white/40 uppercase">CVaR</div>
+          <div className="text-lg font-mono font-bold text-white">{((risk.CVaR ?? 0) * 100).toFixed(2)}%</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] text-white/40 uppercase">Max DD</div>
+          <div className="text-lg font-mono font-bold text-white">{((risk.Max_Drawdown ?? 0) * 100).toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Execution Log ──────────────────────────────────────────────────────────────
+
+function ExecutionLog({ steps }: { steps: AgentStep[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!steps?.length) return null;
+  return (
+    <div className="mt-3">
+      <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-2 text-xs text-white/40 hover:text-white/60 transition-colors">
+        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <Activity size={12} /><span className="font-mono">{steps.length} agent steps</span>
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-1.5 pl-4 border-l border-white/[0.06]">
+          {steps.map((step, i) => (
+            <div key={i} className="flex items-start gap-2 text-[11px]">
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
+              <div>
+                <span className="text-purple-400 font-mono">{step.tool}</span>
+                <span className="text-white/30 mx-1">→</span>
+                <span className="text-white/60">{step.description || JSON.stringify(step.args)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Copy Button ────────────────────────────────────────────────────────────────
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  return (
+    <button onClick={handleCopy} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10" title="Copy">
+      {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} className="text-white/30" />}
+    </button>
+  );
+}
+
+// ─── Message Bubble ─────────────────────────────────────────────────────────────
+
+function MessageBubble({ message }: { message: Message }) {
+  const isUser = message.role === 'user';
+  return (
+    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''} group`}>
+      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+        isUser ? 'bg-gradient-to-br from-purple-500 to-indigo-600' : 'bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-white/10'
+      }`}>
+        {isUser ? <User size={14} className="text-white" /> : <Sparkles size={14} className="text-cyan-400" />}
+      </div>
+      <div className={`max-w-[75%] space-y-1 ${isUser ? 'items-end' : ''}`}>
+        <div className={`flex items-center gap-2 ${isUser ? 'justify-end' : ''}`}>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">{isUser ? 'You' : 'Boomerang AI'}</span>
+          <span className="text-[10px] text-white/20">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          {!isUser && message.content && <CopyButton text={message.content} />}
+        </div>
+        <div className={`rounded-2xl px-5 py-4 ${
+          isUser ? 'bg-gradient-to-br from-purple-600/30 to-indigo-600/20 border border-purple-500/20 text-white'
+                 : 'bg-white/[0.03] border border-white/[0.06] text-white/90'
+        }`}>
+          {message.isStreaming ? (
+            <div className="flex items-center gap-2 text-white/50">
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span className="text-xs">Analyzing markets...</span>
+            </div>
+          ) : (
+            <div className="prose prose-invert prose-sm max-w-none prose-headings:font-display prose-headings:text-white prose-p:text-white/80 prose-p:leading-relaxed prose-strong:text-white prose-code:text-cyan-300 prose-code:bg-white/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-li:text-white/70 prose-a:text-purple-400">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
+          )}
+        </div>
+        {message.agentData?.financial?.ticker && (
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 mt-2 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center">
+              <TrendingUp size={16} className="text-emerald-400" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-white">{message.agentData.financial.ticker}</div>
+              <div className="text-xs text-white/50">${message.agentData.financial.price?.toFixed(2)}
+                {message.agentData.confidence != null && <span className="ml-2 text-purple-400">Conf: {(message.agentData.confidence * 100).toFixed(0)}%</span>}
+              </div>
+            </div>
+            {message.agentData.financial.score != null && (
+              <div className="ml-auto text-right">
+                <div className="text-xs text-white/40">Score</div>
+                <div className="text-lg font-mono font-bold text-white">{typeof message.agentData.financial.score === 'number' ? message.agentData.financial.score.toFixed(1) : message.agentData.financial.score}</div>
+              </div>
+            )}
+          </div>
+        )}
+        {message.agentData?.strategy && <StrategyCard strategy={message.agentData.strategy} />}
+        {message.agentData?.risk_engine && <RiskCard risk={message.agentData.risk_engine} />}
+        {message.agentData?.execution_log && <ExecutionLog steps={message.agentData.execution_log} />}
+        {message.agentData?.divergence && message.agentData.divergence.length > 0 && (
+          <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 mt-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-400 mb-2"><AlertTriangle size={12} /> Agent Divergence Detected</div>
+            {message.agentData.divergence.map((d, i) => <div key={i} className="text-[11px] text-amber-300/70">• {d}</div>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Chat Page ─────────────────────────────────────────────────────────────
+
+export default function AIChat() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollAreaRef.current) scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+  }, []);
+
+  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+
+  const handleScroll = () => {
+    if (!scrollAreaRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
+    setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 100);
+  };
+
+  useEffect(() => {
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+    ws.onopen = () => setWsConnected(true);
+    ws.onclose = () => setWsConnected(false);
+    ws.onerror = () => setWsConnected(false);
+    ws.onmessage = (event) => {
+      try {
+        const data: AgentResponse = JSON.parse(event.data);
+        const content = data.report || data.response || 'Analysis complete.';
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.isStreaming);
+          return [...filtered, { id: uid(), role: 'assistant', content, timestamp: new Date(), agentData: data }];
+        });
+        setIsLoading(false);
+      } catch { setIsLoading(false); }
+    };
+    return () => { ws.close(); };
+  }, []);
+
+  const sendMessage = async (query: string) => {
+    if (!query.trim() || isLoading) return;
+    const userMsg: Message = { id: uid(), role: 'user', content: query.trim(), timestamp: new Date() };
+    const streamingMsg: Message = { id: uid(), role: 'assistant', content: '', timestamp: new Date(), isStreaming: true };
+    setMessages(prev => [...prev, userMsg, streamingMsg]);
+    setInput('');
+    setIsLoading(true);
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ query: query.trim() }));
+    } else {
+      try {
+        const res = await fetch(`${API_BASE}/api/super-agent`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query.trim() }),
+        });
+        const data = await res.json();
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.isStreaming);
+          return [...filtered, { id: uid(), role: 'assistant', content: data.report || data.response || JSON.stringify(data), timestamp: new Date(), agentData: data }];
+        });
+      } catch {
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.isStreaming);
+          return [...filtered, { id: uid(), role: 'assistant', content: 'Connection error. Please ensure the backend is running on port 8001.', timestamp: new Date() }];
+        });
+      } finally { setIsLoading(false); }
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
+
+  return (
+    <div className="h-[calc(100vh-4rem)] flex flex-col">
+      {/* Header */}
+      <div className="shrink-0 flex items-center justify-between pb-5 border-b border-white/[0.06]">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-600/30 to-cyan-500/20 border border-white/10 flex items-center justify-center">
+            <Brain size={18} className="text-purple-400" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl font-bold text-white">AI Command Center</h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              <div className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-red-400'}`} />
+              <span className="text-[10px] text-white/40 font-mono uppercase tracking-wider">{wsConnected ? 'Neural Link Active' : 'REST Fallback'}</span>
+            </div>
+          </div>
+        </div>
+        {messages.length > 0 && (
+          <button onClick={() => { setMessages([]); inputRef.current?.focus(); }} className="text-xs text-white/30 hover:text-white/60 transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5">Clear chat</button>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div ref={scrollAreaRef} onScroll={handleScroll} className="flex-1 overflow-y-auto py-6 space-y-6 scroll-smooth">
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center px-4">
+            <div className="relative mb-8">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-purple-600/20 to-cyan-500/10 border border-white/[0.06] flex items-center justify-center">
+                <Sparkles size={32} className="text-purple-400" />
+              </div>
+              <div className="absolute -inset-4 rounded-[2rem] bg-purple-500/5 blur-xl -z-10" />
+            </div>
+            <h2 className="font-display text-2xl font-bold text-white mb-2">What would you like to analyze?</h2>
+            <p className="text-white/40 text-sm text-center max-w-md mb-10">
+              Research stocks, run backtests, analyze sectors, detect market regimes, and build optimized portfolios.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-3xl w-full">
+              {presetPrompts.map((prompt) => {
+                const Icon = prompt.icon;
+                return (
+                  <button key={prompt.label} onClick={() => sendMessage(prompt.query)}
+                    className="group text-left bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] hover:border-purple-500/30 rounded-2xl p-4 transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                        <Icon size={14} className="text-purple-400" />
+                      </div>
+                      <span className="text-sm font-medium text-white">{prompt.label}</span>
+                    </div>
+                    <p className="text-[11px] text-white/30 leading-relaxed line-clamp-2">{prompt.query}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          messages.map(msg => <MessageBubble key={msg.id} message={msg} />)
+        )}
+      </div>
+
+      {/* Scroll to bottom */}
+      {showScrollBtn && (
+        <button onClick={scrollToBottom} className="absolute bottom-24 right-8 w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/20 transition-colors z-10">
+          <ArrowDown size={14} className="text-white/60" />
+        </button>
+      )}
+
+      {/* Input */}
+      <div className="shrink-0 pt-4 border-t border-white/[0.06]">
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.12] focus-within:border-purple-500/40 rounded-2xl transition-all duration-300 px-5 py-1">
+            <Sparkles size={16} className="text-purple-400/60 shrink-0" />
+            <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask anything about markets, stocks, strategies..." className="flex-1 bg-transparent text-white placeholder:text-white/20 text-sm py-3.5 focus:outline-none" disabled={isLoading} />
+            <button type="submit" disabled={!input.trim() || isLoading}
+              className="shrink-0 w-9 h-9 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-20 flex items-center justify-center transition-all duration-200">
+              {isLoading ? <Loader2 size={14} className="text-white animate-spin" /> : <Send size={14} className="text-white" />}
+            </button>
+          </div>
+          <div className="flex items-center justify-between mt-2 px-1">
+            <p className="text-[10px] text-white/20">Powered by multi-agent pipeline · Gemini + Groq + DeepSeek</p>
+            <p className="text-[10px] text-white/20">{messages.filter(m => m.role === 'user').length} queries</p>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

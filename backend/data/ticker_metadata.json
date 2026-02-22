@@ -1,0 +1,890 @@
+{
+  "ILMN": {
+    "sector": "Healthcare",
+    "industry": "Diagnostics & Research",
+    "longName": "Illumina, Inc.",
+    "country": "United States"
+  },
+  "PSX": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Refining & Marketing",
+    "longName": "Phillips 66",
+    "country": "United States"
+  },
+  "TTD": {
+    "sector": "Communication Services",
+    "industry": "Advertising Agencies",
+    "longName": "The Trade Desk, Inc.",
+    "country": "United States"
+  },
+  "ACN": {
+    "sector": "Technology",
+    "industry": "Information Technology Services",
+    "longName": "Accenture plc",
+    "country": "Ireland"
+  },
+  "POWERGRID.NS": {
+    "sector": "Utilities",
+    "industry": "Utilities - Regulated Electric",
+    "longName": "Power Grid Corporation of India Limited",
+    "country": "India"
+  },
+  "IOC.NS": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Refining & Marketing",
+    "longName": "Indian Oil Corporation Limited",
+    "country": "India"
+  },
+  "FANG": {
+    "sector": "Energy",
+    "industry": "Oil & Gas E&P",
+    "longName": "Diamondback Energy, Inc.",
+    "country": "United States"
+  },
+  "MU": {
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "longName": "Micron Technology, Inc.",
+    "country": "United States"
+  },
+  "SOBHA.NS": {
+    "sector": "Real Estate",
+    "industry": "Real Estate - Development",
+    "longName": "Sobha Limited",
+    "country": "India"
+  },
+  "BAJAJFINSV.BO": {
+    "sector": "Financial Services",
+    "industry": "Financial Conglomerates",
+    "longName": "Bajaj Finserv Ltd.",
+    "country": "India"
+  },
+  "ASIANPAINT.NS": {
+    "sector": "Basic Materials",
+    "industry": "Specialty Chemicals",
+    "longName": "Asian Paints Limited",
+    "country": "India"
+  },
+  "PCAR": {
+    "sector": "Industrials",
+    "industry": "Farm & Heavy Construction Machinery",
+    "longName": "PACCAR Inc",
+    "country": "United States"
+  },
+  "BCC": {
+    "sector": "Basic Materials",
+    "industry": "Lumber & Wood Production",
+    "longName": "Boise Cascade Company",
+    "country": "United States"
+  },
+  "CYIENT.NS": {
+    "sector": "Industrials",
+    "industry": "Conglomerates",
+    "longName": "Cyient Limited",
+    "country": "India"
+  },
+  "CMCSA": {
+    "sector": "Communication Services",
+    "industry": "Telecom Services",
+    "longName": "Comcast Corporation",
+    "country": "United States"
+  },
+  "ABB.NS": {
+    "sector": "Industrials",
+    "industry": "Specialty Industrial Machinery",
+    "longName": "ABB India Limited",
+    "country": "India"
+  },
+  "IRCTC.NS": {
+    "sector": "Consumer Cyclical",
+    "industry": "Travel Services",
+    "longName": "Indian Railway Catering & Tourism Corporation Limited",
+    "country": "India"
+  },
+  "MNST": {
+    "sector": "Consumer Defensive",
+    "industry": "Beverages - Non-Alcoholic",
+    "longName": "Monster Beverage Corporation",
+    "country": "United States"
+  },
+  "BPCL.NS": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Refining & Marketing",
+    "longName": "Bharat Petroleum Corporation Limited",
+    "country": "India"
+  },
+  "GOOG": {
+    "sector": "Communication Services",
+    "industry": "Internet Content & Information",
+    "longName": "Alphabet Inc.",
+    "country": "United States"
+  },
+  "PERSISTENT.NS": {
+    "sector": "Technology",
+    "industry": "Information Technology Services",
+    "longName": "Persistent Systems Limited",
+    "country": "India"
+  },
+  "AMGN": {
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers - General",
+    "longName": "Amgen Inc.",
+    "country": "United States"
+  },
+  "CTRA": {
+    "sector": "Energy",
+    "industry": "Oil & Gas E&P",
+    "longName": "Coterra Energy Inc.",
+    "country": "United States"
+  },
+  "C": {
+    "sector": "Financial Services",
+    "industry": "Banks - Diversified",
+    "longName": "Citigroup Inc.",
+    "country": "United States"
+  },
+  "CHOLAFIN.NS": {
+    "sector": "Financial Services",
+    "industry": "Credit Services",
+    "longName": "Cholamandalam Investment and Finance Company Limited",
+    "country": "India"
+  },
+  "VLO": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Refining & Marketing",
+    "longName": "Valero Energy Corporation",
+    "country": "United States"
+  },
+  "ELF": {
+    "sector": "Consumer Defensive",
+    "industry": "Household & Personal Products",
+    "longName": "e.l.f. Beauty, Inc.",
+    "country": "United States"
+  },
+  "AUROPHARMA.NS": {
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers - Specialty & Generic",
+    "longName": "Aurobindo Pharma Limited",
+    "country": "India"
+  },
+  "PANW": {
+    "sector": "Technology",
+    "industry": "Software - Infrastructure",
+    "longName": "Palo Alto Networks, Inc.",
+    "country": "United States"
+  },
+  "KDP": {
+    "sector": "Consumer Defensive",
+    "industry": "Beverages - Non-Alcoholic",
+    "longName": "Keurig Dr Pepper Inc.",
+    "country": "United States"
+  },
+  "AZN": {
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers - General",
+    "longName": "AstraZeneca PLC",
+    "country": "United Kingdom"
+  },
+  "MCD": {
+    "sector": "Consumer Cyclical",
+    "industry": "Restaurants",
+    "longName": "McDonald's Corporation",
+    "country": "United States"
+  },
+  "SUNDARAM.NS": {
+    "sector": "Basic Materials",
+    "industry": "Paper & Paper Products",
+    "longName": "Sundaram Multi Pap Limited",
+    "country": "India"
+  },
+  "UCOBANK.NS": {
+    "sector": "Financial Services",
+    "industry": "Banks - Regional",
+    "longName": "UCO Bank",
+    "country": "India"
+  },
+  "SUZLON.NS": {
+    "sector": "Industrials",
+    "industry": "Specialty Industrial Machinery",
+    "longName": "Suzlon Energy Limited",
+    "country": "India"
+  },
+  "ONGC.NS": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Integrated",
+    "longName": "Oil and Natural Gas Corporation Limited",
+    "country": "India"
+  },
+  "NMDC.NS": {
+    "sector": "Basic Materials",
+    "industry": "Steel",
+    "longName": "NMDC Limited",
+    "country": "India"
+  },
+  "PEP": {
+    "sector": "Consumer Defensive",
+    "industry": "Beverages - Non-Alcoholic",
+    "longName": "PepsiCo, Inc.",
+    "country": "United States"
+  },
+  "XOM": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Integrated",
+    "longName": "Exxon Mobil Corporation",
+    "country": "United States"
+  },
+  "ODFL": {
+    "sector": "Industrials",
+    "industry": "Trucking",
+    "longName": "Old Dominion Freight Line, Inc.",
+    "country": "United States"
+  },
+  "VOLTAS.NS": {
+    "sector": "Consumer Cyclical",
+    "industry": "Furnishings, Fixtures & Appliances",
+    "longName": "Voltas Limited",
+    "country": "India"
+  },
+  "ICICIPRULI.NS": {
+    "sector": "Financial Services",
+    "industry": "Insurance - Life",
+    "longName": "ICICI Prudential Life Insurance Company Limited",
+    "country": "India"
+  },
+  "TORNTPHARM.NS": {
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers - Specialty & Generic",
+    "longName": "Torrent Pharmaceuticals Limited",
+    "country": "India"
+  },
+  "GFF": {
+    "sector": "Industrials",
+    "industry": "Building Products & Equipment",
+    "longName": "Griffon Corporation",
+    "country": "United States"
+  },
+  "IDXX": {
+    "sector": "Healthcare",
+    "industry": "Diagnostics & Research",
+    "longName": "IDEXX Laboratories, Inc.",
+    "country": "United States"
+  },
+  "ADANIPOWER.NS": {
+    "sector": "Utilities",
+    "industry": "Utilities - Independent Power Producers",
+    "longName": "Adani Power Limited",
+    "country": "India"
+  },
+  "CUMMINSIND.NS": {
+    "sector": "Industrials",
+    "industry": "Specialty Industrial Machinery",
+    "longName": "Cummins India Limited",
+    "country": "India"
+  },
+  "ACC.NS": {
+    "sector": "Basic Materials",
+    "industry": "Building Materials",
+    "longName": "ACC Limited",
+    "country": "India"
+  },
+  "MS": {
+    "sector": "Financial Services",
+    "industry": "Capital Markets",
+    "longName": "Morgan Stanley",
+    "country": "United States"
+  },
+  "MO": {
+    "sector": "Consumer Defensive",
+    "industry": "Tobacco",
+    "longName": "Altria Group, Inc.",
+    "country": "United States"
+  },
+  "ORCL": {
+    "sector": "Technology",
+    "industry": "Software - Infrastructure",
+    "longName": "Oracle Corporation",
+    "country": "United States"
+  },
+  "TATACOMM.NS": {
+    "sector": "Communication Services",
+    "industry": "Telecom Services",
+    "longName": "Tata Communications Limited",
+    "country": "India"
+  },
+  "BOSCHLTD.NS": {
+    "sector": "Consumer Cyclical",
+    "industry": "Auto Parts",
+    "longName": "Bosch Limited",
+    "country": "India"
+  },
+  "MARUTI.BO": {
+    "sector": "Consumer Cyclical",
+    "industry": "Auto Manufacturers",
+    "longName": "Maruti Suzuki India Limited",
+    "country": "India"
+  },
+  "SBUX": {
+    "sector": "Consumer Cyclical",
+    "industry": "Restaurants",
+    "longName": "Starbucks Corporation",
+    "country": "United States"
+  },
+  "NATIONALUM.NS": {
+    "sector": "Basic Materials",
+    "industry": "Aluminum",
+    "longName": "National Aluminium Company Limited",
+    "country": "India"
+  },
+  "CSL": {
+    "sector": "Industrials",
+    "industry": "Building Products & Equipment",
+    "longName": "Carlisle Companies Incorporated",
+    "country": "United States"
+  },
+  "TATAPOWER.NS": {
+    "sector": "Utilities",
+    "industry": "Utilities - Independent Power Producers",
+    "longName": "Tata Power Company Limited",
+    "country": "India"
+  },
+  "RBC": {
+    "sector": "Industrials",
+    "industry": "Tools & Accessories",
+    "longName": "RBC Bearings Incorporated",
+    "country": "United States"
+  },
+  "CENTRALBK.NS": {
+    "sector": "Financial Services",
+    "industry": "Banks - Regional",
+    "longName": "Central Bank of India",
+    "country": "India"
+  },
+  "ROST": {
+    "sector": "Consumer Cyclical",
+    "industry": "Apparel Retail",
+    "longName": "Ross Stores, Inc.",
+    "country": "United States"
+  },
+  "CSGP": {
+    "sector": "Real Estate",
+    "industry": "Real Estate Services",
+    "longName": "CoStar Group, Inc.",
+    "country": "United States"
+  },
+  "HLT": {
+    "sector": "Consumer Cyclical",
+    "industry": "Lodging",
+    "longName": "Hilton Worldwide Holdings Inc.",
+    "country": "United States"
+  },
+  "TATASTEEL.NS": {
+    "sector": "Basic Materials",
+    "industry": "Steel",
+    "longName": "Tata Steel Limited",
+    "country": "India"
+  },
+  "NVDA": {
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "longName": "NVIDIA Corporation",
+    "country": "United States"
+  },
+  "INDUSINDBK.NS": {
+    "sector": "Financial Services",
+    "industry": "Banks - Regional",
+    "longName": "IndusInd Bank Limited",
+    "country": "India"
+  },
+  "HAVELLS.NS": {
+    "sector": "Industrials",
+    "industry": "Electrical Equipment & Parts",
+    "longName": "Havells India Limited",
+    "country": "India"
+  },
+  "ON": {
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "longName": "ON Semiconductor Corporation",
+    "country": "United States"
+  },
+  "TJX": {
+    "sector": "Consumer Cyclical",
+    "industry": "Apparel Retail",
+    "longName": "The TJX Companies, Inc.",
+    "country": "United States"
+  },
+  "SHREECEM.NS": {
+    "sector": "Basic Materials",
+    "industry": "Building Materials",
+    "longName": "Shree Cement Limited",
+    "country": "India"
+  },
+  "FTNT": {
+    "sector": "Technology",
+    "industry": "Software - Infrastructure",
+    "longName": "Fortinet, Inc.",
+    "country": "United States"
+  },
+  "ASTRAL.NS": {
+    "sector": "Industrials",
+    "industry": "Building Products & Equipment",
+    "longName": "Astral Limited",
+    "country": "India"
+  },
+  "ADANIGREEN.NS": {
+    "sector": "Utilities",
+    "industry": "Utilities - Renewable",
+    "longName": "Adani Green Energy Limited",
+    "country": "India"
+  },
+  "JINDALSTEL.NS": {
+    "sector": "Basic Materials",
+    "industry": "Steel",
+    "longName": "Jindal Steel Limited",
+    "country": "India"
+  },
+  "SIEMENS.NS": {
+    "sector": "Industrials",
+    "industry": "Specialty Industrial Machinery",
+    "longName": "Siemens Limited",
+    "country": "India"
+  },
+  "ENSG": {
+    "sector": "Healthcare",
+    "industry": "Medical Care Facilities",
+    "longName": "The Ensign Group, Inc.",
+    "country": "United States"
+  },
+  "META": {
+    "sector": "Communication Services",
+    "industry": "Internet Content & Information",
+    "longName": "Meta Platforms, Inc.",
+    "country": "United States"
+  },
+  "MELI": {
+    "sector": "Consumer Cyclical",
+    "industry": "Internet Retail",
+    "longName": "MercadoLibre, Inc.",
+    "country": "Uruguay"
+  },
+  "NTPC.NS": {
+    "sector": "Utilities",
+    "industry": "Utilities - Regulated Electric",
+    "longName": "NTPC Limited",
+    "country": "India"
+  },
+  "APLAPOLLO.NS": {
+    "sector": "Basic Materials",
+    "industry": "Steel",
+    "longName": "APL Apollo Tubes Limited",
+    "country": "India"
+  },
+  "NAUKRI.NS": {
+    "sector": "Communication Services",
+    "industry": "Internet Content & Information",
+    "longName": "Info Edge (India) Limited",
+    "country": "India"
+  },
+  "WMB": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Midstream",
+    "longName": "The Williams Companies, Inc.",
+    "country": "United States"
+  },
+  "TSLA": {
+    "sector": "Consumer Cyclical",
+    "industry": "Auto Manufacturers",
+    "longName": "Tesla, Inc.",
+    "country": "United States"
+  },
+  "MAHABANK.NS": {
+    "sector": "Financial Services",
+    "industry": "Banks - Regional",
+    "longName": "Bank of Maharashtra",
+    "country": "India"
+  },
+  "TVSMOTOR.NS": {
+    "sector": "Consumer Cyclical",
+    "industry": "Auto Manufacturers",
+    "longName": "TVS Motor Company Limited",
+    "country": "India"
+  },
+  "LAURUSLABS.NS": {
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers - Specialty & Generic",
+    "longName": "Laurus Labs Limited",
+    "country": "India"
+  },
+  "TECHM.BO": {
+    "sector": "Technology",
+    "industry": "Information Technology Services",
+    "longName": "Tech Mahindra Limited",
+    "country": "India"
+  },
+  "MMM": {
+    "sector": "Industrials",
+    "industry": "Conglomerates",
+    "longName": "3M Company",
+    "country": "United States"
+  },
+  "XEL": {
+    "sector": "Utilities",
+    "industry": "Utilities - Regulated Electric",
+    "longName": "Xcel Energy Inc.",
+    "country": "United States"
+  },
+  "EOG": {
+    "sector": "Energy",
+    "industry": "Oil & Gas E&P",
+    "longName": "EOG Resources, Inc.",
+    "country": "United States"
+  },
+  "KO": {
+    "sector": "Consumer Defensive",
+    "industry": "Beverages - Non-Alcoholic",
+    "longName": "The Coca-Cola Company",
+    "country": "United States"
+  },
+  "SLB": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Equipment & Services",
+    "longName": "SLB N.V.",
+    "country": "United States"
+  },
+  "COALINDIA.NS": {
+    "sector": "Energy",
+    "industry": "Thermal Coal",
+    "longName": "Coal India Limited",
+    "country": "India"
+  },
+  "UPL.NS": {
+    "sector": "Basic Materials",
+    "industry": "Agricultural Inputs",
+    "longName": "UPL Limited",
+    "country": "India"
+  },
+  "INDIANB.NS": {
+    "sector": "Financial Services",
+    "industry": "Banks - Regional",
+    "longName": "Indian Bank",
+    "country": "India"
+  },
+  "RBLBANK.NS": {
+    "sector": "Financial Services",
+    "industry": "Banks - Regional",
+    "longName": "RBL Bank Limited",
+    "country": "India"
+  },
+  "PAYX": {
+    "sector": "Technology",
+    "industry": "Software - Application",
+    "longName": "Paychex, Inc.",
+    "country": "United States"
+  },
+  "DVN": {
+    "sector": "Energy",
+    "industry": "Oil & Gas E&P",
+    "longName": "Devon Energy Corporation",
+    "country": "United States"
+  },
+  "SYK": {
+    "sector": "Healthcare",
+    "industry": "Medical Devices",
+    "longName": "Stryker Corporation",
+    "country": "United States"
+  },
+  "UNIONBANK.NS": {
+    "sector": "Financial Services",
+    "industry": "Banks - Regional",
+    "longName": "Union Bank of India",
+    "country": "India"
+  },
+  "IPCALAB.NS": {
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers - Specialty & Generic",
+    "longName": "Ipca Laboratories Limited",
+    "country": "India"
+  },
+  "PETRONET.NS": {
+    "sector": "Energy",
+    "industry": "Oil & Gas Refining & Marketing",
+    "longName": "Petronet LNG Limited",
+    "country": "India"
+  },
+  "SCHW": {
+    "sector": "Financial Services",
+    "industry": "Capital Markets",
+    "longName": "The Charles Schwab Corporation",
+    "country": "United States"
+  },
+  "LODHA.NS": {
+    "sector": "Real Estate",
+    "industry": "Real Estate - Development",
+    "longName": "Lodha Developers Limited",
+    "country": "India"
+  },
+  "WFC": {
+    "sector": "Financial Services",
+    "industry": "Banks - Diversified",
+    "longName": "Wells Fargo & Company",
+    "country": "United States"
+  },
+  "HD": {
+    "sector": "Consumer Cyclical",
+    "industry": "Home Improvement Retail",
+    "longName": "The Home Depot, Inc.",
+    "country": "United States"
+  },
+  "TEAM": {
+    "sector": "Technology",
+    "industry": "Software - Application",
+    "longName": "Atlassian Corporation",
+    "country": "Australia"
+  },
+  "TXN": {
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "longName": "Texas Instruments Incorporated",
+    "country": "United States"
+  },
+  "TCS.BO": {
+    "sector": "Technology",
+    "industry": "Information Technology Services",
+    "longName": "Tata Consultancy Services Limited",
+    "country": "India"
+  },
+  "CDW": {
+    "sector": "Technology",
+    "industry": "Information Technology Services",
+    "longName": "CDW Corporation",
+    "country": "United States"
+  },
+  "GODREJCP.NS": {
+    "sector": "Consumer Defensive",
+    "industry": "Household & Personal Products",
+    "longName": "Godrej Consumer Products Limited",
+    "country": "India"
+  },
+  "CROX": {
+    "sector": "Consumer Cyclical",
+    "industry": "Footwear & Accessories",
+    "longName": "Crocs, Inc.",
+    "country": "United States"
+  },
+  "ZS": {
+    "sector": "Technology",
+    "industry": "Software - Infrastructure",
+    "longName": "Zscaler, Inc.",
+    "country": "United States"
+  },
+  "MSA": {
+    "sector": "Industrials",
+    "industry": "Security & Protection Services",
+    "longName": "MSA Safety Incorporated",
+    "country": "United States"
+  },
+  "GILD": {
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers - General",
+    "longName": "Gilead Sciences, Inc.",
+    "country": "United States"
+  },
+  "BKNG": {
+    "sector": "Consumer Cyclical",
+    "industry": "Travel Services",
+    "longName": "Booking Holdings Inc.",
+    "country": "United States"
+  },
+  "ULTRACEMCO.BO": {
+    "sector": "Basic Materials",
+    "industry": "Building Materials",
+    "longName": "UltraTech Cement Limited",
+    "country": "India"
+  },
+  "AMAT": {
+    "sector": "Technology",
+    "industry": "Semiconductor Equipment & Materials",
+    "longName": "Applied Materials, Inc.",
+    "country": "United States"
+  },
+  "SCHAEFFLER.NS": {
+    "sector": "Consumer Cyclical",
+    "industry": "Auto Parts",
+    "longName": "Schaeffler India Limited",
+    "country": "India"
+  },
+  "SBILIFE.NS": {
+    "sector": "Financial Services",
+    "industry": "Insurance - Life",
+    "longName": "SBI Life Insurance Company Limited",
+    "country": "India"
+  },
+  "AMZN": {
+    "sector": "Consumer Cyclical",
+    "industry": "Internet Retail",
+    "longName": "Amazon.com, Inc.",
+    "country": "United States"
+  },
+  "CB": {
+    "sector": "Financial Services",
+    "industry": "Insurance - Property & Casualty",
+    "longName": "Chubb Limited",
+    "country": "Switzerland"
+  },
+  "WIPRO.BO": {
+    "sector": "Technology",
+    "industry": "Information Technology Services",
+    "longName": "Wipro Limited",
+    "country": "India"
+  },
+  "ASIANPAINT.BO": {
+    "sector": "Basic Materials",
+    "industry": "Specialty Chemicals",
+    "longName": "Asian Paints Limited",
+    "country": "India"
+  },
+  "BEL.NS": {
+    "sector": "Industrials",
+    "industry": "Aerospace & Defense",
+    "longName": "Bharat Electronics Limited",
+    "country": "India"
+  },
+  "PYPL": {
+    "sector": "Financial Services",
+    "industry": "Credit Services",
+    "longName": "PayPal Holdings, Inc.",
+    "country": "United States"
+  },
+  "COP": {
+    "sector": "Energy",
+    "industry": "Oil & Gas E&P",
+    "longName": "ConocoPhillips",
+    "country": "United States"
+  },
+  "EXC": {
+    "sector": "Utilities",
+    "industry": "Utilities - Regulated Electric",
+    "longName": "Exelon Corporation",
+    "country": "United States"
+  },
+  "BAJFINANCE.BO": {
+    "sector": "Financial Services",
+    "industry": "Credit Services",
+    "longName": "Bajaj Finance Limited",
+    "country": "India"
+  },
+  "M&M.NS": {
+    "sector": "Consumer Cyclical",
+    "industry": "Auto Manufacturers",
+    "longName": "Mahindra & Mahindra Limited",
+    "country": "India"
+  },
+  "ABCAPITAL.NS": {
+    "sector": "Financial Services",
+    "industry": "Financial Conglomerates",
+    "longName": "Aditya Birla Capital Limited",
+    "country": "India"
+  },
+  "JSWSTEEL.BO": {
+    "sector": "Basic Materials",
+    "industry": "Steel",
+    "longName": "JSW Steel Limited",
+    "country": "India"
+  },
+  "HDFCLIFE.NS": {
+    "sector": "Financial Services",
+    "industry": "Insurance - Life",
+    "longName": "HDFC Life Insurance Company Limited",
+    "country": "India"
+  },
+  "APOLLOHOSP.NS": {
+    "sector": "Healthcare",
+    "industry": "Medical Care Facilities",
+    "longName": "Apollo Hospitals Enterprise Limited",
+    "country": "India"
+  },
+  "PM": {
+    "sector": "Consumer Defensive",
+    "industry": "Tobacco",
+    "longName": "Philip Morris International Inc.",
+    "country": "United States"
+  },
+  "TMO": {
+    "sector": "Healthcare",
+    "industry": "Diagnostics & Research",
+    "longName": "Thermo Fisher Scientific Inc.",
+    "country": "United States"
+  },
+  "RADICO.NS": {
+    "sector": "Consumer Defensive",
+    "industry": "Beverages - Wineries & Distilleries",
+    "longName": "Radico Khaitan Limited",
+    "country": "India"
+  },
+  "OXY": {
+    "sector": "Energy",
+    "industry": "Oil & Gas E&P",
+    "longName": "Occidental Petroleum Corporation",
+    "country": "United States"
+  },
+  "MUSA": {
+    "sector": "Consumer Cyclical",
+    "industry": "Specialty Retail",
+    "longName": "Murphy USA Inc.",
+    "country": "United States"
+  },
+  "BANDHANBNK.NS": {
+    "sector": "Financial Services",
+    "industry": "Banks - Regional",
+    "longName": "Bandhan Bank Limited",
+    "country": "India"
+  },
+  "BLK": {
+    "sector": "Financial Services",
+    "industry": "Asset Management",
+    "longName": "BlackRock, Inc.",
+    "country": "United States"
+  },
+  "ELV": {
+    "sector": "Healthcare",
+    "industry": "Healthcare Plans",
+    "longName": "Elevance Health, Inc.",
+    "country": "United States"
+  },
+  "ADP": {
+    "sector": "Technology",
+    "industry": "Software - Application",
+    "longName": "Automatic Data Processing, Inc.",
+    "country": "United States"
+  },
+  "CONCOR.NS": {
+    "sector": "Industrials",
+    "industry": "Railroads",
+    "longName": "Container Corporation of India Limited",
+    "country": "India"
+  },
+  "TRV": {
+    "sector": "Financial Services",
+    "industry": "Insurance - Property & Casualty",
+    "longName": "The Travelers Companies, Inc.",
+    "country": "United States"
+  },
+  "ABBV": {
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers - General",
+    "longName": "AbbVie Inc.",
+    "country": "United States"
+  },
+  "PHOENIXLTD.NS": {
+    "sector": "Real Estate",
+    "industry": "Real Estate - Diversified",
+    "longName": "The Phoenix Mills Limited",
+    "country": "India"
+  },
+  "VRSK": {
+    "sector": "Industrials",
+    "industry": "Consulting Services",
+    "longName": "Verisk Analytics, Inc.",
+    "country": "United States"
+  }
+}

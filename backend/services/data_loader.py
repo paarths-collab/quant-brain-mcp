@@ -154,7 +154,10 @@ import yfinance as yf
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import time
+
+import httpx
 
 from backend.services.market_utils import get_market_config
 
@@ -210,6 +213,114 @@ def format_ticker(ticker: str, market: str) -> str:
 # INTERNAL RAW FETCHERS (NOT CACHED)
 # ============================================================
 
+def _to_unix_seconds(date_str: str, *, inclusive_end: bool = False) -> int:
+    """
+    Convert YYYY-MM-DD to unix seconds (UTC).
+    If inclusive_end=True, adds 1 day so Yahoo's period2 is inclusive.
+    """
+    ts = pd.Timestamp(date_str)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    else:
+        ts = ts.tz_convert("UTC")
+    if inclusive_end:
+        ts = ts + pd.Timedelta(days=1)
+    return int(ts.timestamp())
+
+
+def _fetch_history_yahoo_chart(
+    yf_ticker: str,
+    start: str,
+    end: str,
+    interval: str,
+    auto_adjust: bool,
+) -> pd.DataFrame:
+    """
+    Fallback OHLCV fetcher using Yahoo Finance chart endpoint.
+    This bypasses some intermittent yfinance download failures.
+    """
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
+    params = {
+        "period1": _to_unix_seconds(start, inclusive_end=False),
+        "period2": _to_unix_seconds(end, inclusive_end=True),
+        "interval": interval,
+        "includePrePost": "false",
+        "events": "div|split",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+        "Accept": "application/json,text/plain,*/*",
+    }
+
+    last_err: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+                resp = client.get(url, params=params, headers=headers)
+                # Retry on transient throttling
+                if resp.status_code in {429, 500, 502, 503, 504}:
+                    raise httpx.HTTPStatusError("transient", request=resp.request, response=resp)
+                resp.raise_for_status()
+                payload = resp.json()
+        except Exception as e:
+            last_err = e
+            # backoff: 0.5s, 1s, 2s
+            time.sleep(0.5 * (2**attempt))
+            continue
+
+        chart = (payload or {}).get("chart") or {}
+        result = chart.get("result") or []
+        if not result:
+            raise ValueError(f"Yahoo chart returned no result for {yf_ticker}")
+
+        r0 = result[0] or {}
+        timestamps = r0.get("timestamp") or []
+        indicators = r0.get("indicators") or {}
+        quote0 = (indicators.get("quote") or [{}])[0] or {}
+
+        if not timestamps:
+            raise ValueError(f"Yahoo chart has no timestamps for {yf_ticker}")
+
+        idx = pd.to_datetime(timestamps, unit="s", utc=True)
+        df = pd.DataFrame(
+            {
+                "Open": quote0.get("open"),
+                "High": quote0.get("high"),
+                "Low": quote0.get("low"),
+                "Close": quote0.get("close"),
+                "Volume": quote0.get("volume"),
+            },
+            index=idx,
+        )
+
+        # Drop empty rows
+        df = df.dropna(subset=["Close"])
+        if df.empty:
+            raise ValueError(f"Yahoo chart produced empty OHLCV for {yf_ticker}")
+
+        # Auto-adjust if requested (use adjclose ratio)
+        if auto_adjust:
+            adj0 = (indicators.get("adjclose") or [{}])[0] or {}
+            adj = adj0.get("adjclose")
+            if adj:
+                adj_s = pd.Series(adj, index=idx, dtype="float64")
+                # Align and compute adjustment ratio
+                adj_s = adj_s.reindex(df.index)
+                ratio = adj_s / df["Close"].astype("float64")
+                ratio = ratio.replace([pd.NA, float("inf"), -float("inf")], pd.NA).fillna(1.0)
+                for col in ["Open", "High", "Low", "Close"]:
+                    df[col] = df[col].astype("float64") * ratio
+
+        # Normalize dtypes
+        for col in ["Open", "High", "Low", "Close"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0).astype("int64")
+
+        return df
+
+    raise ValueError(f"Yahoo chart fetch failed for {yf_ticker}: {last_err}")
+
+
 def _fetch_history_raw(
     ticker: str,
     start: str,
@@ -222,14 +333,42 @@ def _fetch_history_raw(
     yf_ticker = format_ticker(ticker, market)
     logger.info(f"Fetching history: {yf_ticker}")
 
-    df = yf.download(
-        yf_ticker,
-        start=start,
-        end=end,
-        interval=interval,
-        auto_adjust=auto_adjust,
-        progress=False,
-    )
+    df = pd.DataFrame()
+    try:
+        df = yf.download(
+            yf_ticker,
+            start=start,
+            end=end,
+            interval=interval,
+            auto_adjust=auto_adjust,
+            progress=False,
+            threads=False,
+        )
+    except Exception as e:
+        logger.warning(f"yfinance download failed for {yf_ticker}: {e}")
+
+    # Fallback when yfinance returns empty (common during throttling / intermittent upstream issues)
+    if df is None or df.empty:
+        try:
+            df = _fetch_history_yahoo_chart(
+                yf_ticker=yf_ticker,
+                start=start,
+                end=end,
+                interval=interval,
+                auto_adjust=auto_adjust,
+            )
+        except Exception as e:
+            logger.warning(f"Yahoo chart fallback failed for {yf_ticker}: {e}")
+            # Last-chance fallback via Ticker().history (different code path in yfinance)
+            try:
+                df = yf.Ticker(yf_ticker).history(
+                    start=start,
+                    end=end,
+                    interval=interval,
+                    auto_adjust=auto_adjust,
+                )
+            except Exception as e2:
+                logger.warning(f"yfinance Ticker().history failed for {yf_ticker}: {e2}")
 
     if df.empty:
         raise ValueError(f"No market data for {ticker}")

@@ -1,0 +1,71 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\Paarth\Github\Boomerang - agentic
+plugins: anyio-4.12.1, langsmith-0.6.6
+collected 4 items
+
+backend\tests\test_memory.py F.                                          [ 50%]
+backend\tests\test_screener.py ..                                        [100%]
+
+================================== FAILURES ===================================
+______________________________ test_vector_store ______________________________
+
+    def test_vector_store():
+        store = VectorStore()
+        # Unique ID to prevent collision in persistent DB on re-runs
+        import uuid
+        test_id = str(uuid.uuid4())
+    
+>       store.add(test_id, "AI stocks are growing fast")
+
+backend\tests\test_memory.py:10: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend\memory\vector_store.py:18: in add
+    self.collection.add(
+backend\.venv\Lib\site-packages\chromadb\api\models\Collection.py:84: in add
+    add_request = self._validate_and_prepare_add_request(
+backend\.venv\Lib\site-packages\chromadb\api\models\CollectionCommon.py:95: in wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend\.venv\Lib\site-packages\chromadb\api\models\CollectionCommon.py:219: in _validate_and_prepare_add_request
+    validate_insert_record_set(record_set=add_records)
+backend\.venv\Lib\site-packages\chromadb\api\types.py:373: in validate_insert_record_set
+    validate_metadatas(record_set["metadatas"])
+backend\.venv\Lib\site-packages\chromadb\api\types.py:1035: in validate_metadatas
+    validate_metadata(metadata)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+metadata = {}
+
+    def validate_metadata(metadata: Metadata) -> Metadata:
+        """Validates metadata to ensure it is a dictionary of strings to strings, ints, floats, bools, or SparseVectors"""
+        if not isinstance(metadata, dict) and metadata is not None:
+            raise ValueError(
+                f"Expected metadata to be a dict or None, got {type(metadata).__name__} as metadata"
+            )
+        if metadata is None:
+            return metadata
+        if len(metadata) == 0:
+>           raise ValueError(
+                f"Expected metadata to be a non-empty dict, got {len(metadata)} metadata attributes"
+            )
+E           ValueError: Expected metadata to be a non-empty dict, got 0 metadata attributes in add.
+
+backend\.venv\Lib\site-packages\chromadb\api\types.py:973: ValueError
+============================== warnings summary ===============================
+backend/tests/test_screener.py::test_screener_agent
+  C:\Users\Paarth\Github\Boomerang - agentic\backend\services\duckduckgo_service.py:9: RuntimeWarning: This package (`duckduckgo_search`) has been renamed to `ddgs`! Use `pip install ddgs` instead.
+    with DDGS() as ddgs:
+
+backend/tests/test_screener.py::test_screener_agent
+  C:\Users\Paarth\Github\Boomerang - agentic\backend\.venv\Lib\site-packages\urllib3\util\ssl_.py:262: DeprecationWarning: ssl.PROTOCOL_TLS is deprecated
+    context = SSLContext(ssl_version or ssl.PROTOCOL_SSLv23)
+
+backend/tests/test_screener.py::test_screener_agent
+  C:\Users\Paarth\Github\Boomerang - agentic\backend\.venv\Lib\site-packages\urllib3\connection.py:374: DeprecationWarning: ssl.match_hostname() is deprecated
+    match_hostname(cert, asserted_hostname)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED backend/tests/test_memory.py::test_vector_store - ValueError: Expected...
+=================== 1 failed, 3 passed, 3 warnings in 5.66s ===================

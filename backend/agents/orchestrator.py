@@ -123,11 +123,15 @@ class Orchestrator:
     
     @property
     def llm_agent(self):
-        """Lazy load LLMAgent"""
+        """Lazy load LLMAgent (Groq)"""
         if "llm_agent" not in self._agent_cache:
             if self._should_load_agent("llm"):
-                openrouter_key = self.keys.get("openrouter1") or self.keys.get("openrouter")
-                self._agent_cache["llm_agent"] = LLMAgent(openrouter_api_key=openrouter_key)
+                try:
+                    from backend.agents.groq_agent import GroqAgent
+                    self._agent_cache["llm_agent"] = GroqAgent(api_key=self.keys.get("groq") or self.cfg.get("GROQ_API_KEY"))
+                except ImportError:
+                    print("Could not import GroqAgent, using stub.")
+                    self._agent_cache["llm_agent"] = LLMAgent()
             else:
                 raise AttributeError("LLMAgent not enabled in this orchestrator instance")
         return self._agent_cache["llm_agent"]
@@ -225,6 +229,16 @@ class Orchestrator:
             else:
                 raise AttributeError("SentimentAgent not enabled in this orchestrator instance")
         return self._agent_cache["sentiment_agent"]
+
+    @property
+    def super_agent(self):
+        """Lazy load SuperAgent"""
+        if "super_agent" not in self._agent_cache:
+            # Always load super agent if not explicitly disabled or if logic permits
+            # Assuming 'super_agent' key or enabled by default if not specified
+            from backend.agents.super_agent import SuperAgent
+            self._agent_cache["super_agent"] = SuperAgent(orchestrator=self, llm_agent=self.llm_agent)
+        return self._agent_cache["super_agent"]
 
     def _register_strategies(self):
         print("Orchestrator: Discovering and registering strategies...")
@@ -352,7 +366,7 @@ class Orchestrator:
         """
         
         # --- MODEL NAME UPDATED ---
-        open_router_model = "mistralai/mistral-7b-instruct:free"
+        open_router_model = "llama-3.3-70b-versatile"
         
         print(f"--> Step 4: Querying Junior Analyst A ({open_router_model})...")
         report_a = self.llm_agent.run(prompt=initial_prompt, model_name=open_router_model)

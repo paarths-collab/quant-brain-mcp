@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -42,7 +42,7 @@
   }
   
   body {
-    @apply bg-black text-white antialiased;
+    @apply bg-zinc-900 text-white antialiased;
     font-family: 'Inter', sans-serif;
   }
   
@@ -218,4 +218,122 @@
 .hover-lift:hover {
   transform: translateY(-5px);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Terminal-specific styling */
+.font-mono {
+  font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+  font-feature-settings: "liga" 1, "calt" 1;
+}
+
+/* Terminal scanlines effect */
+.terminal-scanlines::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 50%, rgba(0, 255, 255, 0.02) 50%);
+  background-size: 100% 4px;
+  pointer-events: none;
+  animation: scan 8s linear infinite;
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+/* CRT monitor glow effect */
+.terminal-border {
+  position: relative;
+}
+
+.terminal-border::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(
+    135deg, 
+    rgba(255, 107, 53, 0.2), 
+    transparent 50%, 
+    rgba(255, 0, 255, 0.2)
+  );
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.terminal-border:hover::after {
+  opacity: 1;
+}
+
+/* Data stream pulse animation */
+.data-stream {
+  animation: pulse-data 2s ease-in-out infinite;
+}
+
+@keyframes pulse-data {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Orange neon glow */
+.neon-orange {
+  text-shadow: 0 0 5px #FF6B35, 0 0 10px #FF6B35, 0 0 20px #FF6B35;
+}
+
+/* Purple neon glow */
+.neon-purple {
+  text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff, 0 0 20px #ff00ff;
+}
+
+/* Markdown table styling */
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.prose thead {
+  background: rgba(255, 107, 53, 0.1);
+}
+
+.prose th {
+  border: 1px solid rgba(255, 107, 53, 0.3);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #FF6B35;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.prose td {
+  border: 1px solid rgba(255, 107, 53, 0.2);
+  padding: 0.5rem 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.prose tbody tr:hover {
+  background: rgba(255, 107, 53, 0.05);
+}
+
+.prose table code {
+  background: rgba(255, 107, 53, 0.1);
+  color: #FF6B35;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
 }

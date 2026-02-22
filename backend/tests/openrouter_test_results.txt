@@ -1,0 +1,34 @@
+Testing 2 keys against model: qwen/qwen3-235b-a22b-thinking-2507
+
+Checking Key #1: sk-or-v1-82829e...
+Traceback (most recent call last):
+  File "C:\Users\Paarth\Github\Boomerang - agentic\check_openrouter_keys.py", line 37, in check_key
+    print(f"\u2705 Key #{index + 1} working! Response: {resp.json()['choices'][0]['message']['content']}")
+  File "C:\Users\Paarth\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 0: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Paarth\Github\Boomerang - agentic\check_openrouter_keys.py", line 55, in <module>
+    asyncio.run(main())
+  File "C:\Users\Paarth\AppData\Local\Programs\Python\Python311\Lib\asyncio\runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\Paarth\AppData\Local\Programs\Python\Python311\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Paarth\AppData\Local\Programs\Python\Python311\Lib\asyncio\base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\Paarth\Github\Boomerang - agentic\check_openrouter_keys.py", line 50, in main
+    result = await check_key(key, i)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Paarth\Github\Boomerang - agentic\check_openrouter_keys.py", line 43, in check_key
+    print(f"\u274c Key #{index + 1} error: {str(e)}")
+  File "C:\Users\Paarth\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>

@@ -36,7 +36,7 @@ def run(ticker, start_date, end_date, market, initial_capital=100000, **kwargs):
     
     # Set the parameters for the strategy class
     EmaCross.fast_ema_period = fast_period
-    EmaCross.slow_ema_period = slow_period
+    EmaCross.slow_ema_period = slow_period # type: ignore
 
     hist_df = get_data(ticker, start_date, end_date, market)
     if hist_df.empty:
