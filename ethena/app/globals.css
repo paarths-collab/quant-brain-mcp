@@ -1,0 +1,240 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --accent: #4f46e5;
+  --accent2: #4ade80;
+  --glass: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  /* Use DM Sans as the base body font — matches the light-weight hero text in screenshot */
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Font Utilities ── */
+.font-syne {
+  font-family: 'Syne', sans-serif;
+}
+
+.font-mono {
+  font-family: 'DM Mono', monospace;
+}
+
+.font-sans {
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Typography ── */
+.tight-heading {
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+/* ── Gradients ── */
+.text-gradient {
+  background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.4) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-accent {
+  background: linear-gradient(135deg, #818cf8 0%, #4f46e5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glassmorphism ── */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.5rem;
+}
+
+/* ── Hero dot-grid background (matches screenshot matrix texture) ── */
+.hero-grid-bg {
+  background-image: radial-gradient(circle,
+      rgba(255, 255, 255, 0.55) 1px,
+      transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Fade the grid out toward the edges so it doesn't fight the globe */
+.hero-grid-fade {
+  -webkit-mask-image: radial-gradient(ellipse 70% 80% at 30% 50%,
+      rgba(0, 0, 0, 0.08) 0%,
+      transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 80% at 30% 50%,
+      rgba(0, 0, 0, 0.08) 0%,
+      transparent 100%);
+}
+
+/* ── Stats Bar ── */
+.stats-divider {
+  width: 1px;
+  height: 3rem;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Animations ── */
+@layer utilities {
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* These classes are used in the Globe.tsx JSX */
+.animate-spin-60s { animation: spin 60s linear infinite; }
+.animate-spin-100s-reverse { animation: spin 100s linear infinite reverse; }
+.animate-spin-140s { animation: spin 140s linear infinite; }
+
+/* ── Shimmer card shine effect ── */
+.card-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-shine::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(255, 255, 255, 0.06) 50%,
+      transparent 60%,
+      transparent 100%);
+  background-size: 200% 100%;
+  background-position: -100% 0;
+  transition: none;
+  pointer-events: none;
+  z-index: 20;
+  border-radius: inherit;
+}
+
+.card-shine:hover::before {
+  animation: shimmer-sweep 0.65s ease forwards;
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -100% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ── Border glow on hover ── */
+.card-glow {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.card-glow:hover {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 8px 40px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ── Top-edge highlight on hover ── */
+.card-top-edge {
+  position: relative;
+}
+
+.card-top-edge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.card-top-edge:hover::after {
+  opacity: 1;
+}
+
+/* ── Scroll-reveal base ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
