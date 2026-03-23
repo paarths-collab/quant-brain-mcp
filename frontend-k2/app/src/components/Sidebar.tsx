@@ -4,14 +4,12 @@ import {
   TrendingUp,
   Globe,
   MessageSquare,
-  Brain,
   Layers,
   BarChart3,
   Search,
   Network,
   MessagesSquare,
   User,
-  Zap,
   Settings,
 } from 'lucide-react';
 
@@ -24,9 +22,7 @@ const navigation = [
   { name: 'Global Markets', to: '/globe', icon: Globe },
   { name: 'News Box', to: '/reddit', icon: MessagesSquare },
   { name: 'Peer Comparison', to: '/relationships', icon: Network },
-  { name: 'Investment AI', to: '/ai', icon: Brain },
   { name: 'AI Chat', to: '/chat', icon: MessageSquare },
-  { name: 'Quant Lab', to: '/quant', icon: Zap },
   { name: 'Profile', to: '/profile', icon: User },
   { name: 'Settings', to: '/settings', icon: Settings },
 ];

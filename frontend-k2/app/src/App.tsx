@@ -9,9 +9,7 @@ import Research from './pages/Research';
 import Globe from './pages/Globe';
 import Reddit from './pages/Reddit';
 import Relationships from './pages/Relationships';
-import InvestmentAI from './pages/InvestmentAI';
 import AIChat from './pages/AIChat';
-import QuantLab from './pages/QuantLab';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import './App.css';
@@ -30,9 +28,7 @@ export default function App() {
           <Route path="/globe" element={<Globe />} />
           <Route path="/reddit" element={<Reddit />} />
           <Route path="/relationships" element={<Relationships />} />
-          <Route path="/ai" element={<InvestmentAI />} />
           <Route path="/chat" element={<AIChat />} />
-          <Route path="/quant" element={<QuantLab />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
         </Route>

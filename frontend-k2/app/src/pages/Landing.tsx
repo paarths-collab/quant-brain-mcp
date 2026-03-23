@@ -7,17 +7,7 @@ import {
   Instagram,
   Menu,
   X,
-  BarChart3,
-  Brain,
-  Wallet,
-  LineChart,
   Download,
-  TrendingUp,
-  Shield,
-  Database,
-  Newspaper,
-  Globe2,
-  Briefcase,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -35,7 +25,7 @@ const Navigation = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navItems = ['HOW IT WORKS', 'OUR SERVICES', 'ABOUT US'];
+  const navItems = ['HOW IT WORKS', 'ABOUT US'];
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
@@ -199,139 +189,6 @@ const HeroSection = () => {
   );
 };
 
-// Features Section
-const FeaturesSection = () => {
-  const features = [
-    {
-      icon: BarChart3,
-      title: 'Bloomberg Terminal',
-      description: 'Professional-grade trading platform with real-time market data, analytics, and execution capabilities.',
-      image: '/images/feature-simulation.jpg',
-    },
-    {
-      icon: Database,
-      title: 'Market Data & Analytics',
-      description: 'Access to comprehensive financial data across equities, fixed income, commodities, and currencies.',
-      image: '/images/feature-analytics.jpg',
-    },
-    {
-      icon: Newspaper,
-      title: 'Bloomberg News',
-      description: 'Breaking news, in-depth analysis, and expert commentary from our global newsroom.',
-      image: '/images/img1.556Z.png',
-    },
-    {
-      icon: TrendingUp,
-      title: 'Trading Solutions',
-      description: 'Multi-asset electronic trading with advanced execution algorithms and smart order routing.',
-      image: '/images/feature-ai.jpg',
-    },
-    {
-      icon: Shield,
-      title: 'Risk Management',
-      description: 'Enterprise-grade risk analytics with real-time portfolio monitoring and stress testing.',
-      image: '/images/img2.818Z.png',
-    },
-    {
-      icon: Briefcase,
-      title: 'Portfolio Analytics',
-      description: 'Sophisticated portfolio management tools with performance attribution and optimization.',
-      image: '/images/feature-app.jpg',
-    },
-    {
-      icon: Globe2,
-      title: 'Global Market Coverage',
-      description: 'Access to 350+ exchanges and markets worldwide with 24/7 data feeds and pricing.',
-      image: '/images/img3.319Z.png',
-    },
-    {
-      icon: Brain,
-      title: 'AI & Machine Learning',
-      description: 'Predictive analytics and sentiment analysis powered by advanced machine learning algorithms.',
-      image: '/images/feature-ai.jpg',
-    },
-  ];
-
-  return (
-    <section id="our-services" className="relative py-24 md:py-32 bg-black">
-      <div className="w-full px-6 md:px-12 lg:px-24">
-        <div className="mb-16 text-center">
-          <h2 className="font-display text-3xl md:text-5xl font-bold text-white mb-4">
-            Bloomberg <span className="text-gradient">Services</span>
-          </h2>
-          <p className="text-white/60 max-w-2xl mx-auto">
-            Professional-grade financial solutions trusted by the world's leading institutions. 
-            Access the same tools and data that power global markets.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => {
-            const Icon = feature.icon;
-            return (
-              <div
-                key={index}
-                className="group rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-purple/30 transition-all duration-500 overflow-hidden"
-              >
-                {/* Feature Image */}
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={feature.image}
-                    alt={feature.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                  <div className="absolute top-4 left-4 w-12 h-12 rounded-lg bg-purple/20 backdrop-blur-sm flex items-center justify-center">
-                    <Icon size={24} className="text-purple" />
-                  </div>
-                </div>
-                
-                {/* Feature Content */}
-                <div className="p-6">
-                  <h3 className="font-display text-lg font-semibold text-white mb-2">
-                    {feature.title}
-                  </h3>
-                  <p className="text-white/60 text-sm leading-relaxed">
-                    {feature.description}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Additional Info */}
-        <div className="mt-16 text-center">
-          <p className="text-white/40 text-sm mb-6">
-            Trusted by 325,000+ financial professionals across 176 countries
-          </p>
-          <div className="flex flex-wrap justify-center gap-8 text-white/30 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple" />
-              <span>Securities & Equities</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-cyan" />
-              <span>Fixed Income</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple" />
-              <span>Commodities</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-cyan" />
-              <span>Foreign Exchange</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple" />
-              <span>Derivatives</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
 
 // Footer
 const Footer = () => {
@@ -380,7 +237,6 @@ export default function Landing() {
       <Navigation />
       <main>
         <HeroSection />
-        <FeaturesSection />
       </main>
       <Footer />
     </div>

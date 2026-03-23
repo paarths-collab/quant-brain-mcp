@@ -1,0 +1,149 @@
+{
+  "timestamp": "2026-03-20T00:15:21.925430",
+  "update_count": 51480,
+  "final_epsilon": 0.049999,
+  "q_table_flat": {
+    "Bear_breakout": 1.512034,
+    "Bear_channel_trading": 1.512034,
+    "Bear_ema_crossover": 1.69014,
+    "Bear_fibonacci_pullback": 1.525645,
+    "Bear_macd": 1.495874,
+    "Bear_mean_reversion": 1.522359,
+    "Bear_momentum": 1.52236,
+    "Bear_rsi_momentum": 1.52236,
+    "Bear_rsi_reversal": 1.529512,
+    "Bear_sma_crossover": 1.521394,
+    "Bear_support_resistance": 1.521394,
+    "Bull_breakout": 1.057668,
+    "Bull_channel_trading": 1.057668,
+    "Bull_ema_crossover": 0.901138,
+    "Bull_fibonacci_pullback": 1.057631,
+    "Bull_macd": 0.914431,
+    "Bull_mean_reversion": 1.057711,
+    "Bull_momentum": 1.057333,
+    "Bull_rsi_momentum": 1.056939,
+    "Bull_rsi_reversal": 1.037153,
+    "Bull_sma_crossover": 1.052384,
+    "Bull_support_resistance": 1.052384,
+    "Choppy_breakout": 1.959026,
+    "Choppy_channel_trading": 1.959026,
+    "Choppy_ema_crossover": 1.820633,
+    "Choppy_fibonacci_pullback": 1.954376,
+    "Choppy_macd": 1.499198,
+    "Choppy_mean_reversion": 1.955444,
+    "Choppy_momentum": 1.954269,
+    "Choppy_rsi_momentum": 1.95366,
+    "Choppy_rsi_reversal": 1.962695,
+    "Choppy_sma_crossover": 1.949579,
+    "Choppy_support_resistance": 1.949579
+  },
+  "q_table_by_regime": {
+    "Bull": {
+      "breakout": 1.0577,
+      "channel_trading": 1.0577,
+      "ema_crossover": 0.9011,
+      "fibonacci_pullback": 1.0576,
+      "macd": 0.9144,
+      "mean_reversion": 1.0577,
+      "momentum": 1.0573,
+      "rsi_momentum": 1.0569,
+      "rsi_reversal": 1.0372,
+      "sma_crossover": 1.0524,
+      "support_resistance": 1.0524
+    },
+    "Bear": {
+      "breakout": 1.512,
+      "channel_trading": 1.512,
+      "ema_crossover": 1.6901,
+      "fibonacci_pullback": 1.5256,
+      "macd": 1.4959,
+      "mean_reversion": 1.5224,
+      "momentum": 1.5224,
+      "rsi_momentum": 1.5224,
+      "rsi_reversal": 1.5295,
+      "sma_crossover": 1.5214,
+      "support_resistance": 1.5214
+    },
+    "Choppy": {
+      "breakout": 1.959,
+      "channel_trading": 1.959,
+      "ema_crossover": 1.8206,
+      "fibonacci_pullback": 1.9544,
+      "macd": 1.4992,
+      "mean_reversion": 1.9554,
+      "momentum": 1.9543,
+      "rsi_momentum": 1.9537,
+      "rsi_reversal": 1.9627,
+      "sma_crossover": 1.9496,
+      "support_resistance": 1.9496
+    }
+  },
+  "best_per_regime": {
+    "Bull": {
+      "strategy": "mean_reversion",
+      "q_value": 1.0577
+    },
+    "Bear": {
+      "strategy": "ema_crossover",
+      "q_value": 1.6901
+    },
+    "Choppy": {
+      "strategy": "rsi_reversal",
+      "q_value": 1.9627
+    }
+  },
+  "worst_per_regime": {
+    "Bull": {
+      "strategy": "ema_crossover",
+      "q_value": 0.9011
+    },
+    "Bear": {
+      "strategy": "macd",
+      "q_value": 1.4959
+    },
+    "Choppy": {
+      "strategy": "macd",
+      "q_value": 1.4992
+    }
+  },
+  "spread_per_regime": {
+    "Bull": 0.1566,
+    "Bear": 0.1943,
+    "Choppy": 0.4635
+  },
+  "update_counts_per_key": {
+    "Bear_breakout": 1038,
+    "Bear_channel_trading": 1038,
+    "Bear_ema_crossover": 1038,
+    "Bear_fibonacci_pullback": 1038,
+    "Bear_macd": 1038,
+    "Bear_mean_reversion": 1038,
+    "Bear_momentum": 1038,
+    "Bear_rsi_momentum": 1038,
+    "Bear_rsi_reversal": 1038,
+    "Bear_sma_crossover": 1038,
+    "Bear_support_resistance": 1038,
+    "Bull_breakout": 2041,
+    "Bull_channel_trading": 2041,
+    "Bull_ema_crossover": 2041,
+    "Bull_fibonacci_pullback": 2041,
+    "Bull_macd": 2041,
+    "Bull_mean_reversion": 2041,
+    "Bull_momentum": 2041,
+    "Bull_rsi_momentum": 2041,
+    "Bull_rsi_reversal": 2041,
+    "Bull_sma_crossover": 2041,
+    "Bull_support_resistance": 2041,
+    "Choppy_breakout": 1601,
+    "Choppy_channel_trading": 1601,
+    "Choppy_ema_crossover": 1601,
+    "Choppy_fibonacci_pullback": 1601,
+    "Choppy_macd": 1601,
+    "Choppy_mean_reversion": 1601,
+    "Choppy_momentum": 1601,
+    "Choppy_rsi_momentum": 1601,
+    "Choppy_rsi_reversal": 1601,
+    "Choppy_sma_crossover": 1601,
+    "Choppy_support_resistance": 1601
+  }
+}

@@ -2,6 +2,7 @@ fastapi
 uvicorn
 pydantic
 yfinance 
+httpx
 pandas
 backtesting
 ta

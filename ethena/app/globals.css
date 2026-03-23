@@ -238,3 +238,55 @@ body {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ── Contrast Boost: Brighter Greys + Borders ── */
+@layer utilities {
+  .text-white\/5 { color: rgba(226, 232, 240, 0.35); }
+  .text-white\/10 { color: rgba(226, 232, 240, 0.45); }
+  .text-white\/15 { color: rgba(226, 232, 240, 0.5); }
+  .text-white\/18 { color: rgba(226, 232, 240, 0.52); }
+  .text-white\/20 { color: rgba(226, 232, 240, 0.55); }
+  .text-white\/22 { color: rgba(226, 232, 240, 0.58); }
+  .text-white\/25 { color: rgba(226, 232, 240, 0.6); }
+  .text-white\/30 { color: rgba(226, 232, 240, 0.65); }
+  .text-white\/35 { color: rgba(226, 232, 240, 0.7); }
+  .text-white\/40 { color: rgba(226, 232, 240, 0.75); }
+  .text-white\/45 { color: rgba(226, 232, 240, 0.8); }
+
+  .border-white\/5 { border-color: rgba(255, 255, 255, 0.18); }
+  .border-white\/8 { border-color: rgba(255, 255, 255, 0.22); }
+  .border-white\/10 { border-color: rgba(255, 255, 255, 0.26); }
+  .border-white\/20 { border-color: rgba(255, 255, 255, 0.34); }
+  .border-white\/25 { border-color: rgba(255, 255, 255, 0.38); }
+  .border-white\/30 { border-color: rgba(255, 255, 255, 0.42); }
+  .border-white\/40 { border-color: rgba(255, 255, 255, 0.5); }
+
+  .border-white\/\[0\.01\] { border-color: rgba(255, 255, 255, 0.1); }
+  .border-white\/\[0\.025\] { border-color: rgba(255, 255, 255, 0.12); }
+  .border-white\/\[0\.03\] { border-color: rgba(255, 255, 255, 0.14); }
+  .border-white\/\[0\.04\] { border-color: rgba(255, 255, 255, 0.16); }
+  .border-white\/\[0\.05\] { border-color: rgba(255, 255, 255, 0.18); }
+  .border-white\/\[0\.06\] { border-color: rgba(255, 255, 255, 0.2); }
+  .border-white\/\[0\.07\] { border-color: rgba(255, 255, 255, 0.22); }
+  .border-white\/\[0\.08\] { border-color: rgba(255, 255, 255, 0.24); }
+  .border-white\/\[0\.1\] { border-color: rgba(255, 255, 255, 0.28); }
+  .border-white\/\[0\.12\] { border-color: rgba(255, 255, 255, 0.3); }
+  .border-white\/\[0\.18\] { border-color: rgba(255, 255, 255, 0.38); }
+  .border-white\/\[0\.2\] { border-color: rgba(255, 255, 255, 0.42); }
+
+  /* Brighter indigo accents for active controls */
+  .bg-indigo-500\/5 { background-color: rgba(99, 102, 241, 0.22); }
+  .bg-indigo-500\/8 { background-color: rgba(99, 102, 241, 0.28); }
+  .bg-indigo-500\/10 { background-color: rgba(99, 102, 241, 0.32); }
+  .bg-indigo-500\/12 { background-color: rgba(99, 102, 241, 0.36); }
+  .bg-indigo-500\/15 { background-color: rgba(99, 102, 241, 0.4); }
+  .bg-indigo-500\/20 { background-color: rgba(99, 102, 241, 0.48); }
+  .border-indigo-500\/20 { border-color: rgba(99, 102, 241, 0.5); }
+  .border-indigo-500\/25 { border-color: rgba(99, 102, 241, 0.55); }
+  .border-indigo-500\/30 { border-color: rgba(99, 102, 241, 0.6); }
+  .border-indigo-500\/35 { border-color: rgba(99, 102, 241, 0.65); }
+  .text-indigo-400\/50 { color: rgba(129, 140, 248, 0.75); }
+  .text-indigo-400\/60 { color: rgba(129, 140, 248, 0.82); }
+  .text-indigo-400\/70 { color: rgba(129, 140, 248, 0.88); }
+  .text-indigo-400\/80 { color: rgba(129, 140, 248, 0.94); }
+}

@@ -6,7 +6,20 @@ from backend.routes.investor_profile import router as investor_profile_router
 from backend.routes.market_pulse import router as market_pulse_router
 from backend.routes.stock_advisor import router as stock_advisor_router
 from backend.routes.backtest import router as backtest_router
-# from backend.routes.long_term_routes import router as long_term_router # Uncomment if needed
+from backend.routes.long_term_routes import router as long_term_router
+from backend.routes.market import router as market_router
+from backend.routes.sectors import router as sectors_router
+from backend.routes.fundamentals import router as fundamentals_router
+from backend.routes.sentiment import router as sentiment_router
+from backend.routes.research import router as research_router
+from backend.routes.peers import router as peers_router
+from backend.routes.macro import router as macro_router
+from backend.routes.social import router as social_router
+from backend.routes.network import router as network_router
+from backend.routes.technical_analysis import router as technical_router
+from backend.routes.treemap import router as treemap_router
+from backend.routes.reports_routes import router as reports_router
+from backend.finverse_integration.routes.wealth_routes import router as wealth_router
 
 from backend.engine.pipeline import InvestmentPipeline
 import os
@@ -46,7 +59,20 @@ app.include_router(market_pulse_router)
 app.include_router(stock_advisor_router)
 app.include_router(backtest_router)
 app.include_router(fred_router)
-# app.include_router(long_term_router)
+app.include_router(long_term_router)
+app.include_router(market_router)
+app.include_router(sectors_router)
+app.include_router(fundamentals_router)
+app.include_router(sentiment_router)
+app.include_router(research_router)
+app.include_router(peers_router)
+app.include_router(macro_router)
+app.include_router(social_router)
+app.include_router(network_router)
+app.include_router(technical_router)
+app.include_router(treemap_router)
+app.include_router(reports_router)
+app.include_router(wealth_router)
 
 # Initialize Database
 from backend.database.connection import init_db, run_init_sql

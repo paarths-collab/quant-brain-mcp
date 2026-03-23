@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-03-20T01:21:48.414889",
+  "config": {
+    "train_period": [
+      "2018-01-01",
+      "2022-12-31"
+    ],
+    "test_period": [
+      "2023-01-01",
+      "2024-12-31"
+    ],
+    "transaction_cost": 0.001,
+    "slippage": 0.0005,
+    "initial_capital": 100000,
+    "strategies_used": [
+      "breakout",
+      "channel_trading",
+      "ema_crossover",
+      "fibonacci_pullback",
+      "macd",
+      "mean_reversion",
+      "momentum",
+      "rsi_momentum",
+      "rsi_reversal",
+      "sma_crossover",
+      "support_resistance"
+    ],
+    "strategies_skipped": [
+      "pairs_trading"
+    ],
+    "architecture_alignment": {
+      "strategy_source": "backend.services.strategies.strategy_adapter.STRATEGY_REGISTRY",
+      "backtest_engine": "backend.services.backtest_service.run_backtest_on_df",
+      "confidence_engine": "backend.engine.confidence_engine.calculate_confidence",
+      "rl_selector": "backend.quant.rl_strategy_selector.RLStrategySelector",
+      "regime_note": "Per-day regime segmentation uses local rolling labels (Bull/Bear/Choppy) because backend.regime_detector currently returns a single latest regime snapshot."
+    }
+  },
+  "kpis": {
+    "avg_sharpe_oos": 0.258,
+    "avg_annual_return_pct": 5.01,
+    "tickers_tested": 40,
+    "total_trades": 6266,
+    "positive_sharpe_pct": 58.9,
+    "best_strategy": "fibonacci_pullback",
+    "best_strategy_sharpe": 1.249,
+    "best_strategy_regime_adjusted": "fibonacci_pullback",
+    "best_strategy_regime_sharpe": 1.249,
+    "alpha_vs_nifty50_pct": -11.18,
+    "alpha_vs_sp500_pct": -17.68
+  },
+  "benchmarks": {
+    "NIFTY50": {
+      "annual_return": 14.42,
+      "sharpe": 1.188,
+      "max_drawdown": -10.93
+    },
+    "SP500": {
+      "annual_return": 24.45,
+      "sharpe": 1.901,
+      "max_drawdown": -10.28
+    }
+  },
+  "regime_best_strategy_from_oos": {
+    "Bull": "fibonacci_pullback",
+    "Bear": "mean_reversion",
+    "Choppy": "rsi_reversal"
+  },
+  "latency_ms": {
+    "cold_fetch": 0.01,
+    "cached_fetch": 0.0,
+    "local_regime_detection": 7.36,
+    "backend_regime_detection": 148.33,
+    "signal_generation": 2.84,
+    "full_backtest": 4.86
+  },
+  "error_summary": {
+    "total_errors": 0,
+    "tickers_with_errors": []
+  }
+}

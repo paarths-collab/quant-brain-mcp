@@ -55,13 +55,6 @@ function HeroSection() {
       <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10">
         {/* Left */}
         <div className="relative z-20">
-          <FadeIn y={20}>
-            <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-white/35 mb-8 flex items-center gap-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-pulse inline-block" />
-              TERMINAL STATUS: ONLINE • 87.5% CONFIDENCE
-            </p>
-          </FadeIn>
-
           <FadeIn delay={0.1}>
             <h1
               className="font-sans text-[clamp(44px,5vw,86px)] font-light tracking-[-0.02em] leading-[1.05] mb-6 text-white/90"
