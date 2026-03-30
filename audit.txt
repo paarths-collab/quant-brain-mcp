@@ -1,0 +1,77 @@
+=== ARCHITECTURE AUDIT ===
+MODULE: SECTORS
+  root:  ['intel_service.py', 'main.py', 'service.py']
+  core:  ['config.py', 'data_loader.py', 'fred_data_service.py', 'fundamentals_service.py', 'market_data_service.py', 'news_service.py', 'sector_service.py', 'stock_sentiment_service.py', 'supply_chain_service.py']
+  [STUB/EMPTY] data_loader.py (95 bytes)
+  [STUB/EMPTY] fred_data_service.py (82 bytes)
+  [STUB/EMPTY] news_service.py (50 bytes)
+  [STUB/EMPTY] supply_chain_service.py (50 bytes)
+
+MODULE: MARKETS
+  root:  ['data_service.py', 'eia_service.py', 'fred_service.py', 'main.py']
+  core:  ['config.py', 'data_loader.py', 'eia_service.py', 'fred_data_service.py', 'fred_service.py', 'market_data_service.py']
+  [STUB/EMPTY] data_loader.py (95 bytes)
+  [STUB/EMPTY] fred_data_service.py (82 bytes)
+
+MODULE: TECHNICAL
+  root:  ['fundamentals_service.py', 'main.py', 'peers_legacy_service.py', 'peer_service.py']
+  core:  ['config.py', 'data_loader.py', 'json_utils.py', 'strategy_adapter.py', 'strategy_service.py']
+  [STUB/EMPTY] strategy_adapter.py (115 bytes)
+
+MODULE: CHAT
+  root:  ['autogen_setup.py', 'chat.py', 'intent_router.py', 'main.py', 'orchestrator.py', 'pipelines.py', 'research_legacy.py', 'sentiment.py', 'stock_advisor.py', 'super_agent.py']
+  core:  ['config.py', 'groq_agent.py', 'pipeline.py', 'position_sizing_service.py', 'research_service.py', 'stock_sentiment_service.py', 'tavily.py', 'trade_levels_service.py']
+  [STUB/EMPTY] position_sizing_service.py (0 bytes)
+  [STUB/EMPTY] research_service.py (0 bytes)
+  [STUB/EMPTY] stock_sentiment_service.py (0 bytes)
+  [STUB/EMPTY] trade_levels_service.py (0 bytes)
+
+MODULE: PORTFOLIO
+  root:  ['investor_profile.py', 'long_term.py', 'main.py', 'reports.py']
+  core:  ['config.py', 'long_term_strategy.py', 'market_data_service.py']
+  [STUB/EMPTY] long_term_strategy.py (50 bytes)
+
+MODULE: BACKTEST
+  root:  ['agent_service.py', 'backtest_agent.py', 'backtest_legacy.py', 'main.py', 'monte_carlo.py', 'service.py']
+  core:  ['backtest_agent_service.py', 'backtest_service.py', 'config.py', 'data_loader.py', 'fred_data_service.py', 'groq_agent.py', 'market_data_service.py', 'monte_carlo.py', 'strategy_adapter.py']
+  [STUB/EMPTY] backtest_agent_service.py (0 bytes)
+  [STUB/EMPTY] backtest_service.py (0 bytes)
+  [STUB/EMPTY] data_loader.py (0 bytes)
+  [STUB/EMPTY] fred_data_service.py (0 bytes)
+  [STUB/EMPTY] strategy_adapter.py (0 bytes)
+
+MODULE: PEERS
+  root:  ['comparison_service.py', 'main.py', 'service.py']
+  core:  ['comparison_service.py', 'config.py', 'json_utils.py', 'peers_service.py']
+
+MODULE: RESEARCH
+  root:  ['main.py', 'service.py']
+  core:  ['config.py', 'fundamentals_service.py', 'groq_agent.py', 'market_data_service.py', 'research_service.py']
+  [STUB/EMPTY] fundamentals_service.py (50 bytes)
+
+MODULE: DASHBOARD
+  root:  ['main.py', 'service.py']
+  core:  ['config.py', 'crowd_insight_service.py', 'emotion_agent.py', 'insider_agent.py', 'sentiment_utils.py']
+
+MODULE: NETWORK
+  root:  ['main.py', 'service.py']
+  core:  ['config.py', 'graph_service.py', 'peers_service.py', 'social_service.py']
+  [STUB/EMPTY] peers_service.py (50 bytes)
+
+MODULE: NEWS
+  root:  ['duckduckgo_service.py', 'gnews_service.py', 'live_service.py', 'main.py', 'service.py', 'tavily_service.py']
+  core:  ['config.py', 'gnews_service.py', 'live_news_service.py', 'news_service.py']
+
+MODULE: SCREENER
+  root:  ['main.py', 'service.py']
+  core:  ['config.py', 'data_loader.py', 'fred_data_service.py', 'market_data_service.py', 'screener_service.py']
+  [STUB/EMPTY] data_loader.py (95 bytes)
+  [STUB/EMPTY] fred_data_service.py (82 bytes)
+  [STUB/EMPTY] screener_service.py (175 bytes)
+
+MODULE: PROFILE
+  root:  ['main.py']
+  core:  ['config.py', 'data_loader.py', 'fred_data_service.py', 'market_data_service.py']
+  [STUB/EMPTY] data_loader.py (95 bytes)
+  [STUB/EMPTY] fred_data_service.py (82 bytes)
+

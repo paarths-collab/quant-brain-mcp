@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { getWsUrl, superAgentAPI } from '@/lib/api'
+import { getWsUrl, superAgentAPI, type SuperAgentResponse } from '@/lib/api'
 
 const WS_URL = getWsUrl('/ws/live')
 
@@ -25,26 +25,248 @@ interface Message {
   isStreaming?: boolean
 }
 
+type ChartPoint = { x: number; v: number }
+
+interface RackSnapshot {
+  ticker: string
+  strategyName: string
+  equityData: ChartPoint[]
+  totalReturn: number | null
+  sharpe: number | null
+  winRate: number | null
+  monteData: ChartPoint[]
+  var95: number | null
+  expected: number | null
+  best95: number | null
+  riskVar99: number | null
+  riskCvar: number | null
+  riskMaxDd: number | null
+}
+
 const uid = () => Math.random().toString(36).slice(2)
 
-// ─── Analytics Components ────────────────────────────────────────────────────
-function AnalysisRack() {
-  const equityData = Array.from({ length: 40 }, (_, i) => ({ 
-    x: i, v: 10000 + Math.sin(i/5) * 1000 + i * 150 + Math.random() * 500 
-  }))
-  const monteCarloData = Array.from({ length: 50 }, (_, i) => {
+const DEFAULT_RACK_SNAPSHOT: RackSnapshot = {
+  ticker: 'N/A',
+  strategyName: 'Strategy',
+  equityData: Array.from({ length: 40 }, (_, i) => ({
+    x: i,
+    v: 10000 + Math.sin(i / 5) * 1000 + i * 150,
+  })),
+  totalReturn: 53.1,
+  sharpe: 1.82,
+  winRate: 61.4,
+  monteData: Array.from({ length: 50 }, (_, i) => {
     const x = (i - 25) / 10
     return { x: i, v: Math.exp(-(x * x) / 2) * 100 }
-  })
+  }),
+  var95: -5.0,
+  expected: 8.0,
+  best95: 18.0,
+  riskVar99: 5.0,
+  riskCvar: 8.0,
+  riskMaxDd: 12.0,
+}
+
+const toNum = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const n = Number(value)
+    if (Number.isFinite(n)) return n
+  }
+  return null
+}
+
+const pctFromRatioOrPercent = (value: unknown): number | null => {
+  const n = toNum(value)
+  if (n === null) return null
+  if (Math.abs(n) <= 1) return n * 100
+  return n
+}
+
+const parseTickerFromQuery = (query: string): string | null => {
+  const m = /\b\w*backtest\b\s+([A-Za-z][A-Za-z0-9.\-]{0,19})/i.exec(query || '')
+  if (m?.[1]) return m[1].toUpperCase()
+  const words = (query || '').match(/\b[A-Za-z][A-Za-z0-9.]{1,19}\b/g) || []
+  const candidate = words.find(w => /\.|^[A-Z]{2,12}$/i.test(w))
+  return candidate ? candidate.toUpperCase() : null
+}
+
+const buildMonteCurve = (samples: unknown): ChartPoint[] => {
+  if (!Array.isArray(samples)) return DEFAULT_RACK_SNAPSHOT.monteData
+  const numeric = samples.map(toNum).filter((n): n is number => n !== null)
+  if (numeric.length < 6) return DEFAULT_RACK_SNAPSHOT.monteData
+
+  const min = Math.min(...numeric)
+  const max = Math.max(...numeric)
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+    return DEFAULT_RACK_SNAPSHOT.monteData
+  }
+
+  const bins = 24
+  const width = (max - min) / bins
+  const hist = Array.from({ length: bins }, () => 0)
+  for (const n of numeric) {
+    const idx = Math.max(0, Math.min(bins - 1, Math.floor((n - min) / width)))
+    hist[idx] += 1
+  }
+  const peak = Math.max(...hist, 1)
+  return hist.map((count, i) => ({ x: i, v: (count / peak) * 100 }))
+}
+
+const extractRackSnapshot = (data: SuperAgentResponse, query: string): RackSnapshot | null => {
+  const rawStrategy = (data.strategy && typeof data.strategy === 'object') ? data.strategy as Record<string, unknown> : null
+  const rawBest = (rawStrategy?.best_strategy && typeof rawStrategy.best_strategy === 'object')
+    ? rawStrategy.best_strategy as Record<string, unknown>
+    : null
+  const rawMonte = (rawStrategy?.monte_carlo && typeof rawStrategy.monte_carlo === 'object')
+    ? rawStrategy.monte_carlo as Record<string, unknown>
+    : null
+  const rawRisk = (data.risk_engine && typeof data.risk_engine === 'object')
+    ? data.risk_engine as Record<string, unknown>
+    : null
+  const rawFinancial = (data.financial && typeof data.financial === 'object')
+    ? data.financial as Record<string, unknown>
+    : null
+
+  const rawCurve = Array.isArray(rawBest?.equity_curve) ? rawBest.equity_curve : []
+  const equityData = rawCurve
+    .map((p, idx) => {
+      if (!p || typeof p !== 'object') return null
+      const point = p as Record<string, unknown>
+      const v = toNum(point.value)
+      if (v === null) return null
+      return { x: idx, v }
+    })
+    .filter((p): p is ChartPoint => p !== null)
+
+  const ticker =
+    (typeof rawFinancial?.formatted_ticker === 'string' && rawFinancial.formatted_ticker) ||
+    (typeof rawFinancial?.ticker === 'string' && rawFinancial.ticker) ||
+    parseTickerFromQuery(query) ||
+    'N/A'
+
+  const strategyName =
+    (typeof rawBest?.strategy === 'string' && rawBest.strategy) ||
+    (typeof rawStrategy?.regime === 'object' ? 'AI Selected' : 'Strategy')
+
+  const totalReturn = pctFromRatioOrPercent(rawBest?.return)
+  const winRate = pctFromRatioOrPercent(rawBest?.win_rate)
+  const sharpe = toNum(rawBest?.sharpe) ?? toNum(rawBest?.sharpe_ratio)
+
+  const var95 = pctFromRatioOrPercent(rawRisk?.VaR)
+  const cvar = pctFromRatioOrPercent(rawRisk?.CVaR)
+  const maxDd = pctFromRatioOrPercent(rawRisk?.Max_Drawdown)
+  const best95 = pctFromRatioOrPercent(rawMonte?.best_case)
+  const expected = pctFromRatioOrPercent(rawMonte?.expected_price)
+  const monteData = buildMonteCurve(rawMonte?.simulation_paths)
+
+  const hasAnyLiveData =
+    equityData.length > 0 ||
+    totalReturn !== null ||
+    winRate !== null ||
+    sharpe !== null ||
+    var95 !== null ||
+    cvar !== null ||
+    maxDd !== null
+
+  if (!hasAnyLiveData) return null
+
+  return {
+    ticker,
+    strategyName,
+    equityData: equityData.length ? equityData : DEFAULT_RACK_SNAPSHOT.equityData,
+    totalReturn,
+    sharpe,
+    winRate,
+    monteData,
+    var95,
+    expected,
+    best95,
+    riskVar99: var95,
+    riskCvar: cvar,
+    riskMaxDd: maxDd,
+  }
+}
+
+const extractAssistantContent = (data: SuperAgentResponse) => {
+  const pick = (
+    data.report ||
+    data.response ||
+    (typeof data.content === 'string' ? data.content : null) ||
+    (typeof data.analysis === 'string' ? data.analysis : null) ||
+    (typeof data.message === 'string' ? data.message : null) ||
+    (typeof data.summary === 'string' ? data.summary : null)
+  )
+  if (pick && String(pick).trim()) return String(pick)
+
+  const result = data.result as unknown
+  if (typeof result === 'string' && result.trim()) return result
+  if (result && typeof result === 'object') {
+    const r = result as Record<string, unknown>
+    const nested =
+      (typeof r.report === 'string' ? r.report : null) ||
+      (typeof r.response === 'string' ? r.response : null) ||
+      (typeof r.content === 'string' ? r.content : null) ||
+      (typeof r.analysis === 'string' ? r.analysis : null) ||
+      (typeof r.message === 'string' ? r.message : null)
+    if (nested && nested.trim()) return nested
+  }
+
+  if (typeof data.error === 'string' && data.error.trim()) {
+    return `⚠️ ${data.error}`
+  }
+
+  try {
+    return `Analysis complete.\n\n\`\`\`json\n${JSON.stringify(data, null, 2).slice(0, 3500)}\n\`\`\``
+  } catch {
+    return 'Analysis complete.'
+  }
+}
+
+// ─── Analytics Components ────────────────────────────────────────────────────
+function AnalysisRack({ snapshot }: { snapshot: RackSnapshot }) {
+  const equityData = snapshot.equityData
+  const monteCarloData = snapshot.monteData
+
+  const fmtPercent = (v: number | null, digits = 1) => (v === null ? 'N/A' : `${v.toFixed(digits)}%`)
+  const fmtSignedPercent = (v: number | null, digits = 1) => {
+    if (v === null) return 'N/A'
+    return `${v >= 0 ? '+' : ''}${v.toFixed(digits)}%`
+  }
+  const fmtNumber = (v: number | null, digits = 2) => (v === null ? 'N/A' : v.toFixed(digits))
+
+  const riskRows = [
+    { label: 'VaR_99', val: snapshot.riskVar99 },
+    { label: 'CVaR_EXPECTED', val: snapshot.riskCvar },
+    { label: 'MAX_HISTORICAL_DD', val: snapshot.riskMaxDd },
+  ]
+
+  const maxRiskAbs = Math.max(
+    1,
+    ...riskRows.map(r => Math.abs(r.val ?? 0)),
+  )
+
+  const riskFillWidth = (v: number | null) => {
+    if (v === null) return 2
+    const scaled = (Math.abs(v) / maxRiskAbs) * 100
+    return Math.max(6, Math.min(100, scaled))
+  }
+
+  const riskFillClass = (v: number | null) => {
+    const a = Math.abs(v ?? 0)
+    if (a >= 25) return 'bg-red-500/55 shadow-[0_0_14px_rgba(239,68,68,0.35)]'
+    if (a >= 10) return 'bg-amber-400/55 shadow-[0_0_12px_rgba(251,191,36,0.3)]'
+    return 'bg-indigo-500/55 shadow-[0_0_10px_rgba(99,102,241,0.3)]'
+  }
 
   return (
     <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2 custom-scrollbar pb-10">
       {/* Equity Curve */}
-      <div className="p-5 rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl">
+      <div className="chart-reflect p-5 pb-6 min-h-[min-content] rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <TrendingUp size={14} className="text-indigo-400" />
-            <span className="font-dm-mono text-[11px] text-white/40 uppercase tracking-[0.2em]">Backtest Equity Curve</span>
+            <span className="font-dm-mono text-[11px] text-white/40 uppercase tracking-[0.2em]">{snapshot.ticker} {snapshot.strategyName}</span>
           </div>
           <Maximize2 size={12} className="text-white/20" />
         </div>
@@ -69,21 +291,21 @@ function AnalysisRack() {
         <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/10">
           <div>
             <div className="text-[9px] font-dm-mono text-white/20 uppercase tracking-widest mb-1">TOTAL RETURN</div>
-            <div className="text-[14px] font-dm-mono text-indigo-400 font-bold">+53.1%</div>
+            <div className="text-[14px] font-dm-mono text-indigo-400 font-bold leading-relaxed pb-1">{fmtSignedPercent(snapshot.totalReturn)}</div>
           </div>
           <div>
             <div className="text-[9px] font-dm-mono text-white/20 uppercase tracking-widest mb-1">SHARPE</div>
-            <div className="text-[14px] font-dm-mono text-white font-bold">1.82</div>
+            <div className="text-[14px] font-dm-mono text-white font-bold leading-relaxed pb-1">{fmtNumber(snapshot.sharpe)}</div>
           </div>
           <div>
             <div className="text-[9px] font-dm-mono text-white/20 uppercase tracking-widest mb-1">WIN RATE</div>
-            <div className="text-[14px] font-dm-mono text-white/40">—%</div>
+            <div className="text-[14px] font-dm-mono text-indigo-300 font-bold leading-relaxed pb-1">{fmtPercent(snapshot.winRate)}</div>
           </div>
         </div>
       </div>
 
       {/* Monte Carlo */}
-      <div className="p-5 rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl">
+      <div className="chart-reflect p-5 pb-6 min-h-[min-content] rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 size={14} className="text-indigo-400" />
           <span className="font-dm-mono text-[11px] text-white/40 uppercase tracking-[0.2em]">Monte Carlo Simulation</span>
@@ -99,37 +321,36 @@ function AnalysisRack() {
         </div>
         <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/10">
           {[
-            { l: '5% VaR', v: '-5.0%', c: 'text-red-400' },
-            { l: 'EXPECTED', v: '8.0%', c: 'text-indigo-400' },
-            { l: '95% BEST', v: '18.0%', c: 'text-indigo-400' },
+            { l: '5% VaR', v: fmtPercent(snapshot.var95), c: 'text-red-400' },
+            { l: 'EXPECTED', v: fmtPercent(snapshot.expected), c: 'text-indigo-400' },
+            { l: '95% BEST', v: fmtPercent(snapshot.best95), c: 'text-indigo-400' },
           ].map(s => (
             <div key={s.l}>
               <div className="text-[9px] font-dm-mono text-white/20 uppercase tracking-widest mb-1">{s.l}</div>
-              <div className={`text-[12px] font-dm-mono font-bold ${s.c}`}>{s.v}</div>
+              <div className={`text-[12px] font-dm-mono font-bold leading-relaxed pb-1 ${s.c}`}>{s.v}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Risk Analysis */}
-      <div className="p-5 rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl">
+      <div className="chart-reflect p-5 pb-6 min-h-[min-content] rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl">
         <div className="flex items-center gap-2 mb-5">
            <AlertTriangle size={14} className="text-indigo-400" />
            <span className="font-dm-mono text-[11px] text-white/40 uppercase tracking-[0.2em]">Risk Analysis Rack</span>
         </div>
         <div className="space-y-6">
-          {[
-            { label: 'VaR_99', val: '5.00%' },
-            { label: 'CVaR_EXPECTED', val: '8.00%' },
-            { label: 'MAX_HISTORICAL_DD', val: '12.00%' },
-          ].map(r => (
+          {riskRows.map(r => (
             <div key={r.label} className="flex flex-col gap-2">
               <div className="flex justify-between items-center text-[10px] uppercase font-dm-mono tracking-widest font-semibold">
                 <span className="text-white/30">{r.label}</span>
-                <span className="text-white">{r.val}</span>
+                <span className="text-white">{fmtPercent(r.val, 2)}</span>
               </div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/10 p-[1.5px]">
-                <div className="h-full bg-indigo-500/50 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.3)] transition-all duration-1000" style={{ width: r.val }} />
+                <div
+                  className={`h-full rounded-full transition-all duration-1000 ${riskFillClass(r.val)}`}
+                  style={{ width: `${riskFillWidth(r.val)}%` }}
+                />
               </div>
             </div>
           ))}
@@ -212,11 +433,13 @@ export default function ChatPage() {
   const [wsConnected, setWsConnected] = useState(false)
   const [rackWidth, setRackWidth] = useState(500)
   const [isResizing, setIsResizing] = useState(false)
+  const [rackSnapshot, setRackSnapshot] = useState<RackSnapshot>(DEFAULT_RACK_SNAPSHOT)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const lastQueryRef = useRef('')
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -261,12 +484,19 @@ export default function ChatPage() {
       const ws = new WebSocket(WS_URL)
       wsRef.current = ws
       ws.onopen = () => setWsConnected(true)
-      ws.onclose = () => setWsConnected(false)
+      ws.onclose = () => {
+        setWsConnected(false)
+        setIsLoading(false)
+      }
       ws.onerror = () => setWsConnected(false)
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data)
-          const content = data.report || data.response || 'Analysis complete.'
+          const parsed: unknown = JSON.parse(event.data)
+          const data: SuperAgentResponse =
+            parsed && typeof parsed === 'object' ? (parsed as SuperAgentResponse) : {}
+          const content = extractAssistantContent(data)
+          const snapshot = extractRackSnapshot(data, lastQueryRef.current)
+          if (snapshot) setRackSnapshot(snapshot)
           setMessages(prev => {
             const filtered = prev.filter(m => !m.isStreaming)
             return [...filtered, { id: uid(), role: 'assistant', content, timestamp: new Date() }]
@@ -286,6 +516,7 @@ export default function ChatPage() {
     if (!query.trim() || isLoading) return
     const userMsg: Message = { id: uid(), role: 'user', content: query.trim(), timestamp: new Date() }
     const streamMsg: Message = { id: uid(), role: 'assistant', content: '', timestamp: new Date(), isStreaming: true }
+    lastQueryRef.current = query.trim()
     setMessages(prev => [...prev, userMsg, streamMsg])
     setInput('')
     setIsLoading(true)
@@ -295,17 +526,20 @@ export default function ChatPage() {
     } else {
       try {
         const data = await superAgentAPI.run({ query: query.trim() })
-        const content = data.report || data.response || JSON.stringify(data)
+        const content = extractAssistantContent(data)
+        const snapshot = extractRackSnapshot(data, query.trim())
+        if (snapshot) setRackSnapshot(snapshot)
         setMessages(prev => {
             const filtered = prev.filter(m => !m.isStreaming)
             return [...filtered, { id: uid(), role: 'assistant', content, timestamp: new Date() }]
         })
-      } catch {
+      } catch (err) {
+        const reason = err instanceof Error && err.message ? err.message : 'Request failed'
         setMessages(prev => {
           const filtered = prev.filter(m => !m.isStreaming)
           return [...filtered, {
             id: uid(), role: 'assistant',
-            content: '⚠️ **Link_Lost** — Neural Bridge offline.',
+            content: `⚠️ **Pipeline Error** — ${reason}`,
             timestamp: new Date()
           }]
         })
@@ -416,7 +650,7 @@ export default function ChatPage() {
           className="hidden xl:block shrink-0 h-full border-l border-white/10 pl-6 bg-black/20 overflow-hidden"
           style={{ width: `${rackWidth}px` }}
         >
-          <AnalysisRack />
+          <AnalysisRack snapshot={rackSnapshot} />
         </div>
       </div>
       
@@ -433,6 +667,42 @@ export default function ChatPage() {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(99, 102, 241, 0.2);
+        }
+
+        .chart-reflect {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .chart-reflect > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        .chart-reflect::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background:
+            linear-gradient(164deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.03) 30%, rgba(99,102,241,0.1) 100%),
+            radial-gradient(120% 70% at 18% -12%, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 62%);
+          opacity: 0.8;
+          z-index: 0;
+        }
+
+        .chart-reflect::after {
+          content: '';
+          position: absolute;
+          top: -35%;
+          left: -25%;
+          width: 65%;
+          height: 140%;
+          pointer-events: none;
+          background: linear-gradient(112deg, transparent 0%, rgba(255,255,255,0.14) 48%, transparent 100%);
+          transform: rotate(8deg);
+          opacity: 0.45;
+          z-index: 0;
         }
       `}</style>
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts'
@@ -9,8 +9,8 @@ import {
 const INDIGO_ACCENT = '#6366f1' // Unified indigo accent
 const SILVER = '#c4c4cc'
 
-const CARD = "group relative p-6 rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl hover:border-indigo-400/40 hover:bg-white/5 transition-all duration-500 overflow-hidden"
-const CARD_GLOW = "group relative p-6 rounded-2xl border border-white/25 bg-white/[0.035] backdrop-blur-xl shadow-[0_0_24px_rgba(99,102,241,0.06)] hover:shadow-[0_0_32px_rgba(99,102,241,0.12)] hover:border-indigo-400/50 hover:bg-white/8 transition-all duration-500 overflow-hidden"
+const CARD = "system-card group relative p-6 rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl hover:border-indigo-400/40 hover:bg-white/5 transition-all duration-500 overflow-hidden hover:-translate-y-1"
+const CARD_GLOW = "system-card group relative p-6 rounded-2xl border border-white/25 bg-white/[0.035] backdrop-blur-xl shadow-[0_0_24px_rgba(99,102,241,0.06)] hover:shadow-[0_0_32px_rgba(99,102,241,0.12)] hover:border-indigo-400/50 hover:bg-white/8 transition-all duration-500 overflow-hidden hover:-translate-y-1"
 
 // ─── Market Data ──────────────────────────────────────────────────────────────
 const INDICES_US = [
@@ -107,7 +107,37 @@ function TimeDisplay() {
     return () => clearInterval(id)
   }, [])
   if (!time) return null
-  return <span className="text-indigo-400 font-dm-mono tabular-nums">{time}</span>
+  return <span className="text-indigo-400 data-text tabular-nums">{time}</span>
+}
+
+function useCountUp(value: number, duration = 700) {
+  const [display, setDisplay] = useState(value)
+  const prev = useRef(value)
+  const raf = useRef<number>()
+
+  useEffect(() => {
+    const from = prev.current
+    const to = value
+    const start = performance.now()
+    const animate = (t: number) => {
+      const elapsed = t - start
+      const p = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - p, 3)
+      const next = from + (to - from) * eased
+      setDisplay(next)
+      if (p < 1) {
+        raf.current = requestAnimationFrame(animate)
+      } else {
+        prev.current = to
+      }
+    }
+    raf.current = requestAnimationFrame(animate)
+    return () => {
+      if (raf.current) cancelAnimationFrame(raf.current)
+    }
+  }, [value, duration])
+
+  return display
 }
 
 function NeonSpark({ data, color, id }: { data: { v: number }[]; color: string; id: string }) {
@@ -154,15 +184,15 @@ function IndexCard({ idx, symbol }: { idx: typeof INDICES_US[0]; symbol: string 
     <div className={CARD_GLOW}>
       <div className="flex items-start justify-between mb-4">
         <div>
-          <div className="font-dm-mono text-[11px] tracking-[0.28em] text-white/30 uppercase mb-0.5">{idx.symbol}</div>
-          <div className="font-inter text-[13px] text-white/45 font-light">{idx.name}</div>
+          <div className="data-text text-[11px] tracking-[0.28em] text-white/30 uppercase mb-0.5">{idx.symbol}</div>
+          <div className="data-text text-[13px] tracking-[0.12em] text-white/55 uppercase">{idx.name}</div>
         </div>
-        <div className={`font-dm-mono text-[11px] font-medium px-2 py-1 rounded border ${isUp ? 'border-indigo-500/25 bg-indigo-500/8 text-indigo-400' : 'border-white/8 bg-white/3 text-white/35'}`}>
+        <div className={`data-text text-[11px] font-medium px-2 py-1 rounded border ${isUp ? 'border-indigo-500/25 bg-indigo-500/8 text-indigo-400' : 'border-white/8 bg-white/3 text-white/35'}`}>
           {isUp ? '+' : ''}{idx.pct.toFixed(2)}%
         </div>
       </div>
 
-      <div className="font-dm-mono text-[32px] font-medium text-white tabular-nums tracking-tight mb-5 leading-none">
+      <div className="metric-text glow-text primary-text text-[32px] tabular-nums tracking-tight mb-5 leading-none">
         {symbol}{idx.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
 
@@ -176,11 +206,11 @@ function FredCard({ m }: { m: typeof FRED[0] }) {
   return (
     <div className={CARD_GLOW}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="font-dm-mono text-[10px] text-white/25 tracking-[0.28em] uppercase">{m.id}</span>
-        <span className="font-dm-mono text-[9px] text-indigo-400/60">SYNC_OK</span>
+        <span className="data-text text-[10px] text-white/25 tracking-[0.28em] uppercase">{m.id}</span>
+        <span className="data-text text-[9px] text-indigo-400/60">SYNC_OK</span>
       </div>
-      <div className="font-inter text-[13px] text-white/40 mb-2 font-light">{m.title}</div>
-      <div className="font-dm-mono text-[28px] font-medium text-white mb-4 tabular-nums tracking-tight leading-none">
+      <div className="data-text text-[13px] text-white/50 mb-2">{m.title}</div>
+      <div className="metric-text glow-text primary-text text-[28px] mb-4 tabular-nums tracking-tight leading-none">
         {m.value.toFixed(2)}<span className="text-[16px] text-white/35 ml-0.5">{m.unit}</span>
       </div>
       <NeonLine data={data} color={INDIGO_ACCENT} id={m.id} unit={m.unit} />
@@ -204,6 +234,10 @@ export default function DashboardPage() {
   const portfolioVal = HOLDINGS.reduce((a, h) => a + h.value, 0)
   const portfolioPL = HOLDINGS.reduce((a, h) => a + h.pl, 0)
   const portfolioPct = ((portfolioPL / (portfolioVal - portfolioPL)) * 100).toFixed(2)
+  const animatedPortfolioVal = useCountUp(portfolioVal, 800)
+  const animatedPortfolioPL = useCountUp(portfolioPL, 800)
+  const animatedExposure = useCountUp(1.12, 700)
+  const animatedRisk = useCountUp(1.87, 700)
 
   const doRefresh = async () => {
     setRefreshing(true)
@@ -217,74 +251,101 @@ export default function DashboardPage() {
       : `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   return (
-    <div className="space-y-8 relative font-inter">
-      {/* ── Dimmed Nebula Orbs ── */}
-      {/* Background gradients removed as requested */}
+    <div className="dashboard-bg dashboard-scope space-y-8 relative">
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between relative z-10">
-        <div>
-          <h1 className="font-dm-mono text-[30px] font-medium text-silver tracking-tight flex items-center gap-4">
-            Analytics Terminal
-            <span className="inline-flex items-center gap-2 px-2.5 py-1 text-[10px] border border-indigo-400/40 rounded-full text-indigo-300/80 bg-indigo-500/10">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-              LIVE FEED
-            </span>
-          </h1>
-          <p className="font-dm-mono text-[12px] text-white/25 mt-2 tracking-wider">
-            <TimeDisplay /> · SERVER: NYC_DC_01 · STREAM: {isUS ? 'FRED' : 'RBI/NSE'}
-          </p>
+      {/* ── Terminal Header ── */}
+      <div className="relative z-10 space-y-5">
+        <div className="flex items-center gap-3">
+          <span className="w-1.5 h-6 rounded-full bg-indigo-400/80 shadow-[0_0_16px_rgba(129,140,248,0.6)]" />
+          <span className="data-text text-[12px] text-white/65 tracking-[0.32em] uppercase">
+            Terminal
+          </span>
+          <div className="flex-1 h-px bg-white/10" />
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-3">
-          {/* Market Toggle */}
-          <div className="flex items-center border border-white/20 rounded-lg overflow-hidden font-dm-mono text-[11px] tracking-widest">
-            <button
-              onClick={() => setMarket('us')}
-              className={`px-4 py-2 transition-all ${isUS ? 'bg-indigo-500/15 text-white shadow-lg' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
-            >
-              $ US
-            </button>
-            <div className="w-px h-5 bg-white/20" />
-            <button
-              onClick={() => setMarket('india')}
-              className={`px-4 py-2 transition-all ${!isUS ? 'bg-indigo-500/15 text-white shadow-lg' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
-            >
-              ₹ INDIA
-            </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/15 bg-white/[0.02] backdrop-blur-xl">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="data-text text-[10px] text-white/60 uppercase tracking-[0.24em]">System Status</span>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.015]">
+            <span className="data-text text-[10px] text-indigo-200/90 uppercase tracking-[0.22em]">AI_ACTIVE</span>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.015]">
+            <span className="data-text text-[10px] text-white/55 uppercase tracking-[0.22em]">CONFIDENCE 87.5%</span>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.015]">
+            <span className="data-text text-[10px] text-white/55 uppercase tracking-[0.22em]">
+              STREAM {isUS ? 'FRED' : 'RBI/NSE'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-6">
+          <div>
+            <h1 className="heading-text glow-text text-[30px] text-white tracking-[-0.01em] flex items-center gap-4">
+              Analytics Terminal
+              <span className="inline-flex items-center gap-2 px-2.5 py-1 text-[10px] border border-indigo-400/40 rounded-full text-indigo-200/90 bg-indigo-500/10">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-300 animate-pulse" />
+                LIVE FEED
+              </span>
+            </h1>
+            <p className="data-text text-[11px] meta-text mt-2 tracking-[0.18em] uppercase">
+              <TimeDisplay /> · SERVER NYC_DC_01 · STREAM {isUS ? 'FRED' : 'RBI/NSE'}
+            </p>
           </div>
 
-          <button
-            onClick={doRefresh}
-            className="px-4 py-2 rounded-lg border border-indigo-400/30 bg-indigo-500/10 backdrop-blur-xl text-indigo-300 hover:text-white hover:bg-indigo-500/20 transition-all font-dm-mono text-[11px] uppercase tracking-widest"
-          >
-            {refreshing ? 'REFRESHING...' : 'REFRESH'}
-          </button>
+          {/* Controls */}
+          <div className="flex items-center gap-3">
+            {/* Market Toggle */}
+            <div className="flex items-center border border-white/15 rounded-lg overflow-hidden data-text text-[11px] tracking-widest">
+              <button
+                onClick={() => setMarket('us')}
+                className={`px-4 py-2 transition-all ${isUS ? 'bg-indigo-500/15 text-white shadow-lg' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+              >
+                $ US
+              </button>
+              <div className="w-px h-5 bg-white/15" />
+              <button
+                onClick={() => setMarket('india')}
+                className={`px-4 py-2 transition-all ${!isUS ? 'bg-indigo-500/15 text-white shadow-lg' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+              >
+                ₹ INDIA
+              </button>
+            </div>
+
+            <button
+              onClick={doRefresh}
+              className="px-4 py-2 rounded-lg border border-indigo-400/30 bg-indigo-500/10 backdrop-blur-xl text-indigo-200/90 hover:text-white hover:bg-indigo-500/20 transition-all data-text text-[11px] uppercase tracking-widest"
+            >
+              {refreshing ? 'REFRESHING...' : 'REFRESH'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ── Key Stats ── */}
+      {/* ── System Metrics ── */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 relative z-10">
         {[
-          { label: 'Portfolio Value', val: fmtVal(portfolioVal), sub: `+${portfolioPct}% TOTAL`, glow: true },
-          { label: 'Unrealized P&L', val: `${portfolioPL >= 0 ? '+' : ''}${fmtVal(portfolioPL)}`, sub: 'ESTIMATED_VALUE', glow: false },
-          { label: 'Exposure Index', val: '1.12', sub: 'SYSTEM_CALCULATED', glow: false },
-          { label: 'Risk Efficiency', val: '1.87', sub: 'SHARPE_ANNUAL', glow: false },
+          { label: 'Portfolio Value', val: fmtVal(animatedPortfolioVal), sub: `+${portfolioPct}% TOTAL`, glow: true },
+          { label: 'Unrealized P&L', val: `${portfolioPL >= 0 ? '+' : ''}${fmtVal(animatedPortfolioPL)}`, sub: 'ESTIMATED_VALUE', glow: false },
+          { label: 'Exposure Index', val: animatedExposure.toFixed(2), sub: 'SYSTEM_CALCULATED', glow: false },
+          { label: 'Risk Efficiency', val: animatedRisk.toFixed(2), sub: 'SHARPE_ANNUAL', glow: false },
         ].map(card => (
           <div key={card.label} className={card.glow ? CARD_GLOW : CARD}>
-            <div className="font-inter text-[11px] text-silver/60 uppercase tracking-[0.2em] mb-3 font-medium">{card.label}</div>
-            <div className="font-dm-mono text-[28px] font-medium text-white mb-1.5 tabular-nums tracking-tight leading-none">{card.val}</div>
-            <div className="font-dm-mono text-[10px] text-white/40 tracking-widest">{card.sub}</div>
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(circle_at_top_right,rgba(79,107,255,0.18),transparent_60%)]" />
+            <div className="section-title meta-text mb-3">{card.label}</div>
+            <div className="metric-text glow-text primary-text text-[28px] mb-1.5 tabular-nums leading-none">{card.val}</div>
+            <div className="data-text text-[10px] secondary-text tracking-widest">{card.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Market Indices ── */}
+      {/* ── Market Field ── */}
       <section className="relative z-10">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-6 h-[1px] bg-indigo-400/40" />
-          <span className="font-dm-mono text-[10px] text-silver/40 uppercase tracking-[0.35em]">Market Indices · {isUS ? 'US' : 'INDIA'}</span>
+          <span className="section-title meta-text">Market Field · {isUS ? 'US' : 'INDIA'}</span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {INDICES.map(idx => <IndexCard key={idx.symbol} idx={idx} symbol={sym} />)}
@@ -296,79 +357,79 @@ export default function DashboardPage() {
         {/* Holdings */}
         <div className="lg:col-span-2 rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/[0.05] flex items-center justify-between">
-            <span className="font-inter text-[11px] text-white/35 uppercase tracking-[0.2em] font-medium">Live Holdings</span>
-            <span className="font-dm-mono text-[15px] font-medium text-white tabular-nums">{fmtVal(portfolioVal)}</span>
-          </div>
-          <div className="p-4 space-y-1.5">
-            {HOLDINGS.map(h => (
-              <div key={h.symbol} className="flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.03] hover:border-white/[0.1] hover:bg-white/[0.03] transition-all cursor-default">
-                <div>
-                  <div className="font-dm-mono text-[14px] font-medium text-white tracking-wide">{h.symbol}</div>
-                  <div className="font-inter text-[11px] text-white/22 mt-0.5">{h.qty} × {sym}{h.avg.toFixed(0)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-dm-mono text-[14px] text-white tabular-nums">{fmtVal(h.value)}</div>
-                  <div className={`font-dm-mono text-[11px] font-medium mt-0.5 ${h.pct >= 0 ? 'text-indigo-400' : 'text-white/30'}`}>
-                    {h.pct >= 0 ? '+' : ''}{h.pct.toFixed(2)}%
-                  </div>
+          <span className="data-text text-[11px] text-white/35 uppercase tracking-[0.2em] font-medium">Live Holdings</span>
+          <span className="metric-text primary-text text-[15px] tabular-nums">{fmtVal(portfolioVal)}</span>
+        </div>
+        <div className="p-4 space-y-1.5">
+          {HOLDINGS.map(h => (
+            <div key={h.symbol} className="flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.03] hover:border-white/[0.1] hover:bg-white/[0.03] transition-all cursor-default">
+              <div>
+                <div className="data-text text-[14px] text-white tracking-wide">{h.symbol}</div>
+                <div className="data-text text-[11px] text-white/30 mt-0.5">{h.qty} × {sym}{h.avg.toFixed(0)}</div>
+              </div>
+              <div className="text-right">
+                <div className="metric-text primary-text text-[14px] tabular-nums">{fmtVal(h.value)}</div>
+                <div className={`data-text text-[11px] font-medium mt-0.5 ${h.pct >= 0 ? 'text-indigo-400' : 'text-white/30'}`}>
+                  {h.pct >= 0 ? '+' : ''}{h.pct.toFixed(2)}%
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="px-6 py-3.5 border-t border-white/[0.05] flex justify-between font-dm-mono text-[12px]">
-            <span className="text-white/25 uppercase tracking-wider">TOTAL P&L</span>
-            <span className={`font-medium tabular-nums ${portfolioPL >= 0 ? 'text-indigo-400' : 'text-white/35'}`}>
-              {portfolioPL >= 0 ? '+' : ''}{fmtVal(portfolioPL)} ({portfolioPct}%)
-            </span>
-          </div>
+            </div>
+          ))}
         </div>
+        <div className="px-6 py-3.5 border-t border-white/[0.05] flex justify-between data-text text-[12px]">
+          <span className="text-white/25 uppercase tracking-wider">TOTAL P&L</span>
+          <span className={`metric-text tabular-nums ${portfolioPL >= 0 ? 'text-indigo-400' : 'text-white/35'}`}>
+            {portfolioPL >= 0 ? '+' : ''}{fmtVal(portfolioPL)} ({portfolioPct}%)
+          </span>
+        </div>
+      </div>
 
         {/* Watchlist */}
         <div className="lg:col-span-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/[0.05]">
-            <span className="font-inter text-[11px] text-white/35 uppercase tracking-[0.2em] font-medium">System Watchlist · {isUS ? 'NYSE / NASDAQ' : 'NSE / BSE'}</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/[0.03]">
-                  {['Symbol', 'Price', 'Change', '% Chg', 'Volume'].map(h => (
-                    <th key={h} className="px-6 py-3 text-left font-inter text-[10px] text-white/18 uppercase tracking-[0.2em] font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {WATCHLIST.map(row => {
-                  const up = row.pct >= 0
-                  return (
-                    <tr key={row.symbol} className="border-b border-white/[0.025] hover:bg-white/[0.025] transition-colors cursor-default">
-                      <td className="px-6 py-3.5">
-                        <span className="font-dm-mono text-[14px] font-medium text-white tracking-wide">{row.symbol}</span>
-                      </td>
-                      <td className="px-6 py-3.5 font-dm-mono text-[13px] text-white tabular-nums">{sym}{row.price.toFixed(2)}</td>
-                      <td className={`px-6 py-3.5 font-dm-mono text-[12px] tabular-nums ${up ? 'text-indigo-400' : 'text-white/30'}`}>
-                        {up ? '+' : ''}{row.change.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span className={`font-dm-mono text-[12px] font-medium ${up ? 'text-indigo-400' : 'text-white/30'}`}>
-                          {up ? '+' : ''}{row.pct.toFixed(2)}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 font-dm-mono text-[11px] text-white/22">{row.vol}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="px-6 py-4 border-b border-white/[0.05]">
+          <span className="data-text text-[11px] text-white/35 uppercase tracking-[0.2em] font-medium">System Watchlist · {isUS ? 'NYSE / NASDAQ' : 'NSE / BSE'}</span>
         </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/[0.03]">
+                {['Symbol', 'Price', 'Change', '% Chg', 'Volume'].map(h => (
+                  <th key={h} className="px-6 py-3 text-left data-text text-[10px] text-white/18 uppercase tracking-[0.2em] font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {WATCHLIST.map(row => {
+                const up = row.pct >= 0
+                return (
+                  <tr key={row.symbol} className="border-b border-white/[0.025] hover:bg-white/[0.025] transition-colors cursor-default">
+                    <td className="px-6 py-3.5">
+                      <span className="data-text text-[14px] text-white tracking-wide">{row.symbol}</span>
+                    </td>
+                    <td className="px-6 py-3.5 metric-text text-[13px] text-white tabular-nums">{sym}{row.price.toFixed(2)}</td>
+                    <td className={`px-6 py-3.5 data-text text-[12px] tabular-nums ${up ? 'text-indigo-400' : 'text-white/30'}`}>
+                      {up ? '+' : ''}{row.change.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <span className={`data-text text-[12px] font-medium ${up ? 'text-indigo-400' : 'text-white/30'}`}>
+                        {up ? '+' : ''}{row.pct.toFixed(2)}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-3.5 data-text text-[11px] text-white/22">{row.vol}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
       </div>
 
       {/* ── Macro Data ── */}
       <section className="relative z-10">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-6 h-[1px] bg-indigo-500/40" />
-          <span className="font-dm-mono text-[10px] text-white/25 uppercase tracking-[0.35em]">
+          <span className="data-text text-[10px] text-white/25 uppercase tracking-[0.35em]">
             {isUS ? 'FRED Macro Data' : 'RBI / India Macro'}
           </span>
         </div>
@@ -386,8 +447,8 @@ export default function DashboardPage() {
           { label: 'Latency', status: '<24ms' },
         ].map(s => (
           <div key={s.label} className="flex flex-col gap-1 opacity-25">
-            <span className="font-inter text-[10px] text-white/50 uppercase tracking-widest font-medium">{s.label}</span>
-            <span className="font-dm-mono text-[11px] text-white font-medium">{s.status}</span>
+            <span className="data-text text-[10px] text-white/50 uppercase tracking-widest font-medium">{s.label}</span>
+            <span className="data-text text-[11px] text-white font-medium">{s.status}</span>
           </div>
         ))}
       </div>

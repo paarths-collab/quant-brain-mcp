@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@300;400;500&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -154,6 +155,33 @@ body {
 .animate-spin-100s-reverse { animation: spin 100s linear infinite reverse; }
 .animate-spin-140s { animation: spin 140s linear infinite; }
 
+/* Global page-level shine shell (applies across pages) */
+.page-shine-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.page-shine-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+  background:
+    radial-gradient(80% 55% at 4% 4%, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 26%);
+}
+
+.page-shine-veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.18) 0.45px, transparent 0.45px);
+  background-size: 3px 3px;
+  opacity: 0.06;
+}
+
 /* ── Shimmer card shine effect ── */
 .card-shine {
   position: relative;
@@ -289,4 +317,41 @@ body {
   .text-indigo-400\/60 { color: rgba(129, 140, 248, 0.82); }
   .text-indigo-400\/70 { color: rgba(129, 140, 248, 0.88); }
   .text-indigo-400\/80 { color: rgba(129, 140, 248, 0.94); }
+
+  .dashboard-bg {
+    background: #000000;
+  }
+
+  .heading-text {
+    font-family: 'General Sans', 'Sohne', 'Suisse Intl', sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .data-text {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    letter-spacing: 0.05em;
+  }
+
+  .metric-text {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+
+  .primary-text { color: rgba(255, 255, 255, 0.92); }
+  .secondary-text { color: rgba(255, 255, 255, 0.55); }
+  .meta-text { color: rgba(255, 255, 255, 0.35); }
+
+  .glow-text { text-shadow: 0 0 20px rgba(79, 107, 255, 0.25); }
+
+  .section-title {
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+}
+
+.system-card:hover .metric-text {
+  text-shadow: 0 0 25px rgba(79, 107, 255, 0.35);
 }

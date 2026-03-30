@@ -188,6 +188,16 @@ class IntentRouter:
     def _extract_ticker(self, message: str) -> Tuple[Optional[str], str]:
         """Extract stock ticker and detect market"""
         message_lower = message.lower()
+
+        # Highest-confidence explicit symbol extraction.
+        # Examples: IREDA.NS, TCS.BO, BRK.B
+        dotted_match = re.search(r'\b([A-Za-z][A-Za-z0-9]{0,14})\.(NS|BO|[A-Za-z])\b', message, flags=re.IGNORECASE)
+        if dotted_match:
+            base = dotted_match.group(1).upper()
+            suffix = dotted_match.group(2).upper()
+            if suffix in {"NS", "BO"}:
+                return f"{base}.{suffix}", "IN"
+            return f"{base}.{suffix}", "US"
         
         # Check for known Indian stocks first
         for name, ticker in self.INDIAN_STOCKS.items():
@@ -199,9 +209,9 @@ class IntentRouter:
                 return ticker, "IN"
         
         # Check for .NS or .BO suffix (Indian)
-        indian_match = re.search(r'\b([A-Z]{2,})\.(NS|BO)\b', message.upper())
+        indian_match = re.search(r'\b([A-Z][A-Z0-9]{1,14})\.(NS|BO)\b', message.upper())
         if indian_match:
-            return indian_match.group(1), "IN"
+            return f"{indian_match.group(1)}.{indian_match.group(2)}", "IN"
         
         # Check for Indian market indicators
         is_indian_context = any(x in message_lower for x in ["nse", "bse", "nifty", "sensex", "india", "indian", "rupee", "₹"])
@@ -221,7 +231,7 @@ class IntentRouter:
         # valid tickers are usually 2-5 chars
         
         # Get all potential token candidates
-        tokens = re.findall(r'\b[A-Za-z0-9]+\b', message)
+        tokens = re.findall(r'\b[A-Za-z][A-Za-z0-9]{0,14}\b', message)
         
         candidates = []
         for token in tokens:

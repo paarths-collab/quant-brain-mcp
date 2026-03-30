@@ -63,11 +63,11 @@ except ImportError:
 
 # Import existing services (try both import patterns for compatibility)
 try:
-    from backend.services.emotion_advisor_service import analyze_emotion_safe_advice
-    from backend.services.data_loader import get_history, get_company_snapshot, format_ticker, get_comprehensive_stock_data
-    from backend.services.backtest_service import run_backtest_service
-    from backend.services.emotion_data_scraper import EmotionDataScraper
-    from backend.services.company_resolver import resolve_company_identity
+    
+    
+    
+    
+    
     from backend.tools.duckduckgo_mcp import DuckDuckGoMCPTool
 except ImportError:
     from services.emotion_advisor_service import analyze_emotion_safe_advice

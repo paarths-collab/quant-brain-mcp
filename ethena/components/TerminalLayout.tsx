@@ -26,12 +26,15 @@ export default function TerminalLayout({ children }: { children: React.ReactNode
     <div className="flex h-screen bg-black text-white overflow-hidden font-mono">
       {/* Sidebar */}
       <aside
-        className={`relative flex flex-col shrink-0 border-r border-white/20 bg-white/[0.03] backdrop-blur-2xl transition-all duration-300 ${collapsed ? 'w-[60px]' : 'w-[240px]'
+        className={`relative flex flex-col shrink-0 border-r border-white/20 bg-black transition-all duration-300 [transform-style:preserve-3d] ${collapsed ? 'w-[60px]' : 'w-[240px]'
           }`}
+        style={{ perspective: '1200px' }}
       >
+        {/* 3D lighting layers removed for pure black */}
+
         {/* Logo */}
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-white/20 h-[70px] shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-white/[0.06] border border-white/[0.12] flex items-center justify-center shrink-0 backdrop-blur-sm">
+        <div className="relative z-10 flex items-center gap-3 px-4 py-5 border-b border-white/20 h-[70px] shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-white/[0.08] border border-white/[0.2] shadow-[0_10px_20px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.25)] [transform:translateZ(18px)] flex items-center justify-center shrink-0 backdrop-blur-sm">
             <span className="font-dm-mono text-[12px] font-medium tracking-tight text-white/80">BQ</span>
           </div>
           {!collapsed && (
@@ -51,16 +54,16 @@ export default function TerminalLayout({ children }: { children: React.ReactNode
         </div>
 
         {/* Nav Items */}
-        <nav className="flex flex-col gap-1 p-3 flex-1 overflow-y-auto">
+        <nav className="relative z-10 flex flex-col gap-1.5 p-3 flex-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = pathname === item.href
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center gap-4 px-4 py-3 rounded-sm text-[14px] font-medium transition-all duration-150 ${isActive
-                  ? 'bg-white/10 text-white'
-                  : 'text-white/30 hover:text-white hover:bg-white/5'
+                className={`group relative flex items-center gap-4 px-4 py-3 rounded-md text-[14px] font-medium transition-all duration-200 will-change-transform ${isActive
+                  ? 'text-white bg-white/[0.14] border border-white/[0.2] shadow-[0_8px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.2)] [transform:translateZ(16px)]'
+                  : 'text-white/35 border border-transparent hover:text-white hover:bg-white/[0.08] hover:border-white/[0.12] hover:shadow-[0_6px_18px_rgba(0,0,0,0.3)] hover:[transform:translateZ(10px)]'
                   }`}
                 title={collapsed ? item.label : undefined}
               >
@@ -74,7 +77,7 @@ export default function TerminalLayout({ children }: { children: React.ReactNode
 
         {/* System Status */}
         {!collapsed && (
-          <div className="p-5 border-t border-white/20 space-y-2.5 bg-transparent">
+          <div className="relative z-10 p-5 border-t border-white/20 space-y-2.5 bg-transparent [transform:translateZ(12px)]">
             {[
               { label: 'System', value: 'ONLINE', highlight: true },
               { label: 'Risk Engine', value: 'READY', highlight: false },
@@ -92,7 +95,7 @@ export default function TerminalLayout({ children }: { children: React.ReactNode
         {collapsed && (
           <button
             onClick={() => setCollapsed(false)}
-            className="absolute -right-3 top-[80px] w-6 h-6 rounded-sm bg-black border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors z-10 text-[10px] font-bold"
+            className="absolute -right-3 top-[80px] w-6 h-6 rounded-sm bg-black border border-white/20 shadow-[0_8px_16px_rgba(0,0,0,0.5)] [transform:translateZ(20px)] flex items-center justify-center hover:bg-white/10 transition-colors z-10 text-[10px] font-bold"
           >
             &gt;
           </button>
@@ -119,7 +122,7 @@ export default function TerminalLayout({ children }: { children: React.ReactNode
           </div>
         </header>
 
-        <div className="px-8 pt-4 pb-8 min-h-[calc(100vh-70px)]">
+        <div className={`min-h-[calc(100vh-70px)] flex flex-col ${pathname === '/technical' ? '' : 'px-8 pt-4 pb-8'}`}>
           {children}
         </div>
       </main>

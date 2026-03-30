@@ -1,20 +1,122 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import html2canvas from 'html2canvas'
+import { animate, motion, useMotionValue, useSpring } from 'framer-motion'
 import {
   Play, TrendingUp, Activity, Zap, Target, BarChart3,
-  Layers, ArrowUpDown, Crosshair, GitBranch, Shield, DollarSign
+  Layers, ArrowUpDown, Crosshair, GitBranch, Shield, DollarSign, X
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Legend, ComposedChart, BarChart, Bar, CartesianGrid
 } from 'recharts'
-import { backtestAPI } from '@/lib/api'
+import {
+  backtestAPI,
+  API_BASE,
+  type BacktestInterpretImageRequest,
+  type BacktestInterpretRequest,
+  type BacktestMultiStrategyDetail,
+  type BacktestMultiStrategyResponse,
+  type BacktestSingleResponse,
+} from '@/lib/api'
 
 // Unified card styles from dashboard/sectors/technical
-const CARD = "group relative p-6 rounded-2xl border border-white/20 bg-white/[0.03] backdrop-blur-xl hover:border-indigo-500/30 hover:bg-white/[0.05] transition-all duration-500 overflow-hidden"
-const CARD_GLOW = "group relative p-6 rounded-2xl border border-white/25 bg-white/[0.03] backdrop-blur-xl shadow-[0_0_24px_rgba(79,70,229,0.06)] hover:shadow-[0_0_32px_rgba(79,70,229,0.12)] hover:border-indigo-500/40 hover:bg-white/[0.05] transition-all duration-500 overflow-hidden"
-const CONTROL_BTN = "px-4 py-2 rounded-lg text-[12px] font-dm-mono uppercase tracking-widest transition-all duration-300 border border-white/20"
+const CARD = "shine-surface group relative p-6 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl hover:border-indigo-400/25 hover:bg-white/[0.05] transition-all duration-500 overflow-hidden"
+const CARD_GLOW = "shine-surface group relative p-6 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl shadow-[0_0_24px_rgba(79,70,229,0.06)] hover:shadow-[0_0_32px_rgba(79,70,229,0.14)] hover:border-indigo-400/30 hover:bg-white/[0.05] transition-all duration-500 overflow-hidden"
+const CONTROL_BTN = "shine-btn relative overflow-hidden px-4 py-2 rounded-lg text-[12px] font-dm-mono uppercase tracking-widest transition-all duration-300 border border-white/20"
+
+function StrategyCard({
+  strat,
+  active,
+  onToggle,
+}: {
+  strat: { id: string; name: string; color: string; description: string }
+  active: boolean
+  onToggle: (id: string) => void
+}) {
+  const rotateX = useMotionValue(0)
+  const rotateY = useMotionValue(0)
+  const smoothX = useSpring(rotateX, { stiffness: 180, damping: 18 })
+  const smoothY = useSpring(rotateY, { stiffness: 180, damping: 18 })
+
+  return (
+    <motion.button
+      key={strat.id}
+      onClick={() => onToggle(strat.id)}
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onMouseMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect()
+        const x = e.clientX - rect.left
+        const y = e.clientY - rect.top
+        const cx = rect.width / 2
+        const cy = rect.height / 2
+        rotateX.set(((cy - y) / cy) * 4)
+        rotateY.set(((x - cx) / cx) * 5)
+      }}
+      onMouseLeave={() => {
+        rotateX.set(0)
+        rotateY.set(0)
+      }}
+      style={{
+        rotateX: smoothX,
+        rotateY: smoothY,
+        transformPerspective: 900,
+        boxShadow: active
+          ? '0 14px 34px rgba(33,61,164,0.42), inset 0 1px 0 rgba(255,255,255,0.18)'
+          : '0 0 0 rgba(0,0,0,0)',
+      }}
+      className={`${CARD} flex flex-col items-start gap-1.5 text-left ${active ? 'border-blue-200/35 bg-gradient-to-br from-[#3b3f86]/88 to-[#262f74]/82' : ''}`}
+    >
+      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_20%_10%,rgba(99,102,241,0.15),transparent_45%)] opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="flex items-center gap-2 mb-1.5 relative z-10">
+        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: strat.color }} />
+        <div className="text-[13px] font-dm-mono font-semibold text-white">{strat.name}</div>
+      </div>
+      <div className="text-[11px] text-white/60 leading-tight font-inter relative z-10">{strat.description}</div>
+    </motion.button>
+  )
+}
+
+function AnimatedMetricValue({ value }: { value: any }) {
+  const [display, setDisplay] = useState('—')
+
+  useEffect(() => {
+    if (value === null || value === undefined || value === '—') {
+      setDisplay('—')
+      return
+    }
+
+    const raw = String(value)
+    const match = raw.match(/-?\d+(?:\.\d+)?/)
+    if (!match || match.index === undefined) {
+      setDisplay(raw)
+      return
+    }
+
+    const n = Number(match[0])
+    if (!Number.isFinite(n)) {
+      setDisplay(raw)
+      return
+    }
+
+    const prefix = raw.slice(0, match.index)
+    const suffix = raw.slice(match.index + match[0].length)
+    const decimals = match[0].includes('.') ? 2 : 0
+
+    const controls = animate(0, n, {
+      duration: 1,
+      ease: 'easeOut',
+      onUpdate: (latest) => setDisplay(`${prefix}${latest.toFixed(decimals)}${suffix}`),
+    })
+
+    return () => controls.stop()
+  }, [value])
+
+  return <>{display}</>
+}
 
 // ─── Strategy Definitions ─────────────────────────────────────────────────────
 const STRATEGIES = [
@@ -31,8 +133,19 @@ const STRATEGIES = [
 ]
 
 // ─── Monte Carlo Canvas ───────────────────────────────────────────────────────
-function MonteCarloCanvas({ monteCarlo }: { monteCarlo: any }) {
+function MonteCarloCanvas({ monteCarlo, market }: { monteCarlo: any; market: 'US' | 'IN' }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
+  const currency = market === 'IN' ? '₹' : '$'
+
+  const pp = monteCarlo?.percentilePaths || {}
+  const p5 = pp.p5 as number[] | undefined
+  const p25 = pp.p25 as number[] | undefined
+  const p50 = pp.p50 as number[] | undefined
+  const p75 = pp.p75 as number[] | undefined
+  const p95 = pp.p95 as number[] | undefined
+  const points = p50?.length || monteCarlo?.simulationPaths?.[0]?.length || 0
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -58,7 +171,7 @@ function MonteCarloCanvas({ monteCarlo }: { monteCarlo: any }) {
 
     const xS = (i: number) => pad.left + (i / (steps - 1)) * plotW
     const yS = (v: number) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH
-    const fmtD = (v: number) => Math.abs(v) >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : Math.abs(v) >= 1e3 ? `$${(v / 1e3).toFixed(0)}K` : `$${v.toFixed(0)}`
+    const fmtD = (v: number) => Math.abs(v) >= 1e6 ? `${currency}${(v / 1e6).toFixed(1)}M` : Math.abs(v) >= 1e3 ? `${currency}${(v / 1e3).toFixed(0)}K` : `${currency}${v.toFixed(0)}`
 
     ctx.clearRect(0, 0, W, H)
     ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1
@@ -89,12 +202,38 @@ function MonteCarloCanvas({ monteCarlo }: { monteCarlo: any }) {
       }
     }
 
+    if (hoverIndex !== null && pp?.p50?.length) {
+      const i = Math.max(0, Math.min(pp.p50.length - 1, hoverIndex))
+      const x = xS(i)
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(x, pad.top)
+      ctx.lineTo(x, pad.top + plotH)
+      ctx.stroke()
+
+      const dots: [number[] | undefined, string][] = [
+        [pp.p5, '#ef4444'],
+        [pp.p25, '#f97316'],
+        [pp.p50, '#22c55e'],
+        [pp.p75, '#3b82f6'],
+        [pp.p95, '#8b5cf6'],
+      ]
+      for (const [curve, color] of dots) {
+        if (!curve || curve[i] === undefined) continue
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.arc(x, yS(curve[i]), 3, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
     ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '10px monospace'; ctx.textAlign = 'right'
     for (let i = 0; i <= 5; i++) {
       const val = yMax - (i / 5) * (yMax - yMin)
       ctx.fillText(fmtD(val), pad.left - 4, pad.top + (i / 5) * plotH + 4)
     }
-  }, [monteCarlo])
+  }, [monteCarlo, hoverIndex])
 
   useEffect(() => {
     draw()
@@ -104,95 +243,473 @@ function MonteCarloCanvas({ monteCarlo }: { monteCarlo: any }) {
 
   if (!monteCarlo?.simulationPaths?.length) return <div className="text-[11px] font-mono text-white/25 py-4">Monte Carlo simulation unavailable.</div>
 
+  const formatCurrency = (v?: number) => (typeof v === 'number' ? `${currency}${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—')
+
+  const hoverValues = hoverIndex !== null ? {
+    p5: p5?.[hoverIndex],
+    p25: p25?.[hoverIndex],
+    p50: p50?.[hoverIndex],
+    p75: p75?.[hoverIndex],
+    p95: p95?.[hoverIndex],
+  } : null
+
   return (
-    <div className="space-y-2">
-      <canvas ref={canvasRef} className="w-full rounded-xl" style={{ height: 260 }} />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-2 relative"
+    >
+      <canvas
+        ref={canvasRef}
+        className="w-full rounded-xl cursor-crosshair"
+        style={{ height: 260 }}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          const x = e.clientX - rect.left
+          const y = e.clientY - rect.top
+          const padLeft = 60
+          const padRight = 16
+          const usable = rect.width - padLeft - padRight
+          if (usable <= 0 || points < 2) return
+          const ratio = Math.max(0, Math.min(1, (x - padLeft) / usable))
+          setHoverIndex(Math.round(ratio * (points - 1)))
+          setHoverPos({ x, y })
+        }}
+        onMouseLeave={() => {
+          setHoverIndex(null)
+          setHoverPos(null)
+        }}
+      />
+
+      {hoverValues && hoverPos && (
+        <div
+          className="absolute z-20 pointer-events-none rounded-lg border border-white/20 bg-black/85 px-3 py-2 text-[10px] font-mono shadow-2xl"
+          style={{
+            left: Math.min(hoverPos.x + 12, 620),
+            top: Math.max(hoverPos.y - 90, 8),
+          }}
+        >
+          <div className="text-white/60 mb-1">Step {hoverIndex! + 1}</div>
+          <div className="text-[#ef4444]">P5: {formatCurrency(hoverValues.p5)}</div>
+          <div className="text-[#f97316]">P25: {formatCurrency(hoverValues.p25)}</div>
+          <div className="text-[#22c55e]">P50: {formatCurrency(hoverValues.p50)}</div>
+          <div className="text-[#3b82f6]">P75: {formatCurrency(hoverValues.p75)}</div>
+          <div className="text-[#8b5cf6]">P95: {formatCurrency(hoverValues.p95)}</div>
+        </div>
+      )}
+
+      {hoverValues && (
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-[10px] font-mono rounded-lg border border-white/10 bg-white/[0.02] p-2">
+          <span className="text-white/50">Step {hoverIndex! + 1}</span>
+          <span className="text-[#ef4444]">P5: {formatCurrency(hoverValues.p5)}</span>
+          <span className="text-[#f97316]">P25: {formatCurrency(hoverValues.p25)}</span>
+          <span className="text-[#22c55e]">P50: {formatCurrency(hoverValues.p50)}</span>
+          <span className="text-[#3b82f6]">P75: {formatCurrency(hoverValues.p75)}</span>
+          <span className="text-[#8b5cf6]">P95: {formatCurrency(hoverValues.p95)}</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-4 text-[10px] font-mono">
         {[['P5', '#ef4444'], ['P25', '#f97316'], ['P50 (Median)', '#22c55e'], ['P75', '#3b82f6'], ['P95', '#8b5cf6']].map(([l, c]) => (
           <span key={l} style={{ color: c }}>{l}</span>
         ))}
       </div>
-    </div>
+      <div className="text-[10px] font-mono text-white/35 uppercase tracking-wider">
+        Monte Carlo fan chart: P5 = worst-case tail, P50 = median path, P95 = strong upside tail. Hover chart to inspect exact values.
+      </div>
+    </motion.div>
   )
 }
 
 // ─── Metric Chip ──────────────────────────────────────────────────────────────
 function MetricChip({ label, value, color = 'text-white' }: { label: string; value: any; color?: string }) {
   return (
-    <div className="p-4 rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-xl flex flex-col gap-1">
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.5 }}
+      transition={{ duration: 0.45 }}
+      className="p-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.18)] flex flex-col gap-1"
+    >
       <div className="text-[10px] font-dm-mono text-white/30 uppercase tracking-widest mb-0.5">{label}</div>
-      <div className={`text-xl font-dm-mono font-bold tabular-nums ${color}`}>{value ?? '—'}</div>
-    </div>
+      <div className={`text-xl font-dm-mono font-bold tabular-nums ${color}`}><AnimatedMetricValue value={value} /></div>
+    </motion.div>
   )
 }
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function BacktestPage() {
+  const resultsRef = useRef<HTMLDivElement>(null)
   const [market, setMarket] = useState('US')
   const [selectedStrategies, setSelectedStrategies] = useState(['ema_crossover'])
   const [symbol, setSymbol] = useState('AAPL')
   const [initialCapital, setInitialCapital] = useState(100000)
+  const [rangePeriod, setRangePeriod] = useState('1y')
+  const [candleInterval, setCandleInterval] = useState<'1d' | '1wk' | '1mo'>('1d')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [isRunning, setIsRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
   const [results, setResults] = useState<any>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiVisionLoading, setAiVisionLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null)
+  const [aiVisionError, setAiVisionError] = useState<string | null>(null)
+  const [aiVisionExplanation, setAiVisionExplanation] = useState<string | null>(null)
+  const [expandedModalContent, setExpandedModalContent] = useState<string | null>(null)
+  const [modalTitle, setModalTitle] = useState<string>('')
   const [detailStrategy, setDetailStrategy] = useState('ema_crossover')
+  const [typedAiExplanation, setTypedAiExplanation] = useState('')
+  const [typedAiVisionExplanation, setTypedAiVisionExplanation] = useState('')
+  const [quantReportLoading, setQuantReportLoading] = useState(false)
+  const [quantReportError, setQuantReportError] = useState<string | null>(null)
+  const [quantReportLink, setQuantReportLink] = useState<string | null>(null)
+  const currencySymbol = market === 'IN' ? '₹' : '$'
+  const intervalLabel = candleInterval === '1d' ? '1D' : candleInterval === '1wk' ? '1W' : '1M'
+  const rangeLabel = rangePeriod.toUpperCase()
+
+  const resolveDownloadUrl = (downloadUrl: string) => {
+    if (/^https?:\/\//i.test(downloadUrl)) return downloadUrl
+    if (downloadUrl.startsWith('/api/')) return downloadUrl
+    if (downloadUrl.startsWith('/')) return `${API_BASE}${downloadUrl}`
+    return `${API_BASE}/${downloadUrl}`
+  }
+
+  useEffect(() => {
+    if (!aiExplanation) {
+      setTypedAiExplanation('')
+      return
+    }
+    let i = 0
+    setTypedAiExplanation('')
+    const timer = window.setInterval(() => {
+      i += 4
+      setTypedAiExplanation(aiExplanation.slice(0, i))
+      if (i >= aiExplanation.length) window.clearInterval(timer)
+    }, 14)
+    return () => window.clearInterval(timer)
+  }, [aiExplanation])
+
+  useEffect(() => {
+    if (!aiVisionExplanation) {
+      setTypedAiVisionExplanation('')
+      return
+    }
+    let i = 0
+    setTypedAiVisionExplanation('')
+    const timer = window.setInterval(() => {
+      i += 4
+      setTypedAiVisionExplanation(aiVisionExplanation.slice(0, i))
+      if (i >= aiVisionExplanation.length) window.clearInterval(timer)
+    }, 14)
+    return () => window.clearInterval(timer)
+  }, [aiVisionExplanation])
+
+  const buildInterpretPayload = (): BacktestInterpretRequest | null => {
+    if (!results) return null
+
+    // Calculate equity curve statistics for analysis
+    const calculateEquityStats = (curve: any[]) => {
+      if (!curve || curve.length === 0) return {}
+      const values = curve.map((c: any) => c.portfolio || c.value || 0)
+      const returns = []
+      for (let i = 1; i < values.length; i++) {
+        returns.push(((values[i] - values[i-1]) / values[i-1]) * 100)
+      }
+      const maxDrawdown = values.reduce((maxDD, v, i) => {
+        let dd = 0
+        const peak = Math.max(...values.slice(0, i+1))
+        if (peak > 0) dd = ((peak - v) / peak) * 100
+        return Math.max(maxDD, dd)
+      }, 0)
+      return {
+        initialCapital: values[0],
+        finalCapital: values[values.length - 1],
+        totalReturn: ((values[values.length - 1] - values[0]) / values[0]) * 100,
+        maxDrawdownRealized: maxDrawdown.toFixed(2),
+        avgDailyReturn: (returns.reduce((a, b) => a + b, 0) / returns.length).toFixed(3),
+        volatility: (Math.sqrt(returns.reduce((sum, r) => sum + r*r, 0) / returns.length)).toFixed(2),
+        equityCurveLength: values.length,
+      }
+    }
+
+    // Analyze trade distribution
+    const analyzeTrades = (trades: any[]) => {
+      if (!trades || trades.length === 0) return {}
+      const winners = trades.filter((t: any) => (t.pnl || 0) > 0).length
+      const losers = trades.filter((t: any) => (t.pnl || 0) < 0).length
+      const avgWinTrade = trades.filter((t: any) => (t.pnl || 0) > 0).reduce((sum, t: any) => sum + (t.pnl || 0), 0) / (winners || 1)
+      const avgLoseTrade = trades.filter((t: any) => (t.pnl || 0) < 0).reduce((sum, t: any) => sum + Math.abs(t.pnl || 0), 0) / (losers || 1)
+      return {
+        totalTrades: trades.length,
+        winners,
+        losers,
+        winRate: ((winners / trades.length) * 100).toFixed(1),
+        avgWin: avgWinTrade.toFixed(2),
+        avgLoss: avgLoseTrade.toFixed(2),
+        expectancy: ((avgWinTrade * (winners/trades.length)) - (avgLoseTrade * (losers/trades.length))).toFixed(2),
+      }
+    }
+
+    if (results.isMulti) {
+      const compactStrategies = (results.strategies || []).map((s: any) => ({
+        id: s.id,
+        name: s.displayName,
+        metrics: s.metrics || {},
+        mcRisk: s.monteCarlo?.riskMetrics || {},
+        mcPct: s.monteCarlo?.percentiles || {},
+        equityStats: calculateEquityStats(s.equityCurve),
+        tradeAnalysis: analyzeTrades(s.trades),
+      }))
+      return {
+        symbol,
+        market: market as 'US' | 'IN',
+        selectedStrategies,
+        summary: {
+          mode: 'multi_strategy',
+          interval: candleInterval,
+          range: rangePeriod,
+          ranking: results.ranking || [],
+          strategies: compactStrategies,
+          note: 'Combined chart contains multiple strategy equity paths.',
+        },
+      }
+    }
+
+    const equityStats = calculateEquityStats(results.equityCurve)
+    const tradeAnalysis = analyzeTrades(results.trades)
+
+    return {
+      symbol,
+      market: market as 'US' | 'IN',
+      selectedStrategies,
+      summary: {
+        mode: 'single_strategy',
+        interval: candleInterval,
+        range: rangePeriod,
+        metrics: results.metrics || {},
+        equityStats,
+        tradeAnalysis,
+        monteCarlo: {
+          riskMetrics: results.monteCarlo?.riskMetrics || {},
+          percentiles: results.monteCarlo?.percentiles || {},
+          simulations: results.monteCarlo?.simulations || 0,
+        },
+        latestEquity: results.equityCurve?.[results.equityCurve.length - 1] || null,
+        equityCurveLength: results.equityCurve?.length || 0,
+      },
+    }
+  }
+
+  const captureResultsImage = async (): Promise<string> => {
+    if (!resultsRef.current) throw new Error('No results panel found to capture')
+    const canvas = await html2canvas(resultsRef.current, {
+      backgroundColor: '#05070c',
+      useCORS: true,
+      scale: 1.2,
+      logging: false,
+    })
+    return canvas.toDataURL('image/jpeg', 0.78)
+  }
+
+  const handleCombinedAnalysis = async () => {
+    if (!results || aiLoading || aiVisionLoading) return
+    
+    // Set both to loading
+    setAiLoading(true)
+    setAiVisionLoading(true)
+    setAiError(null)
+    setAiVisionError(null)
+    
+    try {
+      // Run data-driven analysis
+      const payload = buildInterpretPayload()
+      if (payload) {
+        try {
+          const res = await backtestAPI.interpret(payload)
+          setAiExplanation(res.analysis)
+        } catch (err) {
+          setAiError(err instanceof Error ? err.message : 'AI explanation failed')
+        } finally {
+          setAiLoading(false)
+        }
+      } else {
+        setAiLoading(false)
+      }
+      
+      // Run vision analysis
+      try {
+        const imageDataUrl = await captureResultsImage()
+        const payload: BacktestInterpretImageRequest = {
+          symbol,
+          market: market as 'US' | 'IN',
+          selectedStrategies,
+          imageDataUrl,
+          context: {
+            interval: candleInterval,
+            range: rangePeriod,
+            mode: results?.isMulti ? 'multi_strategy' : 'single_strategy',
+          },
+        }
+        const res = await backtestAPI.interpretImage(payload)
+        setAiVisionExplanation(res.analysis)
+      } catch (err) {
+        setAiVisionError(err instanceof Error ? err.message : 'AI screenshot interpretation failed')
+      } finally {
+        setAiVisionLoading(false)
+      }
+    } catch (err) {
+      setAiLoading(false)
+      setAiVisionLoading(false)
+    }
+  }
 
   const toggleStrategy = (id: string) => {
     setSelectedStrategies(prev => {
       if (prev.includes(id)) return prev.length === 1 ? prev : prev.filter(s => s !== id)
-      if (prev.length >= 4) return prev
+      if (prev.length >= 4) return [...prev.slice(1), id]
       return [...prev, id]
     })
   }
 
   const handleRun = async () => {
+    if (isRunning) return
     setIsRunning(true)
+    setRunError(null)
+    setAiError(null)
+    setAiVisionError(null)
+    setAiExplanation(null)
+    setAiVisionExplanation(null)
+    setQuantReportError(null)
+    setQuantReportLink(null)
+    const timeoutId = window.setTimeout(() => {
+      setIsRunning(false)
+      setRunError('Request timed out. Check backend server and try again.')
+    }, 45000)
     try {
       const params: any = {}
       selectedStrategies.forEach(id => {
         const strat = STRATEGIES.find(s => s.id === id)
         if (strat?.params) params[id] = strat.params
       })
+      const normalized = symbol.trim().toUpperCase()
+      const inferredMarket = normalized.endsWith('.NS') || normalized.endsWith('.BO') ? 'india' : 'us'
       const data = await backtestAPI.run({
-        symbol,
+        symbol: normalized,
+        market: market === 'IN' ? 'india' : inferredMarket,
         strategies: selectedStrategies,
-        range: '1y',
+        range: rangePeriod,
+        interval: candleInterval,
         params,
         start: startDate || undefined,
         end: endDate || undefined,
       })
 
       if (data.mode === 'multi_strategy') {
-        const stratResults = data.strategies || {}
-        const strategies = Object.entries(stratResults).map(([id, d]: any) => {
+        const multiData = data as BacktestMultiStrategyResponse
+        const stratResults = multiData.strategies || {}
+        const strategies = Object.entries(stratResults).map(([id, d]) => {
+          const detail = d as BacktestMultiStrategyDetail
           const def = STRATEGIES.find(s => s.id === id)
-          return { id, displayName: def?.name || id, color: d?.color || def?.color, metrics: d?.metrics, trades: d?.trades || [], monteCarlo: d?.monteCarlo, equityCurve: d?.equityCurve || [] }
+          return {
+            id,
+            displayName: def?.name || id,
+            color: detail?.color || def?.color,
+            metrics: detail?.metrics,
+            trades: detail?.trades || [],
+            monteCarlo: detail?.monteCarlo,
+            equityCurve: detail?.equityCurve || [],
+          }
         })
-        const ranking = (data.ranking || []).map((r: any, i: number) => {
+        const ranking = (multiData.ranking || []).map((r) => {
           const def = STRATEGIES.find(s => s.id === r.strategy)
           return { name: def?.name || r.strategy, totalReturn: r.return, sharpe: stratResults[r.strategy]?.metrics?.sharpeRatio ?? '—' }
         })
-        setResults({ isMulti: true, strategies, combinedChartData: data.combinedChartData || [], ranking })
+        setResults({ isMulti: true, strategies, combinedChartData: multiData.combinedChartData || [], ranking })
         setDetailStrategy(strategies[0]?.id ?? selectedStrategies[0])
       } else {
-        const equityCurve = (data.equity_curve || []).map((p: any, i: number) => ({
+        const singleData = data as BacktestSingleResponse
+        const equityCurve = (singleData.equity_curve || []).map((p: any, i: number) => ({
           ...p, date: p.date || `Day ${i + 1}`, portfolio: p.value || initialCapital, benchmark: p.benchmark || initialCapital,
         }))
-        setResults({ isMulti: false, equityCurve, metrics: data.metrics || {}, trades: data.trades || [], monteCarlo: data.monteCarlo || null })
+        setResults({
+          isMulti: false,
+          equityCurve,
+          metrics: singleData.metrics || {},
+          trades: singleData.trades || [],
+          monteCarlo: singleData.monteCarlo || null,
+        })
         setDetailStrategy(selectedStrategies[0])
       }
     } catch (err) {
       console.error('Backtest error:', err)
+      setRunError(err instanceof Error ? err.message : 'Backtest failed')
+      setResults(null)
     } finally {
+      window.clearTimeout(timeoutId)
       setIsRunning(false)
+    }
+  }
+
+  const handleQuantstatsReport = async () => {
+    if (!results || quantReportLoading) return
+
+    setQuantReportLoading(true)
+    setQuantReportError(null)
+
+    try {
+      const strategy = results?.isMulti ? detailStrategy : selectedStrategies[0]
+      if (!strategy) throw new Error('No strategy selected')
+
+      const strategyConfig = STRATEGIES.find((s) => s.id === strategy)
+      const normalized = symbol.trim().toUpperCase()
+      const normalizedSymbol = market === 'IN' && !normalized.endsWith('.NS') && !normalized.endsWith('.BO')
+        ? `${normalized}.NS`
+        : normalized
+
+      const res = await backtestAPI.quantstatsReport({
+        symbol: normalizedSymbol,
+        strategy,
+        range: rangePeriod,
+        params: strategyConfig?.params || {},
+        benchmark: market === 'IN' ? '^NSEI' : 'SPY',
+      })
+
+      const downloadUrl = typeof res?.downloadUrl === 'string' ? String(res.downloadUrl) : ''
+      const filename = typeof res?.filename === 'string'
+        ? String(res.filename)
+        : (downloadUrl ? downloadUrl.split('/').pop() || '' : '')
+
+      if (!downloadUrl && !filename) throw new Error('QuantStats report URL missing')
+
+      const fullUrl = filename
+        ? backtestAPI.downloadReport(filename)
+        : resolveDownloadUrl(downloadUrl)
+      setQuantReportLink(fullUrl)
+      window.open(fullUrl, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'QuantStats report generation failed'
+      if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(message)) {
+        setQuantReportError('Backend is unreachable. Start FastAPI on port 8001 and try again.')
+      } else {
+        setQuantReportError(message)
+      }
+    } finally {
+      setQuantReportLoading(false)
     }
   }
 
   const detailStrat = results?.isMulti ? results.strategies?.find((s: any) => s.id === detailStrategy) : null
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto py-8">
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55 }}
+      className="relative space-y-8 max-w-7xl mx-auto py-8"
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div>
@@ -205,27 +722,31 @@ export default function BacktestPage() {
       </div>
 
       {/* Strategy Grid */}
-      <div>
-        <div className="text-[11px] font-dm-mono text-white/60 uppercase tracking-widest mb-3">Select Strategies (Max 4)</div>
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.25 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="text-[11px] font-dm-mono text-white/60 uppercase tracking-widest mb-3">Select Strategies (Max 4 · 5th click replaces oldest)</div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {STRATEGIES.map(strat => {
             const active = selectedStrategies.includes(strat.id)
             return (
-              <button key={strat.id} onClick={() => toggleStrategy(strat.id)}
-                className={`${CARD} flex flex-col items-start gap-1.5 transition-all text-left ${active ? 'border-indigo-500/40 bg-indigo-500/10' : ''}`}> 
-                <div className="flex items-center gap-2 mb-1.5">
-                   <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: strat.color }} />
-                   <div className="text-[13px] font-dm-mono font-semibold text-white">{strat.name}</div>
-                </div>
-                <div className="text-[11px] text-white/60 leading-tight font-inter">{strat.description}</div>
-              </button>
+              <StrategyCard key={strat.id} strat={strat} active={active} onToggle={toggleStrategy} />
             )
           })}
         </div>
-      </div>
+      </motion.div>
 
       {/* Config Row */}
-      <div className="flex flex-wrap gap-4 items-end">
+      <motion.div
+        initial={{ opacity: 0, y: 22 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.5, delay: 0.06 }}
+        className="flex flex-wrap gap-4 items-end"
+      >
         {[
           { label: 'Symbol', value: symbol, onChange: setSymbol, type: 'text' },
           { label: 'Start Date', value: startDate, onChange: setStartDate, type: 'date' },
@@ -247,20 +768,157 @@ export default function BacktestPage() {
             className="w-full px-3 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-xl text-white font-dm-mono text-[13px] focus:outline-none focus:border-indigo-500/30 transition-colors"
           />
         </div>
-        <button onClick={handleRun} disabled={isRunning}
-          className="flex items-center gap-2 px-8 py-2.5 bg-indigo-500/10 backdrop-blur-xl border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/50 rounded-2xl text-[14px] font-dm-mono font-bold disabled:opacity-50 transition-all duration-300 shadow-[0_0_20px_rgba(99,102,241,0.1)] hover:shadow-[0_0_30px_rgba(99,102,241,0.25)] tracking-widest">
+        <div className="flex-1 min-w-[140px]">
+          <label className="block text-[10px] font-dm-mono text-white/30 uppercase tracking-widest mb-2">Data Interval</label>
+          <select
+            value={candleInterval}
+            onChange={e => setCandleInterval(e.target.value as '1d' | '1wk' | '1mo')}
+            className="backtest-select w-full px-3 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-xl text-white font-dm-mono text-[13px] focus:outline-none focus:border-indigo-500/30 transition-colors"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="1d">1 Day</option>
+            <option value="1wk">1 Week</option>
+            <option value="1mo">1 Month</option>
+          </select>
+        </div>
+        <motion.button
+          type="button"
+          onClick={handleRun}
+          disabled={isRunning}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          animate={!isRunning ? { boxShadow: ['0 0 18px rgba(37,99,235,0.30)', '0 0 34px rgba(37,99,235,0.45)', '0 0 18px rgba(37,99,235,0.30)'] } : { boxShadow: '0 0 0 rgba(0,0,0,0)' }}
+          transition={{ repeat: !isRunning ? Infinity : 0, duration: 2.2, ease: 'easeInOut' }}
+          className="shine-btn relative z-10 overflow-hidden pointer-events-auto flex items-center gap-2 px-8 py-3 rounded-2xl text-[14px] font-dm-mono font-bold tracking-widest text-white bg-gradient-to-r from-blue-900 to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           {isRunning ? 'RUNNING_SIMULATION...' : 'RUN_BACKTEST'}
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
 
       {/* Results */}
+      {runError && (
+        <div className="p-3 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-[12px] font-dm-mono uppercase tracking-wider">
+          {runError}
+        </div>
+      )}
+
       {results && (
-        <div className="space-y-5">
+        <div className="space-y-5" ref={resultsRef}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <motion.button
+              onClick={handleCombinedAnalysis}
+              disabled={aiLoading || aiVisionLoading}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              className="shine-btn relative overflow-hidden px-6 py-2.5 rounded-xl text-[12px] font-dm-mono uppercase tracking-widest text-white bg-gradient-to-r from-blue-900 to-blue-700 shadow-[0_0_30px_rgba(37,99,235,0.30)] disabled:opacity-50"
+            >
+              {aiLoading || aiVisionLoading ? 'ANALYZING_THIS_PAGE...' : 'ANALYZE_THIS_PAGE'}
+            </motion.button>
+            <motion.button
+              onClick={handleQuantstatsReport}
+              disabled={quantReportLoading}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              className="shine-btn relative overflow-hidden px-6 py-2.5 rounded-xl text-[12px] font-dm-mono uppercase tracking-widest text-white bg-gradient-to-r from-indigo-900 to-indigo-700 shadow-[0_0_30px_rgba(79,70,229,0.30)] disabled:opacity-50"
+            >
+              {quantReportLoading ? 'GENERATING_QUANTSTATS...' : 'GENERATE_QUANTSTATS_REPORT'}
+            </motion.button>
+            <span className="text-[10px] font-dm-mono text-white/35 uppercase tracking-wider">Groq-powered chart + data analysis</span>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-400/20 bg-emerald-400/10">
+              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <span className="text-[10px] font-dm-mono text-emerald-300 uppercase tracking-wider">Live Analysis</span>
+            </div>
+            {quantReportLink && (
+              <a
+                href={quantReportLink}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] font-dm-mono uppercase tracking-wider text-indigo-300 hover:text-indigo-200"
+              >
+                OPEN_QUANTSTATS_REPORT
+              </a>
+            )}
+          </div>
+
+          {quantReportError && (
+            <div className="p-3 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-[12px] font-dm-mono">
+              {quantReportError}
+            </div>
+          )}
+
+          {aiError && (
+            <div className="p-3 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-[12px] font-dm-mono">
+              {aiError}
+            </div>
+          )}
+
+          {aiExplanation && (
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 backdrop-blur-xl text-[13px] text-white/85 leading-relaxed shadow-[0_0_40px_rgba(16,185,129,0.08)]"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[11px] font-dm-mono text-emerald-300 uppercase tracking-widest">AI Backtest Interpretation</div>
+                <button
+                  onClick={() => {
+                    setExpandedModalContent(aiExplanation)
+                    setModalTitle('AI Analysis - Full View')
+                  }}
+                  className="px-3 py-1 text-[10px] font-dm-mono uppercase tracking-widest rounded-lg border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 transition-all"
+                >
+                  Expand → Full
+                </button>
+              </div>
+              <div className="prose prose-invert prose-sm max-w-none prose-p:text-white/80 line-clamp-6">
+                <ReactMarkdown>{typedAiExplanation || aiExplanation}</ReactMarkdown>
+              </div>
+            </motion.div>
+          )}
+
+          {aiVisionError && (
+            <div className="p-3 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-[12px] font-dm-mono">
+              {aiVisionError}
+            </div>
+          )}
+
+          {aiVisionExplanation && (
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.05 }}
+              className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 backdrop-blur-xl text-[13px] text-white/85 leading-relaxed shadow-[0_0_40px_rgba(34,211,238,0.08)]"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[11px] font-dm-mono text-cyan-300 uppercase tracking-widest">AI Screenshot Interpretation</div>
+                <button
+                  onClick={() => {
+                    setExpandedModalContent(aiVisionExplanation)
+                    setModalTitle('AI Screenshot Analysis - Full View')
+                  }}
+                  className="px-3 py-1 text-[10px] font-dm-mono uppercase tracking-widest rounded-lg border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 transition-all"
+                >
+                  Expand → Full
+                </button>
+              </div>
+              <div className="prose prose-invert prose-sm max-w-none prose-p:text-white/80 line-clamp-6">
+                <ReactMarkdown>{typedAiVisionExplanation || aiVisionExplanation}</ReactMarkdown>
+              </div>
+            </motion.div>
+          )}
+
           {results.isMulti ? (
             <>
               {/* Multi-strategy comparison */}
-              <div className={CARD_GLOW}>
-                <div className="text-[11px] font-mono text-white/30 uppercase tracking-widest mb-4">Strategy Comparison</div>
+              <motion.div
+                initial={{ opacity: 0, y: 38 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.6 }}
+                className={CARD_GLOW + ' shadow-[inset_0_0_100px_rgba(16,185,129,0.06)]'}
+              >
+                <div className="text-[11px] font-mono text-white/30 uppercase tracking-widest mb-4">Strategy Comparison · Based on {intervalLabel} candles · Range {rangeLabel}</div>
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={results.combinedChartData}>
                     <XAxis dataKey="date" stroke="#3f3f46" tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} />
@@ -270,7 +928,7 @@ export default function BacktestPage() {
                     {results.strategies?.map((s: any) => <Line key={s.id} type="monotone" dataKey={s.id} stroke={s.color || '#f59e0b'} strokeWidth={2} dot={false} name={s.displayName} />)}
                   </LineChart>
                 </ResponsiveContainer>
-              </div>
+              </motion.div>
 
               {/* Rankings */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -289,7 +947,13 @@ export default function BacktestPage() {
               </div>
 
               {/* Detail tabs */}
-              <div className={CARD_GLOW + " space-y-5"}>
+              <motion.div
+                initial={{ opacity: 0, y: 28 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 0.5 }}
+                className={CARD_GLOW + ' space-y-5'}
+              >
                 <div className="flex gap-2 flex-wrap">
                   {results.strategies?.map((s: any) => (
                     <button key={s.id} onClick={() => setDetailStrategy(s.id)}
@@ -311,16 +975,22 @@ export default function BacktestPage() {
                       <MetricChip label="Avg Win" value={`${detailStrat.metrics?.avgWin ?? '—'}%`} color="text-emerald-400" />
                       <MetricChip label="Avg Loss" value={`${detailStrat.metrics?.avgLoss ?? '—'}%`} color="text-red-400" />
                     </div>
-                    <MonteCarloCanvas monteCarlo={detailStrat.monteCarlo} />
+                    <MonteCarloCanvas monteCarlo={detailStrat.monteCarlo} market={market as 'US' | 'IN'} />
                   </>
                 )}
-              </div>
+              </motion.div>
             </>
           ) : (
             <>
               {/* Single strategy equity curve */}
-              <div className={CARD_GLOW}>
-                <div className="text-[11px] font-mono text-white/30 uppercase tracking-widest mb-4">Equity Curve</div>
+              <motion.div
+                initial={{ opacity: 0, y: 38 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.6 }}
+                className={CARD_GLOW + ' shadow-[inset_0_0_100px_rgba(16,185,129,0.06)]'}
+              >
+                <div className="text-[11px] font-mono text-white/30 uppercase tracking-widest mb-4">Equity Curve · Based on {intervalLabel} candles · Range {rangeLabel}</div>
                 <ResponsiveContainer width="100%" height={280}>
                   <ComposedChart data={results.equityCurve}>
                     <XAxis dataKey="date" stroke="#3f3f46" tick={{ fill: '#52525b', fontSize: 10 }} />
@@ -331,7 +1001,7 @@ export default function BacktestPage() {
                     <Line type="monotone" dataKey="benchmark" stroke="#52525b" strokeDasharray="5 5" name="Benchmark" dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
-              </div>
+              </motion.div>
 
               {/* Core Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -347,7 +1017,13 @@ export default function BacktestPage() {
 
               {/* Trades Table */}
               {(results.trades || []).length > 0 && (
-                <div className={CARD_GLOW + " overflow-x-auto"}>
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.25 }}
+                  transition={{ duration: 0.5 }}
+                  className={CARD_GLOW + ' overflow-x-auto'}
+                >
                   <div className="text-[11px] font-mono text-white/30 uppercase tracking-widest mb-4">Trade Log ({results.trades.length} trades)</div>
                   <table className="w-full text-sm">
                     <thead>
@@ -363,8 +1039,8 @@ export default function BacktestPage() {
                           <td className="py-2.5 pr-4 font-mono text-[12px] text-white/50">{t.entryDate}</td>
                           <td className="py-2.5 pr-4 font-mono text-[12px] text-white/50">{t.exitDate}</td>
                           <td className="py-2.5 pr-4 font-mono text-[12px] capitalize text-white/70">{t.side}</td>
-                          <td className="py-2.5 pr-4 font-mono text-[12px] text-white">${t.entryPrice?.toFixed(2)}</td>
-                          <td className="py-2.5 pr-4 font-mono text-[12px] text-white">${t.exitPrice?.toFixed(2)}</td>
+                          <td className="py-2.5 pr-4 font-mono text-[12px] text-white">{currencySymbol}{t.entryPrice?.toFixed(2)}</td>
+                          <td className="py-2.5 pr-4 font-mono text-[12px] text-white">{currencySymbol}{t.exitPrice?.toFixed(2)}</td>
                           <td className={`py-2.5 pr-4 font-mono text-[12px] ${t.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                             {t.pnlPct?.toFixed ? `${t.pnlPct.toFixed(2)}%` : '—'}
                           </td>
@@ -373,20 +1049,138 @@ export default function BacktestPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </motion.div>
               )}
 
               {/* Monte Carlo */}
-              <div className={CARD_GLOW}>
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 0.5 }}
+                className={CARD_GLOW}
+              >
                 <div className="text-[11px] font-mono text-white/30 uppercase tracking-widest mb-4">
-                  Monte Carlo Simulation ({results.monteCarlo?.simulations ?? 0} paths)
+                  Monte Carlo Simulation ({results.monteCarlo?.simulations ?? 0} paths) · Based on {intervalLabel} candles · Range {rangeLabel}
                 </div>
-                <MonteCarloCanvas monteCarlo={results.monteCarlo} />
-              </div>
+                <MonteCarloCanvas monteCarlo={results.monteCarlo} market={market as 'US' | 'IN'} />
+              </motion.div>
             </>
           )}
         </div>
       )}
-    </div>
+
+      <style jsx global>{`
+        .shine-btn,
+        .shine-surface {
+          isolation: isolate;
+        }
+
+        .shine-btn::after {
+          content: '';
+          position: absolute;
+          top: -120%;
+          left: -20%;
+          width: 34%;
+          height: 340%;
+          background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.58) 48%, transparent 100%);
+          transform: translateX(-260%) rotate(18deg);
+          animation: none;
+          pointer-events: none;
+          z-index: 2;
+          opacity: 0;
+          transition: opacity 0.25s ease;
+          mix-blend-mode: screen;
+        }
+
+        .shine-btn:hover::after {
+          animation: sheenSweep 0.9s ease-out 1;
+          opacity: 0.62;
+        }
+
+        .shine-surface::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: linear-gradient(165deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 35%, rgba(99,102,241,0.07) 100%);
+          opacity: 0.7;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .shine-surface::after {
+          content: '';
+          position: absolute;
+          top: -160%;
+          left: -14%;
+          width: 28%;
+          height: 390%;
+          background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.24) 50%, transparent 100%);
+          transform: translateX(-250%) rotate(14deg);
+          animation: none;
+          pointer-events: none;
+          z-index: 1;
+          opacity: 0;
+          transition: opacity 0.25s ease;
+        }
+
+        .shine-surface:hover::after {
+          animation: sheenSweep 1.1s ease-out 1;
+          opacity: 0.45;
+        }
+
+        @keyframes sheenSweep {
+          0% { transform: translateX(-260%) rotate(16deg); }
+          100% { transform: translateX(430%) rotate(16deg); }
+        }
+
+        .backtest-select,
+        .backtest-select:focus,
+        .backtest-select:active {
+          background-color: #05070c;
+          color: #ffffff;
+        }
+
+        .backtest-select option {
+          background-color: #05070c;
+          color: #ffffff;
+        }
+
+        .prose {
+          text-wrap: pretty;
+        }
+      `}</style>
+
+      {/* Full Screen Modal for Expanded Analysis */}
+      {expandedModalContent && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setExpandedModalContent(null)}
+        >
+          <div 
+            className="relative w-full max-w-4xl max-h-[90vh] bg-gray-900/95 border border-white/20 rounded-2xl p-8 overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setExpandedModalContent(null)}
+              className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-lg border border-white/20 text-white/60 hover:text-white hover:bg-white/10 transition-all"
+              aria-label="Close modal"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Title */}
+            <h2 className="text-2xl font-dm-mono font-bold text-white mb-6 pr-12">{modalTitle}</h2>
+
+            {/* Content */}
+            <div className="prose prose-invert max-w-none">
+              <ReactMarkdown>{expandedModalContent}</ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
   )
 }

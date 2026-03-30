@@ -102,7 +102,7 @@ def init_db():
 
 def run_init_sql():
     """Run init.sql to create tables that might not be in ORM (like user_profiles)"""
-    init_sql_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "init.sql")
+    init_sql_path = os.path.join(os.path.dirname(__file__), "init.sql")
     if os.path.exists(init_sql_path):
         print(f"Running init.sql from {init_sql_path}...")
         with open(init_sql_path, "r") as f:

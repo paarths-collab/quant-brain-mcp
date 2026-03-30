@@ -1,7 +1,8 @@
 'use client'
 import { useRef } from 'react'
+import Link from 'next/link'
 import { ArrowRight, ExternalLink, Shield, Zap, Lock, BarChart3, TrendingUp, ArrowUpRight, PieChart, LineChart, ShieldCheck } from 'lucide-react'
-import { motion, useInView, useScroll, useVelocity, useTransform, useSpring } from 'framer-motion'
+import { motion, useInView } from 'framer-motion'
 import { FadeIn, GlassCard, StaggerContainer, StaggerItem } from '@/components/MotionComponents'
 import SectionLabel from '@/components/SectionLabel'
 import Globe from '@/components/Globe'
@@ -47,48 +48,47 @@ function SectionGlow({ depth = 0 }: { depth?: number }) {
 /* ─── HERO ─── */
 
 function HeroSection() {
+
   return (
-    <section className="relative min-h-[92vh] flex items-center px-8 lg:px-16 max-w-[1400px] mx-auto overflow-hidden pt-28 pb-32">
-      {/* Dot grid — defined in globals.css as .hero-grid-bg / .hero-grid-fade */}
-      <div className="absolute inset-0 pointer-events-none hero-grid-bg hero-grid-fade opacity-100" />
+    <>
+      <section className="relative min-h-[92vh] flex items-center px-8 lg:px-16 max-w-[1400px] mx-auto overflow-hidden pt-28 pb-10">
+        {/* Dot grid — defined in globals.css as .hero-grid-bg / .hero-grid-fade */}
+        <div className="absolute inset-0 pointer-events-none hero-grid-bg hero-grid-fade opacity-100" />
 
-      <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10">
-        {/* Left */}
-        <div className="relative z-20">
-          <FadeIn delay={0.1}>
-            <h1
-              className="font-sans text-[clamp(44px,5vw,86px)] font-light tracking-[-0.02em] leading-[1.05] mb-6 text-white/90"
-              style={{ fontWeight: 300 }}
-            >
-              The Intelligent Layer for<br />
-              Quantitative Finance.
-            </h1>
-            <p className="text-[#888899] text-[clamp(15px,1.5vw,18px)] font-light max-w-[540px] leading-relaxed mb-10">
-              Orchestrating a decentralized committee of AI Agents and institutional-grade mathematics to deliver explainable alpha and dynamic risk management.
-            </p>
-          </FadeIn>
+        <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10">
+          {/* Left */}
+          <div className="relative z-20">
+            <FadeIn delay={0.1}>
+              <h1
+                className="font-sans text-[clamp(44px,5vw,86px)] font-light tracking-[-0.02em] leading-[1.05] mb-6 text-white/90"
+                style={{ fontWeight: 300 }}
+              >
+                The Intelligent Layer for<br />
+                Quantitative Finance.
+              </h1>
+              <p className="text-[#888899] text-[clamp(15px,1.5vw,18px)] font-light max-w-[540px] leading-relaxed mb-10">
+                Orchestrating a decentralized committee of AI Agents and institutional-grade mathematics to deliver explainable alpha and dynamic risk management.
+              </p>
+            </FadeIn>
 
-          <FadeIn delay={0.2}>
-            <div className="flex items-center gap-5">
-              <button className="bg-white text-black px-7 py-3 rounded-full font-semibold text-sm hover:bg-gray-100 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)]">
-                Deploy Agentic Pipeline
-              </button>
-              <button className="text-white/60 hover:text-white transition-colors text-sm font-medium">Explore Quant Models</button>
-            </div>
-          </FadeIn>
+            <FadeIn delay={0.2}>
+              <div className="flex items-center gap-5">
+                <Link href="/chat" className="bg-white text-black px-7 py-3 rounded-full font-semibold text-sm hover:bg-gray-100 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)]">
+                  Deploy Agentic Pipeline
+                </Link>
+                <Link href="/backtest" className="text-white/60 hover:text-white transition-colors text-sm font-medium">Explore Quant Models</Link>
+              </div>
+            </FadeIn>
+          </div>
+
+          {/* Right: Globe — fills more of the right column, slightly cropped like screenshot */}
+          <div style={{ marginRight: '-80px' }} className="hidden lg:flex justify-center items-center relative -top-16 z-0">
+            <Globe />
+          </div>
         </div>
-
-        {/* Right: Globe — fills more of the right column, slightly cropped like screenshot */}
-        <div className="hidden lg:flex justify-center items-center relative -top-16 z-0" style={{ marginRight: '-80px' }}>
-          <Globe />
-        </div>
-      </div>
-
-      {/* Stats bar pinned to bottom */}
-      <div className="absolute bottom-0 left-0 right-0">
-        <StatsBar />
-      </div>
-    </section>
+      </section>
+      <StatsBar />
+    </>
   )
 }
 
@@ -111,21 +111,19 @@ const STAT_ICONS = [
 
 function StatsBar() {
   return (
-    <div className="border-t border-white/[0.07] bg-black/30 backdrop-blur-md">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-6 items-center divide-x divide-white/[0.06]">
-          {statsBar.map((stat, i) => (
-            <div key={stat.label} className="flex flex-col items-center gap-2 py-9 px-4 group">
-              <span className="font-mono text-[32px] font-bold tracking-tight text-white/90 group-hover:text-white transition-colors leading-none">
-                {stat.value}
-              </span>
-              <div className="flex items-center gap-1.5 text-white/30">
-                <span className="w-4 h-4 flex-shrink-0 opacity-60">{STAT_ICONS[i]}</span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.15em] font-medium whitespace-nowrap">{stat.label}</span>
-              </div>
+    <div className="border-t border-white/[0.07] bg-black/30 backdrop-blur-md w-full">
+      <div className="grid grid-cols-2 md:grid-cols-4 items-center divide-x divide-white/[0.06]">
+        {statsBar.map((stat, i) => (
+          <div key={stat.label} className="flex flex-col items-center justify-center gap-1 py-6 px-4 group text-center">
+            <span className="font-mono text-[32px] font-bold tracking-tight text-white/90 group-hover:text-white transition-colors leading-none">
+              {stat.value}
+            </span>
+            <div className="flex items-center justify-center gap-1.5 text-white/30">
+              <span className="w-4 h-4 flex-shrink-0 opacity-60">{STAT_ICONS[i]}</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] font-medium whitespace-nowrap">{stat.label}</span>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -304,8 +302,8 @@ function TransparencySection() {
                     transform="rotate(-90 80 80)" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                   <span className="text-[10px] font-mono text-white/30 uppercase tracking-tighter">Liquid</span>
-                   <span className="text-sm font-semibold text-white">92%</span>
+                  <span className="text-[10px] font-mono text-white/30 uppercase tracking-tighter">Liquid</span>
+                  <span className="text-sm font-semibold text-white">92%</span>
                 </div>
               </div>
             </div>
@@ -427,9 +425,9 @@ function HighlightsSection() {
       </StaggerContainer>
 
       <FadeIn delay={0.3} className="flex justify-center mt-12">
-        <button className="bg-white/5 border border-white/10 text-white text-[13px] font-medium px-8 py-3 rounded-full hover:bg-white/10 transition-colors">
+        <Link href="/news" className="bg-white/5 border border-white/10 text-white text-[13px] font-medium px-8 py-3 rounded-full hover:bg-white/10 transition-colors">
           See All News
-        </button>
+        </Link>
       </FadeIn>
     </section>
   )
@@ -452,7 +450,7 @@ function AccessTiersSection() {
           <StaggerItem key={tier.tier}>
             <div className="card-shine card-glow card-top-edge p-10 rounded-[2.5rem] bg-[#0d0d10] border border-white/[0.05] h-full flex flex-col group transition-all relative overflow-hidden">
               <div className="absolute inset-0 opacity-[0.02] pointer-events-none transition-opacity group-hover:opacity-[0.05]" style={{ backgroundImage: `url('https://www.ethena.fi/images/grid.svg')` }} />
-              
+
               <div className="flex justify-between items-start mb-10 relative z-10">
                 <span className="text-[10px] bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-white/50 font-mono tracking-widest uppercase">{tier.badge}</span>
                 <div className="text-right">
@@ -475,9 +473,9 @@ function AccessTiersSection() {
                 ))}
               </div>
 
-              <button className="mt-auto w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[14px] font-medium hover:bg-white/10 transition-all relative z-10">
+              <Link href="/dashboard" className="mt-auto w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[14px] font-medium hover:bg-white/10 transition-all relative z-10 flex items-center justify-center">
                 Start with {tier.tier}
-              </button>
+              </Link>
             </div>
           </StaggerItem>
         ))}
@@ -499,12 +497,12 @@ function FutureSection() {
           Deploy your first Agentic Pipeline or explore our institutional-grade documentation and SDKs.
         </p>
         <div className="flex items-center gap-4 justify-center flex-wrap">
-          <button className="bg-white text-black px-10 py-4 rounded-full text-base font-semibold hover:bg-white/90 transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)]">
+          <Link href="/dashboard" className="bg-white text-black px-10 py-4 rounded-full text-base font-semibold hover:bg-white/90 transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)]">
             Launch Quant Terminal
-          </button>
-          <button className="flex items-center gap-2 text-white/60 hover:text-white transition-all text-base font-medium group">
+          </Link>
+          <Link href="/research" className="flex items-center gap-2 text-white/60 hover:text-white transition-all text-base font-medium group">
             View Documentation <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-          </button>
+          </Link>
         </div>
       </FadeIn>
     </section>
@@ -523,13 +521,9 @@ function SectionDivider() {
 }
 
 export default function HomePage() {
-  const { scrollY } = useScroll()
-  const scrollVelocity = useVelocity(scrollY)
-  const blurValue = useTransform(scrollVelocity, [-2000, 0, 2000], [3, 0, 3])
-  const smoothBlur = useSpring(blurValue, { stiffness: 100, damping: 30 })
 
   return (
-    <motion.div style={{ filter: useTransform(smoothBlur, (v) => `blur(${v}px)`) }}>
+    <>
       <SectionGlow depth={0} />
       <HeroSection />
       <SectionDivider />
@@ -552,6 +546,6 @@ export default function HomePage() {
       <SectionDivider />
       <SectionGlow depth={1} />
       <FutureSection />
-    </motion.div>
+    </>
   )
 }

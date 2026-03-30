@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { marketAPI, fredAPI } from '@/lib/api';
 
 // --- Constants & Styles ---
 const BLUE_ACCENT = '#4f46e5';
-const CARD_GLOW = "group relative p-6 rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_24px_rgba(79,70,229,0.04)] hover:shadow-[0_0_32px_rgba(79,70,229,0.1)] hover:border-indigo-500/20 hover:bg-white/[0.05] transition-all duration-500 overflow-hidden";
+const CARD_GLOW = "group relative rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_24px_rgba(79,70,229,0.04)] hover:shadow-[0_0_32px_rgba(79,70,229,0.12)] hover:border-indigo-500/20 hover:bg-white/[0.05] transition-all duration-500 overflow-hidden hover:-translate-y-1";
+const CACHE_KEY = 'bloomberg_market_data_v1';
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
 
 // --- Mock Data Generator ---
 function makeSpark(n = 20, up = true) {
@@ -19,9 +22,9 @@ function makeSpark(n = 20, up = true) {
 }
 
 // --- Components ---
-function MarketSpark({ data, color, id }: { data: { v: number }[]; color: string; id: string }) {
+function MarketSpark({ data, color, id, height = 40 }: { data: { v: number }[]; color: string; id: string; height?: number }) {
   return (
-    <div className="h-10 mt-4" style={{ filter: `drop-shadow(0 0 4px ${color}40)` }}>
+    <div className="mt-4" style={{ height, filter: `drop-shadow(0 0 6px ${color}55)` }}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
           <defs>
@@ -34,7 +37,7 @@ function MarketSpark({ data, color, id }: { data: { v: number }[]; color: string
             type="monotone" 
             dataKey="v" 
             stroke={color} 
-            strokeWidth={1.5} 
+            strokeWidth={2} 
             fill={`url(#spark-${id})`} 
             dot={false} 
             isAnimationActive={true}
@@ -45,40 +48,47 @@ function MarketSpark({ data, color, id }: { data: { v: number }[]; color: string
   );
 }
 
-function MarketCard({ item, symbol }: { item: any; symbol: string }) {
+function MarketCard({ item, symbol, size = 'md' }: { item: any; symbol: string; size?: 'md' | 'lg' }) {
   const isUp = (item.change_percent || 0) >= 0;
   const sparkData = makeSpark(24, isUp);
+  const isLarge = size === 'lg';
 
   return (
-    <div className={CARD_GLOW}>
-      <div className="flex items-start justify-between mb-4">
+    <div className={`${CARD_GLOW} ${isLarge ? 'p-7' : 'p-6'}`}>
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="font-dm-mono text-[10px] tracking-[0.3em] text-white/50 uppercase mb-0.5 truncate">{item.id}</div>
-          <div className="font-inter text-[13px] text-white/70 font-light truncate">{item.name}</div>
+          <div className="heading-text text-[14px] text-white/80 truncate">
+            {item.name}
+          </div>
         </div>
-        <div className={`shrink-0 font-dm-mono text-[10px] font-bold px-2 py-1 rounded border ${isUp ? 'border-indigo-500/20 bg-indigo-500/5 text-indigo-400' : 'border-white/5 bg-white/2 text-white/25'}`}>
-          {isUp ? '+' : ''}{item.change_percent.toFixed(2)}%
+        <div className={`shrink-0 data-text text-[10px] font-semibold px-2.5 py-1 rounded border ${isUp ? 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300' : 'border-white/5 bg-white/2 text-white/25'}`}>
+          {isUp ? '+' : ''}{item.change_percent?.toFixed(2)}%
         </div>
       </div>
 
-      <div className="font-dm-mono text-[26px] font-medium text-white tabular-nums tracking-tight leading-none mb-4">
-        {symbol}{item.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      <div className={`metric-text glow-text text-white tabular-nums tracking-tight leading-none ${isLarge ? 'text-[30px] mt-4' : 'text-[26px] mt-3'}`}>
+        {symbol}{item.price?.toLocaleString(undefined, { minimumFractionDigits: item.price < 10 ? 4 : 2, maximumFractionDigits: item.price < 10 ? 4 : 2 })}
       </div>
 
-      <MarketSpark data={sparkData} color={isUp ? BLUE_ACCENT : 'rgba(255,255,255,0.2)'} id={item.id} />
+      <div className="flex items-center justify-between mt-2">
+        <span className="data-text text-[10px] text-white/45 uppercase tracking-[0.28em]">{item.id}</span>
+      </div>
+
+      <MarketSpark data={sparkData} color={isUp ? BLUE_ACCENT : 'rgba(255,255,255,0.25)'} id={item.id} height={isLarge ? 56 : 40} />
     </div>
   );
 }
 
 function MarketSection({ title, items, symbol }: { title: string; items: any[]; symbol: string }) {
+    if (!items || items.length === 0) return null;
     return (
         <section className="space-y-5">
             <div className="flex items-center gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-                <span className="font-dm-mono text-[11px] text-white/60 uppercase tracking-[0.4em] font-medium">{title}</span>
+                <span className="data-text text-[10px] text-white/60 uppercase tracking-[0.35em] font-medium">{title}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-                {items.map(item => <MarketCard key={item.id} item={item} symbol={symbol} />)}
+                {items.map(item => <MarketCard key={item.id} item={item} symbol={item.sym || symbol} />)}
             </div>
         </section>
     );
@@ -86,83 +96,211 @@ function MarketSection({ title, items, symbol }: { title: string; items: any[]; 
 
 export default function MarketsPage() {
   const [refreshing, setRefreshing] = useState(false);
+  const [data, setData] = useState<{
+    globalIndices: any[];
+    commodities: any[];
+    fxPairs: any[];
+    macroRates: any[];
+  }>({
+    globalIndices: [],
+    commodities: [],
+    fxPairs: [],
+    macroRates: []
+  });
+
+  const loadFromCache = useCallback(() => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { payload, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_TTL) {
+          setData(payload);
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load cache:', e);
+    }
+    return false;
+  }, []);
+
+  const saveToCache = (payload: any) => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        payload,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      console.error('Failed to save cache:', e);
+    }
+  };
+
+  const fetchAllData = async (force = false) => {
+    try {
+      const fredSeries = [
+        'SP500', 'DJIA', 'NASDAQ100', 
+        'DCOILWTICO', 'DCOILBRENTEU', 'NASDAQQSLVO',
+        'DEXUSEU', 'DEXJPUS', 'DEXUSUK',
+        'DGS10', 'VIXCLS', 'DTWEXBGS'
+      ];
+
+      // 1. Fetch FRED Data
+      const fredResponse: any = force 
+        ? await fredAPI.getLatestLive(fredSeries)
+        : await fredAPI.getLatestCached(fredSeries);
+      
+      const fredData = fredResponse?.data || {};
+
+      // 2. Fetch yfinance Data (Indices + Gold)
+      const overviewRes: any = await marketAPI.getOverview();
+      const overviewIndices = overviewRes?.indices || {};
+
+      // 3. Mapping Logic
+      const newGlobalIndices = [
+        { name: 'S&P 500', id: 'SPX', change_percent: fredData.SP500?.change_pct || 0, price: fredData.SP500?.value || 0, sym: '$' },
+        { name: 'NASDAQ 100', id: 'NDX', change_percent: fredData.NASDAQ100?.change_pct || 0, price: fredData.NASDAQ100?.value || 0, sym: '$' },
+        { name: 'NIFTY 50', id: 'NIFTY', change_percent: overviewIndices['^NSEI']?.change_pct || 0.50, price: overviewIndices['^NSEI']?.price || 22402.40, sym: '₹' },
+        { name: 'DOW JONES', id: 'DJI', change_percent: fredData.DJIA?.change_pct || 0, price: fredData.DJIA?.value || 0, sym: '$' },
+        { name: 'SENSEX', id: 'BSESN', change_percent: overviewIndices['^BSESN']?.change_pct || -0.13, price: overviewIndices['^BSESN']?.price || 73877.30, sym: '₹' },
+      ].filter(x => x.price > 0);
+
+      const newCommodities = [
+        { name: 'Gold Spot', id: 'GOLD', change_percent: overviewIndices['GC=F']?.change_pct || (fredData.GOLDAMGBD228NLBM?.change_pct || 0.54), price: overviewIndices['GC=F']?.price || (fredData.GOLDAMGBD228NLBM?.value || 2242.10), sym: '$' },
+        { name: 'WTI Crude', id: 'WTI', change_percent: fredData.DCOILWTICO?.change_pct || 0, price: fredData.DCOILWTICO?.value || 0, sym: '$' },
+        { name: 'Brent Crude', id: 'BRENT', change_percent: fredData.DCOILBRENTEU?.change_pct || 0, price: fredData.DCOILBRENTEU?.value || 0, sym: '$' },
+        { name: 'Silver Spot', id: 'SILVER', change_percent: fredData.NASDAQQSLVO?.change_pct || 0, price: fredData.NASDAQQSLVO?.value || 0, sym: '$' },
+      ].filter(x => x.price > 0);
+
+      const newFxPairs = [
+        { name: 'EUR / USD', id: 'EURUSD', change_percent: fredData.DEXUSEU?.change_pct || 0, price: fredData.DEXUSEU?.value || 0, sym: '' },
+        { name: 'USD / JPY', id: 'USDJPY', change_percent: (fredData.DEXJPUS?.change_pct || 0) * -1, price: fredData.DEXJPUS?.value || 0, sym: '' },
+        { name: 'GBP / USD', id: 'GBPUSD', change_percent: fredData.DEXUSUK?.change_pct || 0, price: fredData.DEXUSUK?.value || 0, sym: '' },
+      ].filter(x => x.price > 0);
+
+      const newMacroRates = [
+        { name: 'US 10Y Yield', id: 'US10Y', change_percent: fredData.DGS10?.change_pct || 0, price: fredData.DGS10?.value || 0, sym: '%' },
+        { name: 'VIX Index', id: 'VIX', change_percent: fredData.VIXCLS?.change_pct || 0, price: fredData.VIXCLS?.value || 16.31, sym: '' },
+        { name: 'DXY Index', id: 'DXY', change_percent: fredData.DTWEXBGS?.change_pct || 0, price: fredData.DTWEXBGS?.value || 104.12, sym: '' },
+      ].filter(x => x.price > 0);
+
+      const payload = {
+        globalIndices: newGlobalIndices.length > 0 ? newGlobalIndices : STATIC_GLOBAL_INDICES,
+        commodities: newCommodities.length > 0 ? newCommodities : STATIC_COMMODITIES,
+        fxPairs: newFxPairs.length > 0 ? newFxPairs : STATIC_FX_PAIRS,
+        macroRates: newMacroRates.length > 0 ? newMacroRates : STATIC_MACRO_RATES
+      };
+
+      setData(payload);
+      saveToCache(payload);
+    } catch (err) {
+      console.error('Fetch error:', err);
+    }
+  };
 
   const doRefresh = async () => {
     setRefreshing(true);
+    await fetchAllData(true);
     await new Promise(r => setTimeout(r, 600));
     setRefreshing(false);
   };
 
-  // --- Unified Market Data ---
-  const GLOBAL_INDICES = [
+  useEffect(() => {
+    const hasCache = loadFromCache();
+    if (!hasCache) {
+      void fetchAllData();
+    }
+  }, [loadFromCache]);
+
+  // --- Fallback Data (moved to internal constants for safety) ---
+  const STATIC_GLOBAL_INDICES = [
     { name: 'S&P 500', id: 'SPX', change_percent: 0.82, price: 5842.47, sym: '$' },
     { name: 'NASDAQ 100', id: 'NDX', change_percent: 1.14, price: 20378.92, sym: '$' },
     { name: 'NIFTY 50', id: 'NIFTY', change_percent: 0.50, price: 22402.40, sym: '₹' },
     { name: 'DOW JONES', id: 'DJI', change_percent: -0.12, price: 43192.05, sym: '$' },
     { name: 'SENSEX', id: 'BSESN', change_percent: -0.13, price: 73877.30, sym: '₹' },
-    { name: 'FTSE 100', id: 'UK100', change_percent: 0.24, price: 8245.10, sym: '£' },
-    { name: 'DAX 40', id: 'GER40', change_percent: -0.62, price: 18142.40, sym: '€' },
-    { name: 'NIKKEI 225', id: 'JPN225', change_percent: 1.72, price: 40142.60, sym: '¥' },
-    { name: 'HANG SENG', id: 'HKG33', change_percent: -0.84, price: 16842.15, sym: '$' },
-    { name: 'EURO STOXX 50', id: 'ESTX50', change_percent: 0.35, price: 4942.30, sym: '€' },
-    { name: 'CAC 40', id: 'FRA40', change_percent: 0.28, price: 8142.60, sym: '€' },
-    { name: 'ASX 200', id: 'AUS200', change_percent: 0.65, price: 7842.10, sym: '$' },
   ];
 
-  const COMMODITIES = [
+  const STATIC_COMMODITIES = [
     { name: 'Gold Spot', id: 'GOLD', change_percent: 0.54, price: 2242.10, sym: '$' },
     { name: 'WTI Crude', id: 'WTI', change_percent: 1.21, price: 81.42, sym: '$' },
     { name: 'Brent Crude', id: 'BRENT', change_percent: 1.15, price: 86.50, sym: '$' },
     { name: 'Silver Spot', id: 'SILVER', change_percent: -0.84, price: 25.14, sym: '$' },
-    { name: 'Copper Spot', id: 'HG', change_percent: 0.32, price: 9842.05, sym: '$' },
-    { name: 'Natural Gas', id: 'NG', change_percent: -2.45, price: 1.842, sym: '$' },
-    { name: 'Platinum', id: 'XPT', change_percent: 0.12, price: 942.30, sym: '$' },
-    { name: 'Palladium', id: 'XPD', change_percent: -0.92, price: 1042.15, sym: '$' },
   ];
 
-  const FX_PAIRS = [
+  const STATIC_FX_PAIRS = [
     { name: 'EUR / USD', id: 'EURUSD', change_percent: 0.12, price: 1.0842, sym: '' },
     { name: 'USD / JPY', id: 'USDJPY', change_percent: -0.21, price: 149.85, sym: '' },
     { name: 'GBP / USD', id: 'GBPUSD', change_percent: 0.08, price: 1.2741, sym: '' },
-    { name: 'USD / INR', id: 'USDINR', change_percent: 0.05, price: 83.472, sym: '' },
-    { name: 'AUD / USD', id: 'AUDUSD', change_percent: 0.18, price: 0.6542, sym: '' },
-    { name: 'USD / CAD', id: 'USDCAD', change_percent: -0.11, price: 1.3541, sym: '' },
-    { name: 'USD / CHF', id: 'USDCHF', change_percent: -0.05, price: 0.8842, sym: '' },
-    { name: 'NZD / USD', id: 'NZDUSD', change_percent: 0.14, price: 0.6042, sym: '' },
   ];
 
-  const MACRO_RATES = [
+  const STATIC_MACRO_RATES = [
     { name: 'US 10Y Yield', id: 'US10Y', change_percent: 1.05, price: 4.24, sym: '%' },
     { name: 'VIX Index', id: 'VIX', change_percent: -4.78, price: 16.31, sym: '' },
-    { name: 'MOVE Index', id: 'MOVE', change_percent: -0.74, price: 110.25, sym: '' },
     { name: 'DXY Index', id: 'DXY', change_percent: 0.14, price: 104.12, sym: '' },
   ];
 
+  const displayData = {
+    globalIndices: data.globalIndices.length > 0 ? data.globalIndices : STATIC_GLOBAL_INDICES,
+    commodities: data.commodities.length > 0 ? data.commodities : STATIC_COMMODITIES,
+    fxPairs: data.fxPairs.length > 0 ? data.fxPairs : STATIC_FX_PAIRS,
+    macroRates: data.macroRates.length > 0 ? data.macroRates : STATIC_MACRO_RATES,
+  };
+
   return (
-    <div className="space-y-10 pb-20">
+    <div className="space-y-12 pb-20 relative">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: 'radial-gradient(circle at 70% 20%, rgba(79,107,255,0.08), transparent 55%)' }}
+      />
+      
       {/* Universal Header */}
-      <header className="flex items-center justify-between sticky top-0 z-20 bg-black/60 backdrop-blur-xl py-4 border-b border-white/5">
+      <header className="flex items-center justify-between sticky top-0 z-20 bg-black/70 backdrop-blur-xl py-5 border-b border-white/5">
         <div className="flex items-center gap-4">
-          <span className="inline-flex items-center gap-2 px-2.5 py-1 text-[9px] border border-indigo-500/20 rounded-full text-indigo-400/80 bg-indigo-500/5">
-            <span className="w-1 h-1 rounded-full bg-indigo-400 animate-pulse" />
-            GLOBAL_MARKETS_SYNC
-          </span>
+          <div className="flex flex-col">
+            <span className="data-text text-[10px] text-white/40 uppercase tracking-[0.32em]">Global Markets</span>
+            <span className="heading-text text-[26px] text-white/90 tracking-[-0.01em]">Unified Terminal</span>
+          </div>
         </div>
 
-        <button 
-          onClick={doRefresh}
-          className="px-6 py-2 rounded-xl bg-indigo-500/10 backdrop-blur-xl border border-indigo-500/30 text-indigo-400/90 hover:bg-indigo-500/20 hover:border-indigo-500/50 hover:text-indigo-400 transition-all duration-300 font-dm-mono text-[10px] uppercase tracking-widest shadow-[0_0_15px_rgba(99,102,241,0.05)] hover:shadow-[0_0_20px_rgba(99,102,241,0.15)]"
-        >
-          {refreshing ? 'SYNCHRONIZING...' : 'FETCH_LATEST'}
-        </button>
+        <div className="flex items-center gap-4">
+          {refreshing && (
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+              <span className="data-text text-[10px] text-indigo-400 uppercase tracking-widest">Live Syncing</span>
+            </div>
+          )}
+          <button 
+            onClick={doRefresh}
+            disabled={refreshing}
+            className="px-6 py-2 rounded-xl bg-indigo-500/10 backdrop-blur-xl border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-500/50 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 data-text text-[10px] uppercase tracking-[0.28em] shadow-[0_0_15px_rgba(99,102,241,0.06)] hover:shadow-[0_0_22px_rgba(99,102,241,0.18)]"
+          >
+            {refreshing ? 'SYNCHRONIZING...' : 'REFRESH_TERMINAL'}
+          </button>
+        </div>
       </header>
 
       {/* Single Page Sections */}
-      <div className="space-y-16">
-        <MarketSection title="Global Indices" items={GLOBAL_INDICES} symbol="" />
-        <MarketSection title="Commodity Desk" items={COMMODITIES} symbol="$" />
-        <MarketSection title="FX Oracle" items={FX_PAIRS} symbol="" />
-        <MarketSection title="Macro & Volatility" items={MACRO_RATES} symbol="" />
+      <div className="space-y-16 relative z-10">
+        <section className="space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+            <span className="data-text text-[10px] text-white/60 uppercase tracking-[0.35em] font-medium">World Indices</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {displayData.globalIndices.slice(0, 2).map(item => (
+              <MarketCard key={item.id} item={item} symbol={item.sym} size="lg" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+            {displayData.globalIndices.slice(2).map(item => (
+              <MarketCard key={item.id} item={item} symbol={item.sym} />
+            ))}
+          </div>
+        </section>
+
+        <MarketSection title="Resource Desk" items={displayData.commodities} symbol="$" />
+        <MarketSection title="FX Oracle" items={displayData.fxPairs} symbol="" />
+        <MarketSection title="Macro Stability" items={displayData.macroRates} symbol="" />
       </div>
 
       <style jsx global>{`

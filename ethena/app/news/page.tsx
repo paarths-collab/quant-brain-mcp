@@ -1,90 +1,158 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { socialAPI } from '@/lib/api'
 
-const NEWS = [
-  { id: 1, source: 'Reuters', time: '23:01', title: 'Fed signals potential rate cut in Q3 amid cooling inflation data', tag: 'MACRO', sentiment: 'bullish' },
-  { id: 2, source: 'Bloomberg', time: '22:47', title: 'NVIDIA surpasses $2T market cap on record data center demand', tag: 'TECH', sentiment: 'bullish' },
-  { id: 3, source: 'WSJ', time: '22:31', title: 'China consumer confidence falls for third consecutive month', tag: 'GLOBAL', sentiment: 'bearish' },
-  { id: 4, source: 'FT', time: '22:15', title: 'Oil slides on supply glut concerns, WTI below $80/barrel', tag: 'ENERGY', sentiment: 'bearish' },
-  { id: 5, source: 'CNBC', time: '21:58', title: 'Apple launches new AI features in iOS 18, analysts upgrade target', tag: 'TECH', sentiment: 'bullish' },
-  { id: 6, source: 'Reuters', time: '21:42', title: 'ECB holds rates steady, Lagarde flags Q4 easing possible', tag: 'MACRO', sentiment: 'neutral' },
-  { id: 7, source: 'Bloomberg', time: '21:20', title: 'Tesla Q1 deliveries miss estimates by 12%, stock drops after hours', tag: 'AUTO', sentiment: 'bearish' },
-  { id: 8, source: 'CNBC', time: '20:55', title: 'Microsoft Azure revenue grows 31% YoY, beating expectations', tag: 'TECH', sentiment: 'bullish' },
-  { id: 9, source: 'Reuters', time: '20:33', title: 'Gold hits all-time high above $2,300 on safe-haven demand', tag: 'COMMODITY', sentiment: 'bullish' },
-  { id: 10, source: 'FT', time: '20:10', title: 'India GDP forecast raised to 7.2% by IMF for FY2025', tag: 'INDIA', sentiment: 'bullish' },
-]
+interface NewsItem {
+  title: string
+  url: string
+  date?: string
+  source?: string
+}
 
-const TAGS = ['ALL', 'MACRO', 'TECH', 'GLOBAL', 'ENERGY', 'AUTO', 'COMMODITY', 'INDIA']
+const DEFAULT_QUERY = 'stock market news'
+const HEADLINE_LIMIT = 10
 
-const sentimentStyle = (s: string) => {
-  if (s === 'bullish') return 'text-indigo-400 border-indigo-500/25 bg-indigo-500/8'
-  if (s === 'bearish') return 'text-white/35 border-white/10 bg-white/[0.03]'
-  return 'text-white/40 border-white/8 bg-white/[0.02]'
+const sourceLabel = (source?: string) => {
+  const raw = (source || 'Live Feed').trim()
+  const collapsed = raw.replace(/\s+/g, ' ')
+  if (collapsed.length <= 18) return collapsed
+  return `${collapsed.slice(0, 18)}...`
+}
+
+const formatDate = (iso?: string) => {
+  if (!iso) return '-- ---'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '-- ---'
+  return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' }).toUpperCase()
+}
+
+const formatTime = (iso?: string) => {
+  if (!iso) return '--:--'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '--:--'
+  return d.toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export default function NewsBoxPage() {
-  const [activeTag, setActiveTag] = useState('ALL')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [news, setNews] = useState<NewsItem[]>([])
 
-  const filtered = activeTag === 'ALL' ? NEWS : NEWS.filter(n => n.tag === activeTag)
+  const loadNews = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const res: any = await socialAPI.getNews(DEFAULT_QUERY, HEADLINE_LIMIT)
+      const rows = Array.isArray(res?.articles) ? res.articles : []
+      setNews(rows.slice(0, HEADLINE_LIMIT))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load news')
+      setNews([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadNews()
+  }, [])
 
   return (
-    <div className="space-y-6 font-inter">
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-          <span className="font-dm-mono text-[11px] text-white/50 tracking-[0.2em] uppercase font-semibold">Intelligence Stream / Sentiment Analysis</span>
-        </div>
-        <p className="font-inter text-[13px] text-white/30">Aggregated real-time narrative flow across global equity and macro markets.</p>
-      </div>
+    <div className="space-y-5 font-inter">
+      <div className="rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(10,10,10,0.9),rgba(5,5,5,0.86))] px-4 md:px-5 py-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.75)]" />
+              <span className="font-dm-mono text-[10px] md:text-[11px] text-white/55 tracking-[0.2em] uppercase font-semibold">
+                Intelligence Stream / Top Headlines
+              </span>
+            </div>
+            <p className="font-inter text-[12px] md:text-[13px] text-white/38 leading-relaxed">
+              Live scrape feed with the latest 10 market-moving headlines.
+            </p>
+          </div>
 
-      {/* Tag filters */}
-      <div className="flex flex-wrap gap-2">
-        {TAGS.map(tag => (
           <button
-            key={tag}
-            onClick={() => setActiveTag(tag)}
-            className={`font-dm-mono text-[10px] px-3 py-1.5 rounded-lg border tracking-widest transition-all ${
-              activeTag === tag
-                ? 'border-indigo-500/35 bg-indigo-500/12 text-white'
-                : 'border-white/[0.06] bg-transparent text-white/25 hover:text-white/50 hover:border-white/[0.12]'
-            }`}
+            type="button"
+            onClick={loadNews}
+            disabled={isLoading}
+            className="shrink-0 font-dm-mono text-[10px] px-3 py-1.5 rounded-lg border tracking-[0.16em] transition-all border-blue-500/35 bg-blue-500/12 text-blue-200 hover:bg-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {tag}
+            {isLoading ? 'LOADING...' : 'REFRESH'}
           </button>
-        ))}
+        </div>
+
+        <div className="mt-3 flex items-center gap-2 text-[10px] font-dm-mono uppercase tracking-[0.16em] text-white/35">
+          <span className="px-2 py-1 rounded border border-white/12 bg-white/[0.03]">10 Headline Limit</span>
+          <span className="px-2 py-1 rounded border border-white/12 bg-white/[0.03]">Live Sources</span>
+        </div>
       </div>
 
-      {/* News feed */}
-      <div className="space-y-2">
-        {filtered.map(n => (
-          <a
-            key={n.id}
-            href={`https://news.example.com/article/${n.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
-          >
-            <div
-              className="flex items-start gap-4 px-5 py-4 rounded-xl border border-white/20 bg-white/5 hover:bg-white/[0.08] hover:border-white/40 transition-all cursor-pointer group"
+      <div className="space-y-2.5">
+        {isLoading && (
+          <div className="px-5 py-10 rounded-xl border border-white/12 bg-white/[0.03] text-center font-dm-mono text-[11px] text-white/45 uppercase tracking-[0.18em]">
+            Fetching live headlines...
+          </div>
+        )}
+
+        {error && !isLoading && (
+          <div className="px-5 py-4 rounded-xl border border-rose-400/20 bg-rose-400/10 text-rose-100 text-sm">
+            {error}
+          </div>
+        )}
+
+        {!isLoading && !error && news.length === 0 && (
+          <div className="px-5 py-10 rounded-xl border border-white/12 bg-white/[0.03] text-center font-dm-mono text-[11px] text-white/35 uppercase tracking-[0.16em]">
+            No headlines available right now.
+          </div>
+        )}
+
+        {!isLoading && !error &&
+          news.slice(0, HEADLINE_LIMIT).map((item, idx) => (
+            <a
+              key={`${item.url || item.title || 'news'}-${idx}`}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative overflow-hidden rounded-xl border border-white/15 bg-[linear-gradient(125deg,rgba(9,9,9,0.92),rgba(4,4,4,0.88))] px-4 md:px-5 py-4 hover:border-blue-400/35 transition-all"
             >
-              <div className="shrink-0 pt-0.5 text-right w-[52px]">
-                <div className="font-dm-mono text-[10px] text-white/30 tabular-nums uppercase">{n.time}</div>
-                <div className="font-dm-mono text-[9px] text-white/25 mt-0.5 uppercase tracking-wider">{n.source}</div>
-              </div>
-              <div className="w-px h-10 bg-white/20 shrink-0 self-center" />
-              <div className="flex-1 min-w-0">
-                <p className="font-inter text-[14px] text-white/75 leading-snug group-hover:text-white/90 transition-colors">{n.title}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className={`font-dm-mono text-[9px] px-2 py-0.5 rounded border tracking-wider ${sentimentStyle(n.sentiment)}`}>
-                    {n.sentiment.toUpperCase()}
-                  </span>
-                  <span className="font-dm-mono text-[9px] text-white/20 tracking-widest">{n.tag}</span>
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-blue-400/0 via-blue-400/45 to-cyan-300/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-[68px] text-right pt-0.5">
+                  <div className="font-dm-mono text-[10px] text-white/35 tabular-nums uppercase tracking-wider">
+                    {formatTime(item.date)}
+                  </div>
+                  <div className="font-dm-mono text-[9px] text-white/25 mt-0.5 uppercase tracking-wider">
+                    {formatDate(item.date)}
+                  </div>
+                </div>
+
+                <div className="w-px h-12 bg-white/12 shrink-0 self-center" />
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="font-dm-mono text-[9px] uppercase tracking-[0.14em] text-blue-200/85 px-2 py-0.5 rounded border border-blue-300/25 bg-blue-300/10">
+                      {sourceLabel(item.source)}
+                    </span>
+                    <span className="font-dm-mono text-[9px] uppercase tracking-[0.14em] text-white/28">
+                      #{String(idx + 1).padStart(2, '0')}
+                    </span>
+                  </div>
+
+                  <p className="font-inter text-[14px] md:text-[15px] text-white/78 leading-snug group-hover:text-white transition-colors">
+                    {item.title || 'Untitled headline'}
+                  </p>
                 </div>
               </div>
-            </div>
-          </a>
-        ))}
+            </a>
+          ))}
       </div>
     </div>
   )

@@ -1,0 +1,147 @@
+{
+  "RELIANCE.NS": {
+    "peers": ["ONGC.NS", "IOC.NS", "BPCL.NS", "HINDPETRO.NS", "GAIL.NS", "NTPC.NS", "POWERGRID.NS", "TATAPOWER.NS"],
+    "sector": "Energy",
+    "category": "Oil & Gas / Power"
+  },
+  "TCS.NS": {
+    "peers": ["INFY.NS", "WIPRO.NS", "HCLTECH.NS", "TECHM.NS", "LTIM.NS", "MPHASIS.NS", "PERSISTENT.NS", "MINDTREE.NS"],
+    "sector": "IT Services",
+    "category": "Information Technology"
+  },
+  "HDFCBANK.NS": {
+    "peers": ["ICICIBANK.NS", "AXISBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "SBIN.NS", "FEDERALBNK.NS", "SCBLBANK.NS", "AUBANK.NS"],
+    "sector": "Financials",
+    "category": "Banking"
+  },
+  "INFY.NS": {
+    "peers": ["TCS.NS", "WIPRO.NS", "HCLTECH.NS", "TECHM.NS", "LTIM.NS", "MPHASIS.NS", "PERSISTENT.NS", "MINDTREE.NS"],
+    "sector": "IT Services",
+    "category": "Information Technology"
+  },
+  "ICICIBANK.NS": {
+    "peers": ["HDFCBANK.NS", "AXISBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "SBIN.NS", "FEDERALBNK.NS", "SCBLBANK.NS", "AUBANK.NS"],
+    "sector": "Financials",
+    "category": "Banking"
+  },
+  "HINDUNILVR.NS": {
+    "peers": ["ITC.NS", "BRITANNIA.NS", "NESTLEIND.NS", "GODREJIND.NS", "WILLPRDT.NS", "MARICO.NS", "EMAMILTD.NS", "BAJAJFINSV.NS"],
+    "sector": "Consumer Staples",
+    "category": "FMCG"
+  },
+  "ITC.NS": {
+    "peers": ["HINDUNILVR.NS", "BRITANNIA.NS", "NESTLEIND.NS", "GODREJIND.NS", "WILLPRDT.NS", "MARICO.NS", "EMAMILTD.NS", "JUBLPHARMA.NS"],
+    "sector": "Diversified",
+    "category": "FMCG & Others"
+  },
+  "SBIN.NS": {
+    "peers": ["HDFCBANK.NS", "ICICIBANK.NS", "AXISBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "FEDERALBNK.NS", "SCBLBANK.NS", "AUBANK.NS"],
+    "sector": "Financials",
+    "category": "Banking"
+  },
+  "LT.NS": {
+    "peers": ["JSWSTEEL.NS", "TATASTEEL.NS", "HINDALCO.NS", "GRASIM.NS", "APOLLOHOSP.NS", "TECHM.NS", "EICHERMOT.NS", "M&M.NS"],
+    "sector": "Industrials",
+    "category": "Engineering / Capital Goods"
+  },
+  "KOTAKBANK.NS": {
+    "peers": ["HDFCBANK.NS", "ICICIBANK.NS", "AXISBANK.NS", "INDUSINDBK.NS", "SBIN.NS", "FEDERALBNK.NS", "SCBLBANK.NS", "AUBANK.NS"],
+    "sector": "Financials",
+    "category": "Banking"
+  },
+  "HCLTECH.NS": {
+    "peers": ["TCS.NS", "INFY.NS", "WIPRO.NS", "TECHM.NS", "LTIM.NS", "MPHASIS.NS", "PERSISTENT.NS", "MINDTREE.NS"],
+    "sector": "IT Services",
+    "category": "Information Technology"
+  },
+  "AXISBANK.NS": {
+    "peers": ["HDFCBANK.NS", "ICICIBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "SBIN.NS", "FEDERALBNK.NS", "SCBLBANK.NS", "AUBANK.NS"],
+    "sector": "Financials",
+    "category": "Banking"
+  },
+  "ASIANPAINT.NS": {
+    "peers": ["SAMSTROY.NS", "TIMKEN.NS", "GRASIM.NS", "HINDALCO.NS", "JSWSTEEL.NS", "TATASTEEL.NS", "UNIPHARMA.NS", "NESTLEIND.NS"],
+    "sector": "Materials",
+    "category": "Paints & Coatings"
+  },
+  "MARUTI.NS": {
+    "peers": ["M&M.NS", "TATAMOTORS.NS", "EICHERMOT.NS", "APOLLOHOSP.NS", "SBIN.NS", "LTIM.NS", "JSWSTEEL.NS", "BHARTIARTL.NS"],
+    "sector": "Automobiles",
+    "category": "Auto & Auto Components"
+  },
+  "BAJFINANCE.NS": {
+    "peers": ["HDFCBANK.NS", "ICICIBANK.NS", "AXISBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "SBIN.NS", "AUBANK.NS", "FEDERALBNK.NS"],
+    "sector": "Financials",
+    "category": "Financial Services"
+  },
+  "BHARTIARTL.NS": {
+    "peers": ["JIOTOWERSINV.NS", "ADANIPORTS.NS", "ADANIENT.NS", "RELIANCE.NS", "HINDUNILVR.NS", "ITC.NS", "SBIN.NS", "APOLLOHOSP.NS"],
+    "sector": "Telecom",
+    "category": "Telecommunications"
+  },
+  "SUNPHARMA.NS": {
+    "peers": ["DRREDDY.NS", "CIPLA.NS", "DIVISLAB.NS", "JUBLPHARMA.NS", "LUPIN.NS", "APOLLOHOSP.NS", "NESTLEIND.NS", "BRITANNIA.NS"],
+    "sector": "Healthcare",
+    "category": "Pharmaceuticals"
+  },
+  "ULTRACEMCO.NS": {
+    "peers": ["TATASTEEL.NS", "JSWSTEEL.NS", "HINDALCO.NS", "GRASIM.NS", "Coalition.NS", "ASIANPAINT.NS", "MARUTI.NS", "LT.NS"],
+    "sector": "Materials",
+    "category": "Cement"
+  },
+  "TITAN.NS": {
+    "peers": ["BRITANNIA.NS", "NESTLEIND.NS", "HINDUNILVR.NS", "ITC.NS", "ASIANPAINT.NS", "MARUTI.NS", "M&M.NS", "BAJAJFINSV.NS"],
+    "sector": "Consumer Discretionary",
+    "category": "Watches & Jewellery"
+  },
+  "NTPC.NS": {
+    "peers": ["POWERGRID.NS", "RELIANCE.NS", "ONGC.NS", "IOC.NS", "TATAPOWER.NS", "GAIL.NS", "ADANIPOWER.NS", "JINDALSTEL.NS"],
+    "sector": "Energy",
+    "category": "Power Generation"
+  },
+  "POWERGRID.NS": {
+    "peers": ["NTPC.NS", "RELIANCE.NS", "ONGC.NS", "TATAPOWER.NS", "ADANIPORTS.NS", "ADANIENT.NS", "GAIL.NS", "IOC.NS"],
+    "sector": "Energy",
+    "category": "Power Distribution"
+  },
+  "ONGC.NS": {
+    "peers": ["RELIANCE.NS", "IOC.NS", "BPCL.NS", "HINDPETRO.NS", "GAIL.NS", "NTPC.NS", "POWERGRID.NS", "TATAPOWER.NS"],
+    "sector": "Energy",
+    "category": "Oil & Gas"
+  },
+  "TATAMOTORS.NS": {
+    "peers": ["M&M.NS", "MARUTI.NS", "EICHERMOT.NS", "APOLLOHOSP.NS", "SBIN.NS", "LTIM.NS", "JSWSTEEL.NS", "HINDALCO.NS"],
+    "sector": "Automobiles",
+    "category": "Auto & Auto Components"
+  },
+  "ADANIPORTS.NS": {
+    "peers": ["ADANIENT.NS", "RELIANCE.NS", "BHARTIARTL.NS", "POWERGRID.NS", "NTPC.NS", "JSWSTEEL.NS", "APITECH.NS", "GRASIM.NS"],
+    "sector": "Industrials",
+    "category": "Ports & Infrastructure"
+  },
+  "ADANIENT.NS": {
+    "peers": ["ADANIPORTS.NS", "RELIANCE.NS", "BHARTIARTL.NS", "POWERGRID.NS", "JSWSTEEL.NS", "GRASIM.NS", "HCLTECH.NS", "TATASTEEL.NS"],
+    "sector": "Diversified",
+    "category": "Infrastructure"
+  },
+  "BAJAJFINSV.NS": {
+    "peers": ["HDFCBANK.NS", "ICICIBANK.NS", "AXISBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "SBIN.NS", "AUBANK.NS", "FEDERALBNK.NS"],
+    "sector": "Financials",
+    "category": "Financial Services"
+  },
+  "WIPRO.NS": {
+    "peers": ["TCS.NS", "INFY.NS", "HCLTECH.NS", "TECHM.NS", "LTIM.NS", "MPHASIS.NS", "PERSISTENT.NS", "MINDTREE.NS"],
+    "sector": "IT Services",
+    "category": "Information Technology"
+  },
+  "GRASIM.NS": {
+    "peers": ["HINDALCO.NS", "TATASTEEL.NS", "JSWSTEEL.NS", "COALINDIA.NS", "ASIANPAINT.NS", "ULTRACEMCO.NS", "M&M.NS", "MARUTI.NS"],
+    "sector": "Materials",
+    "category": "Diversified"
+  },
+  "DRREDDY.NS": {
+    "peers": ["SUNPHARMA.NS", "CIPLA.NS", "DIVISLAB.NS", "JUBLPHARMA.NS", "LUPIN.NS", "APOLLOHOSP.NS", "NESTLEIND.NS", "BRITANNIA.NS"],
+    "sector": "Healthcare",
+    "category": "Pharmaceuticals"
+  }
+}
