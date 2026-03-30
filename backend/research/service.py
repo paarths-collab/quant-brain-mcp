@@ -4,8 +4,8 @@ from typing import Dict, Any
 from langchain_core.messages import HumanMessage
 from .core.fundamentals_service import get_fundamentals_summary
 from .core.market_data_service import fetch_candles
-from backend.finverse_integration.agents.stock_agent import StockSelectionAgent
-from backend.finverse_integration.utils.llm_manager import LLMManager
+from .core.stock_agent import StockSelectionAgent
+from .core.llm_manager import LLMManager
 
 # Initialize Finverse Components
 # We initialize them globally to reuse clients/connections
@@ -110,3 +110,4 @@ def generate_research_report(symbol: str) -> Dict[str, Any]:
              "research_source": research_source
         }
     }
+
