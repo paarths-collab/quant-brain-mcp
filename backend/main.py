@@ -1,4 +1,5 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import json
@@ -29,6 +30,20 @@ from backend.chat.core.pipeline import InvestmentPipeline
 warnings.filterwarnings("ignore", category=FutureWarning, module=r"yfinance\..*")
 
 app = FastAPI(title="Agentic Investment OS")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    logging.error(f"Global Error Hook caught: {str(exc)}\n{traceback.format_exc()}")
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "error",
+            "message": str(exc)
+        }
+    )
+
+
 
 # CORS Configuration
 default_origins = [

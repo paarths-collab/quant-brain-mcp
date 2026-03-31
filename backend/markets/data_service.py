@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
 from .core.data_loader import get_history
 from .core.fred_data_service import FredDataService
+from backend.core.safe_yfinance import safe_fetch_history, safe_fetch_info
 
 def fetch_candles(
     symbol: str,
@@ -218,24 +219,24 @@ def get_market_overview() -> Dict[str, Any]:
     except Exception as e:
         print(f"FRED fetch failed: {e}")
 
-    # 2. Add yfinance indices explicitly (Nifty, Sensex, Gold)
+    # 2. Add yfinance indices explicitly (Nifty, Sensex, Gold) — using safe wrapper
     for symbol, name in yf_map.items():
+        res = safe_fetch_history(symbol, period="5d")
+        if res["status"] != "ok":
+            continue
         try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="5d")
-            if not hist.empty:
-                current = float(hist['Close'].iloc[-1])
-                previous = float(hist['Close'].iloc[-2]) if len(hist) > 1 else current
-                change_pct = ((current - previous) / previous * 100) if previous else 0
-                
-                overview[symbol] = {
-                    "name": name,
-                    "price": current,
-                    "change_pct": float(change_pct),
-                    "volume": int(hist['Volume'].iloc[-1]) if 'Volume' in hist else 0,
-                    "source": "yfinance",
-                    "date": hist.index[-1].date().isoformat() if len(hist.index) else None,
-                }
+            hist = res["data"]
+            current = float(hist['Close'].iloc[-1])
+            previous = float(hist['Close'].iloc[-2]) if len(hist) > 1 else current
+            change_pct = ((current - previous) / previous * 100) if previous else 0
+            overview[symbol] = {
+                "name": name,
+                "price": current,
+                "change_pct": float(change_pct),
+                "volume": int(hist['Volume'].iloc[-1]) if 'Volume' in hist else 0,
+                "source": "yfinance",
+                "date": hist.index[-1].date().isoformat() if len(hist.index) else None,
+            }
         except Exception:
             continue
 
@@ -245,10 +246,18 @@ def get_market_overview() -> Dict[str, Any]:
 def get_current_price(ticker: str) -> float:
     try:
         if not ticker: return 0.0
-        # Simple normalization for common cases if needed, but relying on yf for now
         ticker = ticker.upper().strip()
-        stock = yf.Ticker(ticker)
-        price = stock.info.get('currentPrice') or stock.info.get('regularMarketPrice') or stock.info.get('previousClose')
+        res = safe_fetch_info(ticker)
+        if res["status"] != "ok":
+            # Fallback: try history close price
+            hist_res = safe_fetch_history(ticker, period="5d")
+            if hist_res["status"] == "ok":
+                closes = hist_res["data"]["Close"].dropna()
+                if not closes.empty:
+                    return float(closes.iloc[-1])
+            return 0.0
+        info = res["data"]
+        price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose')
         return float(price) if price else 0.0
     except Exception:
         return 0.0
@@ -370,7 +379,12 @@ class MarketDataService:
         return ticker
 
     def get_history(self, ticker):
-        return yf.Ticker(ticker).history(period="6mo")
+        res = safe_fetch_history(ticker, period="6mo")
+        if res["status"] == "ok":
+            return res["data"]
+        import pandas as pd
+        return pd.DataFrame()
 
     def get_fundamentals(self, ticker):
-        return yf.Ticker(ticker).info
+        res = safe_fetch_info(ticker)
+        return res.get("data", {})
