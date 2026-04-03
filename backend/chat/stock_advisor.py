@@ -4,7 +4,7 @@ Uses LangGraph for the 3-agent POV workflow.
 
 Routes:
   POST /api/stock-advisor/recommend  — profile-driven stock recommendation
-  POST /api/stock-advisor/multi-pov  — 3 agents (Gemini/Groq/DeepSeek) analyze a stock
+    POST /api/stock-advisor/multi-pov  — 3 agents (Groq/Groq/Groq) analyze a stock
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from backend.database.connection import get_db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/stock-advisor", tags=["Stock Advisor"])
+router = APIRouter(prefix="/stock-advisor", tags=["Stock Advisor"])
 
 
 # ---------------------------------------------------------------------------
@@ -94,36 +94,6 @@ def _call_groq(prompt: str) -> str:
     except Exception as e:
         logger.warning(f"Groq call failed: {e}")
         return f"[Groq error: {e}]"
-
-
-def _call_qwen(prompt: str) -> str:
-    """Call Qwen via OpenRouter (replaces DeepSeek)."""
-    try:
-        import httpx
-        api_key = os.getenv("OPENROUTER_API_KEY")
-        if not api_key:
-            return "[Qwen unavailable — no OpenRouter key]"
-        model = "qwen/qwen3-vl-235b-a22b-thinking"
-        resp = httpx.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 2048,
-            },
-            timeout=120,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
-    except Exception as e:
-        logger.warning(f"Qwen/OpenRouter call failed: {e}")
-        return f"[Qwen error: {e}]"
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +192,7 @@ def _parse_pov_response(raw: str, agent_name: str, provider: str) -> AgentPov:
 def _run_multi_pov_langgraph(symbol: str, market: str, context: str = "") -> Dict[str, Any]:
     """
     Run a LangGraph-style stateful workflow:
-      Node 1 (Bull / Gemini) → Node 2 (Bear / Groq) → Node 3 (Neutral / DeepSeek)
+    Node 1 (Bull / Groq) → Node 2 (Bear / Groq) → Node 3 (Neutral / Groq)
     Each node runs in sequence, adding its result to the shared state.
     """
     try:
@@ -239,8 +209,8 @@ def _run_multi_pov_langgraph(symbol: str, market: str, context: str = "") -> Dic
 
         def bull_node(state: PovState) -> PovState:
             prompt = _build_pov_prompt(state["symbol"], state["market"], "bull", state["context"])
-            raw = _call_gemini(prompt)
-            pov = _parse_pov_response(raw, "Bull Analyst", "Gemini")
+            raw = _call_groq(prompt)
+            pov = _parse_pov_response(raw, "Bull Analyst", "Groq")
             state["bull"] = pov.model_dump()
             return state
 
@@ -253,8 +223,8 @@ def _run_multi_pov_langgraph(symbol: str, market: str, context: str = "") -> Dic
 
         def neutral_node(state: PovState) -> PovState:
             prompt = _build_pov_prompt(state["symbol"], state["market"], "neutral", state["context"])
-            raw = _call_qwen(prompt)
-            pov = _parse_pov_response(raw, "Neutral Analyst", "Qwen")
+            raw = _call_groq(prompt)
+            pov = _parse_pov_response(raw, "Neutral Analyst", "Groq")
             state["neutral"] = pov.model_dump()
             return state
 
@@ -286,15 +256,15 @@ def _run_multi_pov_langgraph(symbol: str, market: str, context: str = "") -> Dic
         bear_prompt = _build_pov_prompt(symbol, market, "bear", context)
         neutral_prompt = _build_pov_prompt(symbol, market, "neutral", context)
 
-        bull_raw = _call_gemini(bull_prompt)
+        bull_raw = _call_groq(bull_prompt)
         bear_raw = _call_groq(bear_prompt)
-        neutral_raw = _call_qwen(neutral_prompt)
+        neutral_raw = _call_groq(neutral_prompt)
 
         return {
             "symbol": symbol,
-            "bull": _parse_pov_response(bull_raw, "Bull Analyst", "Gemini").model_dump(),
+            "bull": _parse_pov_response(bull_raw, "Bull Analyst", "Groq").model_dump(),
             "bear": _parse_pov_response(bear_raw, "Bear Analyst", "Groq").model_dump(),
-            "neutral": _parse_pov_response(neutral_raw, "Neutral Analyst", "Qwen").model_dump(),
+            "neutral": _parse_pov_response(neutral_raw, "Neutral Analyst", "Groq").model_dump(),
         }
 
 
