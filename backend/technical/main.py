@@ -8,14 +8,15 @@ from fastapi import APIRouter, HTTPException, Query
 from .fundamentals_service import get_fundamentals_summary
 from .peer_service import fetch_peer_comparison
 from .peers_legacy_service import fetch_stock_peers
-# Localized services (Redundant Isolation)
-from .core.data_loader import get_data
+
+# Unified services
+from backend.services.market_data import market_service
 from .core.strategy_service import get_strategy, get_available_strategies
 from .core.json_utils import make_json_safe
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Technical & Fundamentals"])
+router = APIRouter(prefix="", tags=["Technical & Fundamentals"])
 
 # --- Technical Analysis (Legacy /api/technical) ---
 
@@ -49,7 +50,7 @@ async def analyze_strategy(
         start_date_str = start_date.strftime('%Y-%m-%d') if isinstance(start_date, pd.Timestamp) else str(start_date)
         end_date_str = end_date.strftime('%Y-%m-%d')
             
-        df = get_data(symbol, start=start_date_str, end=end_date_str, market=market)
+        df = market_service.fetch_ohlcv(symbol, interval=interval, period=period, market=market)
         if df.empty: raise HTTPException(status_code=404, detail="No data")
             
         strategy_params = json.loads(params) if params else {}

@@ -1,20 +1,22 @@
 """
 Isolated fundamentals_service for research/core.
-Self-contained fundamental data fetching using yfinance.
+Self-contained fundamental data fetching using unified MarketDataService.
 """
-import yfinance as yf
 from typing import Dict, Any, Optional
-
+from backend.services.market_data import market_service
 
 def get_fundamentals_summary(ticker: str) -> Dict[str, Any]:
     """
-    Fetch comprehensive fundamental data for a ticker.
+    Fetch comprehensive fundamental data for a ticker using unified market_service.
     Returns a structured dict ready for research reports.
     """
     try:
         ticker = ticker.strip().upper()
-        stock = yf.Ticker(ticker)
-        info = stock.info or {}
+        # MarketDataService handles normalization and safety
+        info = market_service.get_fundamentals(ticker)
+        
+        if not info:
+             return {"ticker": ticker, "error": "No fundamental data found.", "status": "error"}
 
         # Valuation
         pe = info.get("forwardPE") or info.get("trailingPE")

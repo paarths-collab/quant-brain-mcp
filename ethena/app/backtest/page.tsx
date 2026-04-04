@@ -628,7 +628,8 @@ export default function BacktestPage() {
           return { name: def?.name || r.strategy, totalReturn: r.return, sharpe: stratResults[r.strategy]?.metrics?.sharpeRatio ?? '—' }
         })
         setResults({ isMulti: true, strategies, combinedChartData: multiData.combinedChartData || [], ranking })
-        setDetailStrategy(strategies[0]?.id ?? selectedStrategies[0])
+        const firstWithMonteCarlo = strategies.find((s: any) => s?.monteCarlo?.simulationPaths?.length)
+        setDetailStrategy(firstWithMonteCarlo?.id ?? strategies[0]?.id ?? selectedStrategies[0])
       } else {
         const singleData = data as BacktestSingleResponse
         const equityCurve = (singleData.equity_curve || []).map((p: any, i: number) => ({

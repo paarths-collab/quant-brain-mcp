@@ -1,19 +1,21 @@
 """
 Isolated research_service for chat/core.
-Provides research report generation using available AI services.
+Refactored to use unified MarketDataService.
+Ensures 100% architectural consistency and resolves direct yfinance usage.
 """
-import os
-from typing import Dict, Any, Optional
-
+from typing import Dict, Any
+from backend.services.market_data import market_service
 
 def generate_research_report(ticker: str, market: str = "us") -> Dict[str, Any]:
     """
-    Generate a structured research report for a given ticker.
+    [DELEGATED] Generate a structured research report using unified MarketDataService.
     """
     try:
-        import yfinance as yf
-        stock = yf.Ticker(ticker.upper())
-        info = stock.info or {}
+        # MarketDataService handles normalization and safety
+        info = market_service.get_fundamentals(ticker)
+        
+        if not info:
+             return {"ticker": ticker.upper(), "error": "No data found", "status": "error"}
 
         name = info.get("longName") or info.get("shortName") or ticker
         sector = info.get("sector", "N/A")
@@ -41,7 +43,6 @@ def generate_research_report(ticker: str, market: str = "us") -> Dict[str, Any]:
     except Exception as e:
         print(f"[research_service] generate_research_report({ticker}) failed: {e}")
         return {"ticker": ticker, "error": str(e), "status": "error"}
-
 
 def get_fundamentals_summary(ticker: str) -> Dict[str, Any]:
     """Return key fundamental metrics for a ticker."""

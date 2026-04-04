@@ -188,8 +188,22 @@ const detectBacktestQuery = (query: string): { isBacktest: boolean; ticker: stri
 }
 
 const formatBacktestContent = (data: Record<string, unknown>, ticker: string, strategies: string[]) => {
-  const stratDetails = data.strategies as Record<string, any> || {}
-  const stratEntries = Object.entries(stratDetails).slice(0, 3)
+  type BacktestEntry = {
+    metrics?: Record<string, unknown>
+  }
+
+  const strategyMap = (data.strategies && typeof data.strategies === 'object')
+    ? (data.strategies as Record<string, BacktestEntry>)
+    : null
+
+  const singleStrategyName = typeof data.strategy === 'string' ? data.strategy : null
+  const singleMetrics = (data.metrics && typeof data.metrics === 'object')
+    ? (data.metrics as Record<string, unknown>)
+    : null
+
+  const stratEntries: Array<[string, BacktestEntry]> = strategyMap
+    ? Object.entries(strategyMap).slice(0, 3)
+    : (singleStrategyName && singleMetrics ? [[singleStrategyName, { metrics: singleMetrics }]] : [])
 
   const lines = [
     `## Backtest Results`,
@@ -213,6 +227,10 @@ const formatBacktestContent = (data: Record<string, unknown>, ticker: string, st
       `- **Trades:** ${trades}`,
       ''
     )
+  }
+
+  if (!stratEntries.length) {
+    lines.push('No strategy metrics were returned for this backtest request.', '')
   }
 
   lines.push('*View full results on the Backtest page.*')

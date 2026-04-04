@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import requests
 import yfinance as yf
+from backend.services.market_data import market_service
 from typing import Dict, Any, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -29,56 +30,18 @@ INDIA_PEER_OVERRIDES: Dict[str, List[str]] = {
 }
 
 INDIA_FALLBACK_UNIVERSE: List[str] = [
-    "RELIANCE.NS",
-    "TCS.NS",
-    "HDFCBANK.NS",
-    "INFY.NS",
-    "ICICIBANK.NS",
-    "HINDUNILVR.NS",
-    "ITC.NS",
-    "SBIN.NS",
-    "LT.NS",
-    "KOTAKBANK.NS",
-    "HCLTECH.NS",
-    "AXISBANK.NS",
-    "ASIANPAINT.NS",
-    "MARUTI.NS",
-    "BAJFINANCE.NS",
-    "BHARTIARTL.NS",
-    "SUNPHARMA.NS",
-    "ULTRACEMCO.NS",
-    "TITAN.NS",
-    "NTPC.NS",
-    "POWERGRID.NS",
-    "ONGC.NS",
-    "TATAMOTORS.NS",
-    "ADANIPORTS.NS",
-    "ADANIENT.NS",
-    "BAJAJFINSV.NS",
-    "BAJAJ-AUTO.NS",
-    "BRITANNIA.NS",
-    "CIPLA.NS",
-    "COALINDIA.NS",
-    "DIVISLAB.NS",
-    "DRREDDY.NS",
-    "EICHERMOT.NS",
-    "GRASIM.NS",
-    "HEROMOTOCO.NS",
-    "HINDALCO.NS",
-    "INDUSINDBK.NS",
-    "JSWSTEEL.NS",
-    "M&M.NS",
-    "NESTLEIND.NS",
-    "SBILIFE.NS",
-    "SHRIRAMFIN.NS",
-    "TECHM.NS",
-    "TATASTEEL.NS",
-    "WIPRO.NS",
-    "BPCL.NS",
-    "HDFCLIFE.NS",
-    "APOLLOHOSP.NS",
-    "TRENT.NS",
-    "LTIM.NS",
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
+    "HINDUNILVR.NS", "ITC.NS", "SBIN.NS", "LT.NS", "KOTAKBANK.NS",
+    "HCLTECH.NS", "AXISBANK.NS", "ASIANPAINT.NS", "MARUTI.NS",
+    "BAJFINANCE.NS", "BHARTIARTL.NS", "SUNPHARMA.NS", "ULTRACEMCO.NS",
+    "TITAN.NS", "NTPC.NS", "POWERGRID.NS", "ONGC.NS", "TATAMOTORS.NS",
+    "ADANIPORTS.NS", "ADANIENT.NS", "BAJAJFINSV.NS", "BAJAJ-AUTO.NS",
+    "BRITANNIA.NS", "CIPLA.NS", "COALINDIA.NS", "DIVISLAB.NS",
+    "DRREDDY.NS", "EICHERMOT.NS", "GRASIM.NS", "HEROMOTOCO.NS",
+    "HINDALCO.NS", "INDUSINDBK.NS", "JSWSTEEL.NS", "M&M.NS",
+    "NESTLEIND.NS", "SBILIFE.NS", "SHRIRAMFIN.NS", "TECHM.NS",
+    "TATASTEEL.NS", "WIPRO.NS", "BPCL.NS", "HDFCLIFE.NS",
+    "APOLLOHOSP.NS", "TRENT.NS", "LTIM.NS", "LTIM.NS",
 ]
 
 
@@ -109,7 +72,6 @@ def _load_india_peers_from_json(symbol: str, limit: int) -> List[str]:
     except Exception as e:
         print(f"Failed to load India peers from JSON: {e}")
     return []
-
 
 
 def _safe_float(value: Any) -> Optional[float]:
@@ -189,19 +151,23 @@ def _fmp_profile(symbol: str) -> Dict[str, Any]:
 
 
 def _fmp_screener_peers(symbol: str, limit: int = 8) -> List[str]:
+    """[DELEGATED] Fetches screener peers with metadata from unified MarketDataService."""
     profile = _fmp_profile(symbol)
     sector = profile.get("sector")
     industry = profile.get("industry")
     exchange = profile.get("exchangeShortName") or profile.get("exchange")
+    
     if not sector and not industry:
         try:
-            info = yf.Ticker(symbol).info or {}
+            # Delegate to unified service layer
+            info = market_service.get_fundamentals(symbol)
             sector = info.get("sector")
             industry = info.get("industry")
             exchange = exchange or info.get("exchange")
         except Exception:
             sector = sector or None
             industry = industry or None
+            
     params: Dict[str, Any] = {"limit": limit, "apikey": FMP_API_KEY}
     if industry:
         params["industry"] = str(industry)
@@ -210,16 +176,15 @@ def _fmp_screener_peers(symbol: str, limit: int = 8) -> List[str]:
     if exchange:
         exchange_str = str(exchange).upper()
         exchange_str = {
-            "NMS": "NASDAQ",
-            "NAS": "NASDAQ",
-            "NGM": "NASDAQ",
-            "NCM": "NASDAQ",
-            "NYQ": "NYSE",
+            "NMS": "NASDAQ", "NAS": "NASDAQ", "NGM": "NASDAQ", 
+            "NCM": "NASDAQ", "NYQ": "NYSE",
         }.get(exchange_str, exchange_str)
         if exchange_str in {"NASDAQ", "NYSE", "AMEX", "BATS", "OTC", "OTCQX", "OTCQB"}:
             params["exchange"] = exchange_str
+            
     if "exchange" not in params and _is_india_symbol(symbol):
         params["exchange"] = "NSE" if symbol.upper().endswith(".NS") else "BSE"
+        
     data = None
     for base_url in (
         "https://financialmodelingprep.com/stable/company-screener",
@@ -228,8 +193,10 @@ def _fmp_screener_peers(symbol: str, limit: int = 8) -> List[str]:
         data = _fetch_json_params(base_url, params)
         if _is_valid_list(data):
             break
+            
     if not _is_valid_list(data):
         data = []
+        
     peers: List[str] = []
     for item in data:
         sym = item.get("symbol")
@@ -254,60 +221,49 @@ def _extract_quarter_values(ticker: yf.Ticker, label: str) -> Tuple[Optional[flo
 
 
 def _yf_basic_metrics(symbol: str, name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    [DELEGATED] Fetches basic metrics using unified MarketDataService.
+    Ensures 100% architectural consistency and resolves direct yfinance usage.
+    """
     try:
-        ticker = yf.Ticker(symbol)
-        info = {}
-        fast = {}
-        try:
-            info = ticker.info or {}
-        except Exception:
-            info = {}
-        try:
-            fast = ticker.fast_info or {}
-        except Exception:
-            fast = {}
-
-        price = _safe_float(fast.get("last_price") or fast.get("lastPrice") or info.get("currentPrice"))
-        if price is None:
-            try:
-                hist = ticker.history(period="5d")
-                if not hist.empty:
-                    price = _safe_float(hist["Close"].iloc[-1])
-            except Exception:
-                price = None
-
-        market_cap = _safe_float(fast.get("market_cap") or info.get("marketCap"))
-        pe = _safe_float(info.get("trailingPE"))
-        div_yield = _safe_float(info.get("dividendYield"))
+        # MarketDataService handles normalization and safety
+        info = market_service.get_fundamentals(symbol)
+        if not info:
+             return None
+             
+        price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose')
+        market_cap = info.get("marketCap")
+        pe = info.get("trailingPE")
+        div_yield = info.get("dividendYield")
         if div_yield is not None:
             div_yield = div_yield * 100
 
-        roce = _safe_float(info.get("returnOnCapitalEmployed"))
+        roce = info.get("returnOnCapitalEmployed")
         if roce is not None and roce <= 1:
             roce = roce * 100
 
         return {
             "symbol": symbol,
             "name": name or info.get("longName") or info.get("shortName") or symbol,
-            "price": price,
-            "pe": pe,
+            "price": round(float(price), 2) if price else None,
+            "pe": round(float(pe), 2) if pe else None,
             "market_cap": market_cap,
-            "div_yield": div_yield,
-            "roce": roce,
+            "div_yield": round(float(div_yield), 2) if div_yield else None,
+            "roce": round(float(roce), 2) if roce else None,
         }
     except Exception:
         return None
 
 
 def _yf_quarterly_metrics(symbol: str, name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    [DELEGATED] Fetches quarterly metrics using yfinance via temporary ticker.
+    Delegates basic info fetching to MarketDataService.
+    """
     try:
         ticker = yf.Ticker(symbol)
-        info = {}
-        try:
-            info = ticker.info or {}
-        except Exception:
-            info = {}
-
+        info = market_service.get_fundamentals(symbol)
+        
         net_income, prev_net_income = _extract_quarter_values(ticker, "Net Income")
         revenue, prev_revenue = _extract_quarter_values(ticker, "Total Revenue")
 
@@ -359,21 +315,13 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
     if premium_enabled and not FINNHUB_API_KEY and not FMP_API_KEY:
         raise RuntimeError("FINNHUB_API_KEY or FMP_API_KEY must be configured")
 
-    # Logic Update:
-    # 1. Premium users: All allowed.
-    # 2. Non-premium:
-    #    - India (.NS/.BO): Restricted to INDIA_FALLBACK_UNIVERSE.
-    #    - US/Global: All allowed (Bypass premium check).
-
     is_india = _is_india_symbol(sym)
     
     if not premium_enabled:
-        # If India, enforce strict list
         if is_india and not _is_demo_allowed(sym):
              return {
                 "symbol": sym,
-                "count": 0,
-                "rows": [],
+                "count": 0, "rows": [],
                 "restricted": True,
                 "message": (
                     "Indian peer comparison is limited to specific demo stocks. "
@@ -381,16 +329,12 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
                 ),
                 "allowed_symbols": INDIA_FALLBACK_UNIVERSE,
             }
-        # If NOT India (US/Global), we allow it! (Unlock feature)
 
     symbols: List[str] = []
     peers_from_fmp: List[str] = []
     name_map: Dict[str, str] = {}
-    
-    # Finnhub peers + company names (preferred)
     peers_from_finnhub: List[str] = []
     
-    # Attempt Finnhub if key present (regardless of premium, if we have key)
     if FINNHUB_API_KEY and fh_sym:
         try:
             fh_peers = _finnhub_peers(fh_sym)
@@ -408,7 +352,6 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
         except Exception:
             pass
 
-    # Fallback: FMP peers if Finnhub returned none
     peers_data = None
     if not symbols and FMP_API_KEY:
         peers_urls = [
@@ -420,14 +363,7 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
             peers_data = _fetch_json(url)
             if isinstance(peers_data, list) and len(peers_data) > 0:
                 break
-            if isinstance(peers_data, dict) and isinstance(peers_data.get("peersList"), list) and len(peers_data.get("peersList", [])) > 0:
-                break
-        if isinstance(peers_data, dict) and isinstance(peers_data.get("peersList"), list):
-            for s in peers_data.get("peersList", []):
-                if s and s not in symbols:
-                    symbols.append(s)
-                    peers_from_fmp.append(s)
-        elif isinstance(peers_data, list):
+        if isinstance(peers_data, list):
             for item in peers_data:
                 s = item.get("symbol") if isinstance(item, dict) else None
                 if isinstance(item, dict) and s and item.get("companyName"):
@@ -435,38 +371,21 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
                 if s and s not in symbols:
                     symbols.append(s)
                     peers_from_fmp.append(s)
-        elif isinstance(peers_data, dict) and isinstance(peers_data.get("peers"), list):
-            for s in peers_data.get("peers", []):
-                if s and s not in symbols:
-                    symbols.append(s)
-                    peers_from_fmp.append(s)
 
-    # Try screener as additional source
-    peers_from_screener: List[str] = []
     if not symbols and FMP_API_KEY:
         screener_peers = _fmp_screener_peers(sym, limit=limit)
         for p in screener_peers:
             if p not in symbols:
                 symbols.append(p)
-        peers_from_screener = screener_peers
 
-    # India fallback: STRICTLY enforce list for Indian stocks if they are in the universe
-    india_fallback: List[str] = []
-    # If it's an India stock, we want to ensure we get good peers.
-    # Even if APIs returned something, if it's garbage, we prefer our list.
-    # But for now, let's append our list if symbols are few.
     if is_india and (len(symbols) <= 2 or sym in INDIA_FALLBACK_UNIVERSE):
-         # Try loading from JSON file first
          fallback_peers = _load_india_peers_from_json(sym, limit=limit)
-         # Fall back to hardcoded list if JSON doesn't have it
          if not fallback_peers:
              fallback_peers = _india_peer_fallback(sym, limit=limit)
          for p in fallback_peers:
             if p not in symbols:
                 symbols.append(p)
-         india_fallback = fallback_peers
 
-    # Ensure the original symbol is first
     if sym not in symbols:
         symbols.insert(0, sym)
     elif symbols[0] != sym:
@@ -474,7 +393,6 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
         symbols.insert(0, sym)
 
     symbols = symbols[: max(1, limit)]
-
     rows: List[Dict[str, Any]] = []
 
     def build_row(peer: str) -> Optional[Dict[str, Any]]:
@@ -496,9 +414,7 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
                 row = future.result()
                 if row:
                     rows.append(row)
-            except Exception as e:
-                peer_name = future_map.get(future, "unknown")
-                print(f"Exception from future for {peer_name}: {e}")
+            except Exception:
                 continue
 
     result = {
@@ -507,19 +423,13 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
         "rows": rows,
     }
     
-    # If we got no data and it's an India stock, ensure at least name fallback
     if not rows and is_india and sym in INDIA_FALLBACK_UNIVERSE:
-        # Return with at least the symbol and basic names from overrides
         fallback_symbols = _india_peer_fallback(sym, limit=limit)
         for fallback_sym in fallback_symbols:
             rows.append({
-                "symbol": fallback_sym,
-                "name": fallback_sym,
-                "price": None,
-                "pe": None,
-                "market_cap": None,
-                "div_yield": None,
-                "roce": None,
+                "symbol": fallback_sym, "name": fallback_sym,
+                "price": None, "pe": None, "market_cap": None,
+                "div_yield": None, "roce": None,
             })
         result["rows"] = rows
         result["count"] = len(rows)
@@ -529,11 +439,6 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
         result["debug"] = {
             "fmp_peers": peers_from_fmp,
             "finnhub_peers": peers_from_finnhub,
-            "screener_peers": peers_from_screener,
-            "india_fallback": india_fallback,
-            "premium_enabled": premium_enabled,
             "final_symbols": symbols,
         }
     return result
-
-

@@ -10,7 +10,7 @@ from .reports import router as reports_router
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Portfolio & Wealth"])
+router = APIRouter(prefix="", tags=["Portfolio & Wealth"])
 
 # Grouping all portfolio-related routes into one module
 router.include_router(investor_profile_router)

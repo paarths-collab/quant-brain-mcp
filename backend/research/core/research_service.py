@@ -3,7 +3,7 @@ import json
 from typing import Dict, Any
 from langchain_core.messages import HumanMessage
 from .fundamentals_service import get_fundamentals_summary
-from .market_data_service import fetch_candles
+from backend.services.market_data import market_service
 from backend.finverse_integration.agents.stock_agent import StockSelectionAgent
 from backend.finverse_integration.utils.llm_manager import LLMManager
 
@@ -27,7 +27,7 @@ def generate_research_report(symbol: str) -> Dict[str, Any]:
     # 1. Gather Data (Fundamentals & Technicals)
     try:
         fundamentals = get_fundamentals_summary(symbol)
-        candles = fetch_candles(symbol, interval="1wk", period="3mo")
+        candles = market_service.fetch_candles(symbol, interval="1wk", period="3mo")
     except Exception as e:
         return {"error": f"Data fetch failed: {e}"}
 

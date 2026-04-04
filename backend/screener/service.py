@@ -1,5 +1,5 @@
-import pandas as pd
-import yfinance as yf
+from backend.services.market_data import market_service
+from backend.services.technical_analysis import technical_service
 import numpy as np
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -35,39 +35,6 @@ PARAMS = {
 }
 
 class ScreenerService:
-    def fetch_ohlcv(self, ticker: str, interval: str, period: str) -> pd.DataFrame:
-        try:
-            df = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
-            if df.empty or len(df) < PARAMS["volume_ma_period"] + PARAMS["momentum_period"]:
-                return pd.DataFrame()
-            df.index = pd.to_datetime(df.index)
-            return df
-        except:
-            return pd.DataFrame()
-
-    def compute_signals(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        close = df["Close"].squeeze()
-        volume = df["Volume"].squeeze()
-        mom_period = PARAMS["momentum_period"]
-        vol_period = PARAMS["volume_ma_period"]
-
-        if len(close) < mom_period + vol_period:
-            return None
-
-        roc = ((close.iloc[-1] - close.iloc[-mom_period]) / close.iloc[-mom_period]) * 100
-        avg_volume = volume.iloc[-vol_period - 1 : -1].mean()
-        vol_ratio = volume.iloc[-1] / avg_volume if avg_volume > 0 else 0
-        latest_close = float(close.iloc[-1])
-        sma20 = float(close.iloc[-vol_period:].mean())
-        
-        return {
-            "close": round(latest_close, 2),
-            "roc_pct": round(float(roc), 2),
-            "vol_ratio": round(float(vol_ratio), 2),
-            "trend": "up" if latest_close > sma20 else "down",
-            "as_of": df.index[-1].strftime("%Y-%m-%d %H:%M"),
-        }
-
     def run_scan(self, timeframe: str = "1d") -> List[Dict[str, Any]]:
         tf_params = PARAMS["timeframes"].get(timeframe)
         if not tf_params:
@@ -75,15 +42,28 @@ class ScreenerService:
 
         results = []
         for ticker in WATCHLIST:
-            df = self.fetch_ohlcv(ticker, tf_params["interval"], tf_params["period"])
+            # 1. Fetch OHLCV using unified service
+            df = market_service.fetch_ohlcv(
+                ticker, 
+                interval=tf_params["interval"], 
+                period=tf_params["period"],
+                market="india"
+            )
+            
             if df.empty:
                 continue
             
-            sig = self.compute_signals(df)
+            # 2. Compute signals using unified service
+            sig = technical_service.compute_signals(
+                df, 
+                mom_period=PARAMS["momentum_period"], 
+                vol_period=PARAMS["volume_ma_period"]
+            )
+            
             if not sig:
                 continue
             
-            # Simple classification logic
+            # 3. Simple classification logic (Standardized at domain level)
             label = "SKIP"
             if sig["roc_pct"] >= PARAMS["min_momentum_pct"] and sig["vol_ratio"] >= PARAMS["volume_spike_multiplier"]:
                 label = "LONG"

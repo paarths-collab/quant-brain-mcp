@@ -10,7 +10,7 @@ from .service import analyze_crowd_insight, get_market_sentiment
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+router = APIRouter(prefix="", tags=["Dashboard"])
 
 _EMOTION_AGENT = EmotionAnalysisAgent()
 

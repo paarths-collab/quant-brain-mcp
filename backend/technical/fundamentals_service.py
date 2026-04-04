@@ -1,32 +1,35 @@
-import yfinance as yf
 from typing import Dict, Any, Optional
 from datetime import datetime
-
+from backend.services.market_data import market_service
 
 def _format_ex_dividend_date(raw: Optional[float]) -> Optional[str]:
     if raw is None:
         return None
     try:
-        return datetime.utcfromtimestamp(int(raw)).strftime("%Y-%m-%d")
+        # Use datetime from timestamp if it's a numeric timestamp
+        if isinstance(raw, (int, float)):
+            return datetime.utcfromtimestamp(int(raw)).strftime("%Y-%m-%d")
+        return str(raw) # Fallback if it's already a string
     except Exception:
         return None
 
 def get_fundamentals_summary(symbol: str) -> Dict[str, Any]:
     """
-    Aggregates profile and key metrics using yfinance.
+    [DELEGATED] Aggregates profile and key metrics using unified MarketDataService.
+    Ensures 100% architectural consistency and resolves direct yfinance usage.
     """
     if not symbol or not isinstance(symbol, str):
         return {}
     
     try:
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
+        # MarketDataService handles normalization and safety
+        info = market_service.get_fundamentals(symbol)
         
         if not info:
-            print(f"Warning: yfinance returned no info for {symbol}")
+            print(f"Warning: unified market_service returned no info for {symbol}")
             return {}
         
-        # Map yfinance info to our schema
+        # Map unified info to our domain-specific schema
         summary = {
             "symbol": symbol,
             "name": info.get("shortName") or info.get("longName"),
@@ -75,6 +78,4 @@ def get_fundamentals_summary(symbol: str) -> Dict[str, Any]:
         return summary
     except Exception as e:
         print(f"Error fetching fundamentals for {symbol}: {e}")
-        import traceback
-        traceback.print_exc()
         return {}

@@ -10,7 +10,7 @@ from .research_legacy import router as research_router
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["AI Chat & Research"])
+router = APIRouter(prefix="", tags=["AI Chat & Research"])
 
 # Mounting legacy sub-routers for now to keep it clean, but grouping them in this module's main.py
 router.include_router(super_agent_router)

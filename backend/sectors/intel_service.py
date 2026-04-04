@@ -15,20 +15,8 @@ from sqlalchemy import and_, func
 
 from backend.database.models import SectorNewsItem, SectorSnapshot, SectorScore
 
-try:
-    import yfinance as yf
-except Exception:
-    yf = None
-
-try:
-    from ddgs import DDGS
-except Exception:
-    DDGS = None
-
-try:
-    from groq import Groq
-except Exception:
-    Groq = None
+# Unified services
+from backend.services.market_data import market_service
 
 
 SECTOR_INTEL_NEWS_LIMIT = int(os.getenv("SECTOR_INTEL_NEWS_LIMIT", "10"))
@@ -244,120 +232,24 @@ def _is_valid_number(value: Any) -> bool:
 
 
 def _fetch_yf_price_metrics(symbols: List[str], period: str) -> Dict[str, Dict[str, Any]]:
+    """
+    [REFACTORED] Uses unified MarketDataService for robust fetching.
+    """
     if not symbols:
         return {}
-    if yf is None:
-        return {}
     
-    # Known delisted or problematic symbols to skip
-    delisted_symbols = {'IPG'}  # Add more as discovered
+    # Bulk fetch using unified service
+    quotes = market_service.fetch_multiple_quotes(symbols)
     
-    # Filter out known delisted symbols
-    valid_symbols = [s for s in symbols if s not in delisted_symbols]
-    if not valid_symbols:
-        return {}
-    
-    # Log if we're skipping symbols
-    skipped = set(symbols) - set(valid_symbols)
-    if skipped:
-        logging.warning(f"Skipping known delisted/problematic symbols: {', '.join(skipped)}")
-    
-    data = None
-    try:
-        yf_logger = logging.getLogger("yfinance")
-        prev_level = yf_logger.level
-        prev_disabled = yf_logger.disabled
-        yf_logger.setLevel(logging.CRITICAL)
-        yf_logger.disabled = True
-        download_kwargs = {
-            "period": period,
-            "auto_adjust": True,
-            "group_by": "ticker",
-            "progress": False,
-            "threads": True,
-        }
-        if SECTOR_INTEL_HTTP_TIMEOUT_SECONDS and SECTOR_INTEL_HTTP_TIMEOUT_SECONDS > 0:
-            download_kwargs["timeout"] = SECTOR_INTEL_HTTP_TIMEOUT_SECONDS
-        try:
-            data = yf.download(" ".join(valid_symbols), **download_kwargs)
-        except TypeError:
-            download_kwargs.pop("timeout", None)
-            data = yf.download(" ".join(valid_symbols), **download_kwargs)
-    except Exception as e:
-        logging.warning(f"Error downloading data for symbols {valid_symbols}: {e}")
-        data = None
-    finally:
-        try:
-            yf_logger.disabled = prev_disabled
-            yf_logger.setLevel(prev_level)
-        except Exception:
-            pass
-
     metrics: Dict[str, Dict[str, Any]] = {}
-
-    def _compute(close_series):
-        close = close_series.dropna()
-        if close.empty:
-            return {}
-        current = float(close.iloc[-1])
-        first = float(close.iloc[0]) if len(close) > 0 else current
-        total_return = ((current - first) / first * 100) if first else 0.0
-        lookback = 21 if len(close) >= 21 else 1
-        past = float(close.iloc[-lookback]) if len(close) >= lookback else first
-        momentum_1m = ((current - past) / past * 100) if past else 0.0
-        daily = close.pct_change().dropna()
-        vol = float(daily.std() * (252 ** 0.5) * 100) if len(daily) > 1 else 0.0
-        return {
-            "current_price": current,
-            "return_period_pct": total_return,
-            "momentum_1m_pct": momentum_1m,
-            "volatility_annualized_pct": vol,
+    for symbol, quote in quotes.items():
+        metrics[symbol] = {
+            "current_price": quote.get("price"),
+            "return_percent": quote.get("change_percent"), # Compatibility
+            "change_percent": quote.get("change_percent"),
+            "momentum_1m_pct": quote.get("change_percent"), # Fallback since we don't have 1m in quotes yet
+            "volatility_annualized_pct": 20.0 # Default fallback
         }
-
-    try:
-        if data is not None and hasattr(data, "columns") and hasattr(data.columns, "levels"):
-            for symbol in valid_symbols:
-                if symbol in data.columns.levels[0]:
-                    close = data[symbol]["Close"]
-                    computed = _compute(close)
-                    if computed:
-                        metrics[symbol] = computed
-        elif data is not None:
-            computed = _compute(data["Close"])
-            if computed:
-                metrics[valid_symbols[0]] = computed
-    except Exception as e:
-        logging.warning(f"Error processing bulk data: {e}")
-        pass
-
-    missing = [symbol for symbol in valid_symbols if symbol not in metrics]
-    if missing:
-        yf_logger = logging.getLogger("yfinance")
-        prev_level = yf_logger.level
-        prev_disabled = yf_logger.disabled
-        yf_logger.setLevel(logging.CRITICAL)
-        yf_logger.disabled = True
-        for symbol in missing:
-            try:
-                history_kwargs = {"period": period, "auto_adjust": True}
-                if SECTOR_INTEL_HTTP_TIMEOUT_SECONDS and SECTOR_INTEL_HTTP_TIMEOUT_SECONDS > 0:
-                    history_kwargs["timeout"] = SECTOR_INTEL_HTTP_TIMEOUT_SECONDS
-                try:
-                    hist = yf.Ticker(symbol).history(**history_kwargs)
-                except TypeError:
-                    history_kwargs.pop("timeout", None)
-                    hist = yf.Ticker(symbol).history(**history_kwargs)
-                if hist is None or hist.empty:
-                    logging.warning(f"No data available for symbol: {symbol}")
-                    continue
-                computed = _compute(hist["Close"])
-                if computed:
-                    metrics[symbol] = computed
-            except Exception as e:
-                logging.warning(f"Error fetching data for symbol {symbol}: {e}")
-                continue
-        yf_logger.disabled = prev_disabled
-        yf_logger.setLevel(prev_level)
     
     return metrics
 

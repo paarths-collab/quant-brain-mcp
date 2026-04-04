@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
 import { treemapAPI, formatLargeNumber } from '@/lib/api';
 
-// ─── Color scale: purple for positive, grey for negative ─────────────────────
+// ─── Color scale: Indigo-600 for positive, Slate-500 for negative ──────────
 const MAX_ABS_CHANGE_FOR_COLOR = 8;
 
 const colorScale = (val: number) => {
@@ -12,13 +12,107 @@ const colorScale = (val: number) => {
 
   const intensity = d3.scaleLinear()
     .domain([0, MAX_ABS_CHANGE_FOR_COLOR])
-    .range([0.58, 0.95])
+    .range([0.45, 0.90])
     .clamp(true)(Math.abs(safe));
 
+  // Indigo-300 / Blueish Purple (Lighter and more vibrant)
   return safe >= 0
-    ? `rgba(168,85,247,${intensity})`
-    : `rgba(156,163,175,${Math.max(0.45, intensity - 0.14)})`;
+    ? `rgba(165, 180, 252, ${intensity})`
+    : `rgba(71, 85, 105, ${Math.max(0.35, intensity - 0.1)})`;
 };
+
+// ─── Display Name Formatter Layer ──────────────────────────────────────────
+const INDEX_NAME_MAP: Record<string, string> = {
+  "NIFTY 50": "Nifty 50",
+  "NIFTY NEXT 50": "Nifty Next 50",
+  "NIFTY BANK": "Bank Nifty",
+  "NIFTY IT": "Nifty IT",
+  "NIFTY METAL": "Nifty Metal",
+  "NIFTY REALTY": "Nifty Realty",
+  "NIFTY AUTO": "Nifty Auto",
+  "NIFTY ENERGY": "Nifty Energy",
+  "NIFTY FMCG": "Nifty FMCG",
+  "NIFTY INFRA": "Nifty Infra",
+  "NIFTY PHARMA": "Nifty Pharma",
+  "NIFTY PSU BANK": "Nifty PSU Bank",
+  "NIFTY PRIVATE BANK": "Nifty Private Bank",
+
+  "NIFTY 100": "Nifty 100",
+  "NIFTY 200": "Nifty 200",
+  "NIFTY 500": "Nifty 500",
+
+  "NIFTY MIDCAP 100": "Nifty Midcap 100",
+  "NIFTY MIDCAP 150": "Nifty Midcap 150",
+  "NIFTY MIDCAP 50": "Nifty Midcap 50",
+  "NIFTY MIDCAP SELECT": "Nifty Midcap Select",
+
+  "NIFTY SMALLCAP 100": "Nifty Smallcap 100",
+  "NIFTY SMALLCAP 250": "Nifty Smallcap 250",
+  "NIFTY SMALLCAP 500": "Nifty Smallcap 500",
+  "NIFTY SMALLCAP 50": "Nifty Smallcap 50",
+
+  "NIFTY MICROCAP 250": "Nifty Microcap 250",
+
+  "NIFTY LARGEMIDCAP 250": "Nifty LargeMidcap 250",
+  "NIFTY MIDSMALLCAP 400": "Nifty MidSmallcap 400",
+  "NIFTY MIDSMALLCAP 400 50:50": "Nifty MidSmallcap 400 (50:50)",
+
+  "NIFTY 500 MULTICAP 50:25:25": "Nifty 500 Multicap (50:25:25)",
+  "NIFTY 500 LARGEMIDSMALL EQUAL CAP WEIGHTED": "Nifty 500 Equal Weight",
+
+  "NIFTY TOTAL MARKET": "Nifty Total Market",
+  "NIFTY INDIA FPI 150": "Nifty India FPI 150",
+
+  "BSE SENSEX": "Sensex"
+};
+
+const formatIndexName = (raw: string) => {
+  if (!raw) return "";
+  let n = raw
+    .replace(/^IND[_\s]?/i, "")
+    .replace(/_?LIST/i, "")
+    .replace(/_/g, " ")
+    .toUpperCase()
+    .trim();
+
+  // Insert spaces where missing using regex (e.g. NIFTY50 -> NIFTY 50)
+  n = n.replace(/([A-Z])([0-9])/g, "$1 $2");
+  n = n.replace(/([0-9])([A-Z])/g, "$1 $2");
+
+  // Aggressive keyword spacing for adjacent keywords
+  const keywords = [
+    "MIDCAP", "SMALLCAP", "MICROCAP", "LARGEMIDSMALL", "LARGEMID", 
+    "MULTICAP", "TOTALMARKET", "MIDSMALLCAP", "MIDSMALL", 
+    "EQUAL", "CAP", "WEIGHTED", "NEXT", "INDIA", "FPI"
+  ];
+
+  // Run multiple passes to catch adjacent keywords like LARGEMIDSMALLEQUAL
+  for (let i = 0; i < 2; i++) {
+    keywords.forEach(kw => {
+      // Use a lookahead/lookbehind approach or just simple replacement if it matches part of a word
+      // We want to avoid spacing things that are already spaced.
+      // Match keyword that is adjacent to another letter
+      const reg = new RegExp(`(${kw})([A-Z])`, "g");
+      n = n.replace(reg, "$1 $2");
+      const reg2 = new RegExp(`([A-Z])(${kw})`, "g");
+      n = n.replace(reg2, "$1 $2");
+    });
+  }
+
+  // Cleanup extra spaces
+  n = n.replace(/\s+/g, " ").trim();
+
+  if (n.includes("SENSEX")) return "Sensex";
+
+  // Return mapped name or correctly spaced name
+  return INDEX_NAME_MAP[n] || n;
+};
+
+const formatChange = (value: unknown) => {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return 'N/A'
+  return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
+}
 
 const CARD = 'relative rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-xl';
 const CONTROL_BTN = 'px-4 py-2 rounded-lg text-[12px] font-mono uppercase tracking-widest transition-all duration-300 border border-white/[0.08]';
@@ -36,7 +130,7 @@ function StockDetailModal({
       onClick={onClose}
     >
       <div
-        className="bg-[#09090b] border border-white/10 rounded-3xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col shadow-[0_0_80px_rgba(99,102,241,0.15)]"
+        className="bg-[#09090b] border border-white/10 rounded-3xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col shadow-[0_0_80px_rgba(99,102,241,0.15)]"
         onClick={e => e.stopPropagation()}
       >
         {loading ? (
@@ -49,7 +143,7 @@ function StockDetailModal({
         ) : details ? (
           <>
             {/* Header */}
-            <div className="flex items-start justify-between p-8 border-b border-white/[0.06] bg-white/[0.015] shrink-0">
+            <div className="flex items-start justify-between p-6 border-b border-white/[0.06] bg-white/[0.015] shrink-0">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-2xl font-bold text-white">{details.name}</h2>
@@ -76,7 +170,7 @@ function StockDetailModal({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 space-y-8">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Price Banner */}
               <div className="flex flex-wrap items-baseline gap-4 p-6 bg-white/[0.02] border border-white/[0.05] rounded-2xl">
                 <span className="text-5xl font-mono font-bold text-white">
@@ -271,7 +365,7 @@ export default function SectorsPage() {
           // Wrap in a timeout race to ensure we don't hang if yfinance is slow
           const live: any = await Promise.race([
             livePromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Live indices timeout')), 10000)),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Live indices timeout')), 20000)),
           ]);
           
           if (!cancelled && live?.indices?.length > 0) {
@@ -285,7 +379,7 @@ export default function SectorsPage() {
       } catch (err) {
         console.error(`[Sectors] Primary loading error:`, err);
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setTimeout(() => setIsLoading(false), 600);
       }
     };
 
@@ -324,7 +418,7 @@ export default function SectorsPage() {
       })
       .catch(console.error)
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setTimeout(() => setIsLoading(false), 500);
       });
 
     return () => {
@@ -391,7 +485,7 @@ export default function SectorsPage() {
           name: s.name,
           symbol: s.symbol,
           value: Math.max(s.market_cap || 1, 1),
-          change: s.change_percent || 0,
+          change: Number.isFinite(s.change_percent) ? s.change_percent : null,
           price: s.price,
         }))
         : items.map((idx: any) => ({
@@ -399,7 +493,7 @@ export default function SectorsPage() {
           id: idx.id,
           // Keep index-level tiles evenly sized for clear visual scanning.
           value: 1,
-          change: idx.change_percent || 0,
+          change: Number.isFinite(idx.change_percent) ? idx.change_percent : null,
           price: idx.price,
         })),
     };
@@ -471,83 +565,81 @@ export default function SectorsPage() {
         }
       });
 
-    // Name label with adaptive wrapping and clipping for readability.
+    // Name label with premium styles and adaptive wrapping.
     cells.append('text')
-      .attr('x', 10)
+      .attr('x', (d: any) => (d.x1 - d.x0) / 2) // Center horizontally
       .attr('y', 18)
-      .attr('fill', 'rgba(255,255,255,0.98)')
-      .attr('stroke', 'rgba(0,0,0,0.65)')
-      .attr('stroke-width', 1.1)
-      .attr('paint-order', 'stroke')
-      .attr('font-size', (d: any) => {
-        const w = d.x1 - d.x0;
-        const h = d.y1 - d.y0;
-        const base = Math.max(9, Math.min(14, Math.floor(Math.min(w / 13, h / 5.5))));
-        return `${base}px`;
-      })
-      .attr('font-weight', '700')
-      .attr('font-family', 'monospace')
-      .attr('letter-spacing', '0.03em')
+      .attr('text-anchor', 'middle') // Center alignment
+      .attr('fill', 'rgba(255,255,255,0.85)')
+      .attr('font-size', '11px')
+      .attr('font-weight', '500')
+      .attr('font-family', 'Inter, system-ui, sans-serif')
+      .attr('text-transform', 'none')
       .attr('pointer-events', 'none')
       .each(function (d: any) {
         const text = d3.select(this);
-        const w = d.x1 - d.x0;
-        const h = d.y1 - d.y0;
-        const raw: string = ((isShowingStocks ? d.data.symbol : d.data.name) || '').trim();
+        const w = (d.x1 - d.x0);
+        const h = (d.y1 - d.y0);
+        const raw = (isShowingStocks ? d.data.symbol : d.data.name) || '';
+        
+        if (!isShowingStocks) console.log(`[Treemap] Formatter input: "${raw}"`);
+        const name = formatIndexName(raw);
 
-        if (!raw || w < 46 || h < 26) {
+        if (!name || w < 40 || h < 25) {
           text.text('');
           return;
         }
 
-        // Max chars per line based on cell width.
-        const charsPerLine = Math.max(5, Math.floor((w - 14) / 7));
-        const maxLines = h > 120 ? 3 : h > 70 ? 2 : 1;
-
-        const words = raw.split(/\s+/).filter(Boolean);
+        // Multi-line wrapping logic
+        const words = name.split(/\s+/).filter(Boolean);
         const lines: string[] = [];
-        let current = '';
+        let currentLine = "";
+        const maxChars = Math.max(5, Math.floor(w / 7.2)); 
+        const maxLines = Math.max(1, Math.floor(h / 15));
 
-        for (const word of words) {
-          const next = current ? `${current} ${word}` : word;
-          if (next.length <= charsPerLine) {
-            current = next;
-            continue;
+        for (let word of words) {
+          // If a single word is too long, force split it
+          while (word.length > maxChars) {
+            if (currentLine) lines.push(currentLine);
+            lines.push(word.slice(0, maxChars));
+            word = word.slice(maxChars);
+            currentLine = "";
+            if (lines.length >= maxLines) break;
           }
+          if (lines.length >= maxLines) break;
 
-          if (current) lines.push(current);
-          current = word;
-          if (lines.length >= maxLines - 1) break;
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          if (testLine.length <= maxChars) {
+            currentLine = testLine;
+          } else {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+            if (lines.length >= maxLines - 1) break;
+          }
         }
+        if (currentLine && lines.length < maxLines) lines.push(currentLine);
 
-        if (current && lines.length < maxLines) lines.push(current);
-
-        // Fallback for tokens without spaces (e.g., long symbols/names).
-        if (!lines.length) {
-          lines.push(raw.length > charsPerLine ? `${raw.slice(0, charsPerLine - 1)}…` : raw);
+        // Fallback for very empty boxes
+        if (lines.length === 0 && name) {
+           lines.push(name.length > maxChars ? name.slice(0, maxChars-1) + "…" : name);
         }
 
         text.text('');
         lines.slice(0, maxLines).forEach((line, i) => {
-          const output = i === maxLines - 1 && line.length > charsPerLine
-            ? `${line.slice(0, charsPerLine - 1)}…`
-            : line;
           text.append('tspan')
-            .attr('x', 10)
-            .attr('dy', i === 0 ? 0 : 14)
-            .text(output);
+            .attr('x', w / 2)
+            .attr('dy', i === 0 ? 0 : '1.2em')
+            .text(line);
         });
       });
 
-    // Change % badge for high contrast visibility (stocks view only).
-    // Indices view doesn't have real-time change data from the base endpoint.
+    // Change % badge for high contrast visibility.
     const changeBadge = cells.append('g')
       .attr('pointer-events', 'none')
       .style('display', (d: any) => {
         const w = d.x1 - d.x0;
         const h = d.y1 - d.y0;
-        // Hide badge in indices view or for small tiles
-        if (!isShowingStocks) return 'none';
+        // Hide badge for very small tiles
         return (w < 44 || h < 24) ? 'none' : null;
       });
 
@@ -572,9 +664,7 @@ export default function SectorsPage() {
       .attr('font-weight', '800')
       .attr('font-family', 'monospace')
       .text((d: any) => {
-        const c = Number.isFinite(d.data.change) ? d.data.change : 0;
-        console.log(`[Badge] ${d.data.name}: change=${c}`);
-        return `${c >= 0 ? '+' : ''}${c.toFixed(2)}%`;
+        return formatChange(d.data.change);
       });
   }, [indicesData, stocksData]);
 
@@ -595,7 +685,7 @@ export default function SectorsPage() {
   const totalItems = stocksData?.stocks?.length ?? indicesData.length;
 
   return (
-    <div className="flex flex-col gap-6" style={{ minHeight: 'calc(100vh - 100px)' }}>
+    <div className="font-google-sans flex flex-col gap-6" style={{ minHeight: 'calc(100vh - 100px)' }}>
       {/* Header Controls */}
       <div className="flex items-center justify-between shrink-0 flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
@@ -642,7 +732,7 @@ export default function SectorsPage() {
       )}
 
       {/* Treemap area */}
-      <div className={`${CARD} relative w-full flex flex-col`} style={{ minHeight: '600px', height: '70vh', maxHeight: 'calc(100vh - 200px)' }}>
+      <div className={`${CARD} relative w-full flex flex-col group/treemap`} style={{ minHeight: '600px', height: '80vh', maxHeight: 'calc(100vh - 120px)' }}>
         {/* Sticky label */}
         <div className="sticky top-0 left-0 p-4 z-10 pointer-events-none shrink-0">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-sm border border-white/5">
@@ -660,10 +750,10 @@ export default function SectorsPage() {
 
         {/* Hover tooltip */}
         {hoveredItem && (
-          <div className="fixed bottom-8 right-8 p-5 rounded-2xl bg-black/95 border border-indigo-500/25 z-50 min-w-[200px] shadow-2xl pointer-events-none">
-            <p className="font-mono text-[9px] text-indigo-400/40 uppercase tracking-widest mb-2">Live Oracle</p>
-            <p className="font-bold text-white text-base mb-0.5">{hoveredItem.name}</p>
-            <p className="font-mono text-[10px] text-white/30 mb-3 uppercase">{hoveredItem.symbol || hoveredItem.id}</p>
+          <div className="fixed bottom-8 right-8 p-5 rounded-2xl bg-black/95 border border-indigo-500/25 z-50 min-w-[200px] shadow-2xl pointer-events-none transition-all duration-300">
+            <p className="font-mono text-[9px] text-indigo-400/60 uppercase tracking-[0.2em] mb-2">Live Oracle</p>
+            <p className="font-bold text-white text-base mb-0.5">{formatIndexName(hoveredItem.name)}</p>
+            <p className="font-mono text-[10px] text-white/30 mb-3 uppercase tracking-widest">{hoveredItem.symbol || hoveredItem.id}</p>
             <div className="space-y-1.5 pt-3 border-t border-white/[0.06]">
               {hoveredItem.price != null && (
                 <div className="flex justify-between">
@@ -673,8 +763,8 @@ export default function SectorsPage() {
               )}
               <div className="flex justify-between">
                 <span className="font-mono text-[10px] text-white/20 uppercase">Change</span>
-                <span className={`font-mono text-sm font-bold ${(hoveredItem.change ?? 0) >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
-                  {(hoveredItem.change ?? 0) >= 0 ? '+' : ''}{(hoveredItem.change ?? 0).toFixed(2)}%
+                <span className={`font-mono text-sm font-bold ${Number(hoveredItem.change) >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
+                  {formatChange(hoveredItem.change)}
                 </span>
               </div>
             </div>
@@ -698,8 +788,8 @@ export default function SectorsPage() {
                   </p>
                   <p className="font-mono text-[9px] text-white/25 uppercase truncate">{stock.name}</p>
                 </div>
-                <span className={`ml-1 shrink-0 font-mono text-[10px] font-bold ${(stock.change_percent ?? 0) >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
-                  {(stock.change_percent ?? 0) >= 0 ? '+' : ''}{(stock.change_percent ?? 0).toFixed(2)}%
+                <span className={`ml-1 shrink-0 font-mono text-[10px] font-bold ${Number(stock.change_percent) >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
+                  {formatChange(stock.change_percent)}
                 </span>
               </div>
               <p className="font-mono text-sm font-bold text-white/90">

@@ -51,8 +51,15 @@ export default function NewsBoxPage() {
       const rows = Array.isArray(res?.articles) ? res.articles : []
       setNews(rows.slice(0, HEADLINE_LIMIT))
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load news')
-      setNews([])
+      try {
+        const cached: any = await socialAPI.getNewsCached(DEFAULT_QUERY, HEADLINE_LIMIT)
+        const rows = Array.isArray(cached?.articles) ? cached.articles : []
+        setNews(rows.slice(0, HEADLINE_LIMIT))
+        setError(rows.length ? 'Live feed timed out. Showing cached headlines.' : 'Live feed timed out. No cached headlines available yet.')
+      } catch {
+        setError(err instanceof Error ? err.message : 'Failed to load news')
+        setNews([])
+      }
     } finally {
       setIsLoading(false)
     }

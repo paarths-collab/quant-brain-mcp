@@ -5,7 +5,6 @@ Modifying this does NOT affect any other module.
 """
 import pandas as pd
 import numpy as np
-import yfinance as yf
 from typing import Dict, Any, List, Optional
 
 
@@ -46,9 +45,11 @@ def run_long_term_strategy(
 
         # Fetch close prices
         data = {}
+        from backend.services.market_data import market_service
+        
         for ticker in tickers:
             try:
-                hist = yf.download(ticker, start=start_date, progress=False, auto_adjust=True)
+                hist = market_service.get_history(ticker, start=start_date)
                 if not hist.empty:
                     data[ticker.upper()] = hist["Close"]
             except Exception as e:

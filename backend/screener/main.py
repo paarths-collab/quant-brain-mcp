@@ -5,7 +5,7 @@ from .service import ScreenerService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/screener", tags=["Screener"])
+router = APIRouter(prefix="", tags=["Screener"])
 
 _SERVICE = ScreenerService()
 

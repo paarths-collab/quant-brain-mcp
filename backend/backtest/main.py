@@ -1,10 +1,10 @@
 import math
+import matplotlib
 from fastapi import APIRouter, HTTPException, Body, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
-from .service import run_backtest_service, run_multi_strategy_backtest, generate_backtest_report, prepare_candles_df, run_backtest_on_df
+from .service import run_backtest_service, run_multi_strategy_backtest, generate_backtest_report, prepare_candles_df, run_backtest_on_df, fetch_candles
 from .core.groq_agent import GroqAgent
 from .core.strategy_adapter import STRATEGY_REGISTRY
-from .core.market_data_service import fetch_candles
 from typing import Dict, Any, List
 from datetime import datetime
 from pathlib import Path
@@ -13,9 +13,60 @@ import json
 import asyncio
 import os
 
-router = APIRouter(prefix="/api/backtest", tags=["Backtest"])
+# Use a non-GUI backend for server-side chart/report generation.
+matplotlib.use("Agg")
+
+router = APIRouter(prefix="", tags=["Backtest"])
 REPORTS_DIR = Path(__file__).parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
+
+
+def _normalize_strategy_name(strategy: str) -> str:
+    s = (strategy or "").strip().lower()
+    aliases = {
+        "rsi_reversal": "rsi_momentum",
+    }
+    return aliases.get(s, s)
+
+
+def _normalize_strategy_params(strategy: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Map frontend/backward-compatible param names to strategy ctor names."""
+    normalized = dict(params or {})
+    s = _normalize_strategy_name(strategy)
+
+    if s in {"ema_crossover", "sma_crossover"}:
+        if "fast" in normalized and "fast_period" not in normalized:
+            normalized["fast_period"] = normalized.pop("fast")
+        if "slow" in normalized and "slow_period" not in normalized:
+            normalized["slow_period"] = normalized.pop("slow")
+        if "short_window" in normalized and "fast_period" not in normalized:
+            normalized["fast_period"] = normalized.pop("short_window")
+        if "long_window" in normalized and "slow_period" not in normalized:
+            normalized["slow_period"] = normalized.pop("long_window")
+
+    if s == "momentum":
+        if "lookback" in normalized and "period" not in normalized:
+            normalized["period"] = normalized.pop("lookback")
+        if "lookback_period" in normalized and "period" not in normalized:
+            normalized["period"] = normalized.pop("lookback_period")
+        if "window" in normalized and "period" not in normalized:
+            normalized["period"] = normalized.pop("window")
+
+    if s in {"mean_reversion", "rsi_momentum"}:
+        if "window" in normalized and "period" not in normalized:
+            normalized["period"] = normalized.pop("window")
+        if "rsi_window" in normalized and "period" not in normalized:
+            normalized["period"] = normalized.pop("rsi_window")
+        if "num_std" in normalized and "std_dev" not in normalized:
+            normalized["std_dev"] = normalized.pop("num_std")
+        if "std" in normalized and "std_dev" not in normalized:
+            normalized["std_dev"] = normalized.pop("std")
+        if "lower" in normalized and "oversold" not in normalized:
+            normalized["oversold"] = normalized.pop("lower")
+        if "upper" in normalized and "overbought" not in normalized:
+            normalized["overbought"] = normalized.pop("upper")
+
+    return normalized
 
 
 @router.post("/interpret")
@@ -362,13 +413,33 @@ async def backtest_websocket(websocket: WebSocket):
 
 
 def _sanitize_floats(obj):
-    """Recursively replace inf/nan floats with None for JSON safety."""
+    """Recursively sanitize values for JSON safety (numpy/pandas included)."""
     if isinstance(obj, dict):
         return {k: _sanitize_floats(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_sanitize_floats(v) for v in obj]
-    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
-        return None
+    # Normalize numpy scalars (np.int64, np.float64, np.bool_, etc.)
+    if isinstance(obj, np.generic):
+        obj = obj.item()
+
+    # Convert pandas timestamps to iso strings
+    if hasattr(obj, "isoformat") and type(obj).__name__ in {"Timestamp", "datetime", "date"}:
+        try:
+            return obj.isoformat()
+        except Exception:
+            return str(obj)
+
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return float(obj)
+
+    if isinstance(obj, int):
+        return int(obj)
+
+    if isinstance(obj, bool):
+        return bool(obj)
+
     return obj
 
 
@@ -415,28 +486,40 @@ def run_simulation(
         
         if strategies and isinstance(strategies, list) and len(strategies) > 1:
             # Multiple strategies mode
-            params_dict = payload.get("params", {})
+            raw_params_dict = payload.get("params", {})
+            normalized_strategies: List[str] = []
+            normalized_params_dict: Dict[str, Dict[str, Any]] = {}
+
+            for raw_strategy in strategies:
+                normalized_strategy = _normalize_strategy_name(raw_strategy)
+                normalized_strategies.append(normalized_strategy)
+                strategy_params = {}
+                if isinstance(raw_params_dict, dict):
+                    strategy_params = raw_params_dict.get(raw_strategy) or raw_params_dict.get(normalized_strategy) or {}
+                normalized_params_dict[normalized_strategy] = _normalize_strategy_params(normalized_strategy, strategy_params)
             
             result = run_multi_strategy_backtest(
                 symbol=symbol,
-                strategy_names=strategies,
+                strategy_names=normalized_strategies,
                 range_period=range_period,
                 interval=interval,
                 market=market,
                 start_date=start_date,
                 end_date=end_date,
-                params_dict=params_dict
+                params_dict=normalized_params_dict
             )
         else:
             # Single strategy mode (backward compatible)
             strategy = payload.get("strategy") or (strategies[0] if strategies else None)
             if not strategy:
                 raise HTTPException(status_code=400, detail="Strategy is required")
+            strategy = _normalize_strategy_name(strategy)
                 
             params = payload.get("params", {})
             # If params is a dict of strategy params, extract the right one
             if isinstance(params, dict) and strategy in params:
                 params = params[strategy]
+            params = _normalize_strategy_params(strategy, params)
             
             result = run_backtest_service(
                 symbol=symbol,
@@ -659,25 +742,26 @@ def download_report(filename: str):
     """
     Downloads a generated backtest report file.
     """
-    from pathlib import Path
-    
-    reports_dir = Path(__file__).parent.parent / "reports"
-    file_path = reports_dir / filename
-    
+    file_path = REPORTS_DIR / filename
+
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Report not found")
     
     if filename.endswith(".html"):
         media_type = "text/html"
+        disposition = "inline"  # Open in browser
     elif filename.endswith(".pdf"):
         media_type = "application/pdf"
+        disposition = "inline"  # Open in browser
     else:
         media_type = "text/csv"
+        disposition = "attachment"  # Download CSV
     
     return FileResponse(
         path=str(file_path),
         filename=filename,
-        media_type=media_type
+        media_type=media_type,
+        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'}
     )
 
 
@@ -704,7 +788,8 @@ def generate_quantstats_report(payload: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=400, detail="symbol and strategy are required")
 
     range_period = payload.get("range", "1y")
-    params = payload.get("params", {})
+    strategy_name = _normalize_strategy_name(strategy_name)
+    params = _normalize_strategy_params(strategy_name, payload.get("params", {}))
     benchmark = payload.get("benchmark", "SPY")
 
     try:

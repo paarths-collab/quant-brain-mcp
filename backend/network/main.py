@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from .core.graph_service import get_network_graph
 
-router = APIRouter(prefix="/api/network", tags=["Network Graph"])
+router = APIRouter(prefix="", tags=["Network Graph"])
 
 @router.get("/{symbol}")
 def get_graph(symbol: str):

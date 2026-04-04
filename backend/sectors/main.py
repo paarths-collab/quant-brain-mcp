@@ -4,8 +4,11 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from backend.database.connection import get_db
 
-# Import consolidated services
+# Unified services
 from .service import sectors_service
+from backend.services.technical_analysis import technical_service
+
+# Sector Intel services
 from .intel_service import (
     refresh_sector,
     refresh_all_sectors,
@@ -14,15 +17,15 @@ from .intel_service import (
     get_sector_constituents,
     get_markets
 )
-# Localized services (Redundant Isolation)
+
+# Localized services (To be retired)
 from .core.fundamentals_service import get_fundamentals_summary
-from .core.market_data_service import calculate_indicators
 from .core.stock_sentiment_service import fetch_duckduckgo_news
 from .core.sector_service import fetch_sector_performance
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Sectors & Treemaps"])
+router = APIRouter(prefix="", tags=["Sectors & Treemaps"])
 
 def _sanitize_for_json(value):
     """Recursively replace non-finite floats with None for JSON compliance."""
@@ -60,8 +63,12 @@ def _snapshot_to_dict(snapshot):
 
 @router.get("/treemap/indices")
 async def get_indices(market: str = Query("india")):
-    indices = sectors_service._get_market_indices(market) # Use the fast list
-    return _sanitize_for_json({"market": market, "count": len(indices), "indices": indices})
+    try:
+        indices = sectors_service._get_market_indices(market) # Use the fast list
+        return _sanitize_for_json({"market": market, "count": len(indices), "indices": indices})
+    except Exception as e:
+        logger.error(f"Treemap indices error for market={market}: {e}")
+        return {"market": market, "count": 0, "indices": [], "error": "indices_unavailable"}
 
 @router.get("/treemap/indices/live")
 async def get_indices_live(market: str = Query("india")):
@@ -70,7 +77,7 @@ async def get_indices_live(market: str = Query("india")):
         return _sanitize_for_json({"market": market, "count": len(indices), "indices": indices})
     except Exception as e:
         logger.error(f"Treemap live error: {e}")
-        return {"error": str(e), "indices": []}
+        return {"market": market, "count": 0, "indices": [], "error": str(e)}
 
 @router.get("/treemap/index/{index_id}")
 async def get_index_stocks(
@@ -82,17 +89,95 @@ async def get_index_stocks(
     if "error" in data:
         raise HTTPException(status_code=404, detail=data["error"])
     return _sanitize_for_json(data)
+    
+@router.get("/{index_id}")
+async def get_index_stocks_alias(
+    index_id: str, 
+    market: str = Query("india"), 
+    include_prices: bool = Query(True)
+):
+    """Compatibility alias for /api/sectors/{index_id}"""
+    return await get_index_stocks(index_id, market, include_prices)
 
-# --- Legacy /api/sectors routes ---
+@router.get("/treemap/stock/{symbol}")
+def get_treemap_stock(symbol: str, market: str = Query("india")):
+    from backend.services.market_data import market_service
+    q_key = market_service.normalize_ticker(symbol, market)
+    
+    # 1. Fetch live quotes for latest price
+    quotes = market_service.fetch_multiple_quotes([q_key])
+    q = quotes.get(q_key, {})
+    
+    # 2. Fetch comprehensive info for fundamentals
+    info = market_service.get_fundamentals(q_key)
+    if not isinstance(info, dict):
+        info = {}
 
-@router.get("/sectors/performance")
+    return _sanitize_for_json({
+        "symbol": symbol,
+        "name": info.get("shortName") or info.get("longName") or symbol,
+        "sector": info.get("sector"),
+        "industry": info.get("industry"),
+        "price": {
+            "current": q.get("price") or info.get("currentPrice") or info.get("regularMarketPrice"),
+            "change": q.get("change") or 0.0,
+            "change_percent": q.get("change_percent") or 0.0,
+            "open": info.get("open"),
+            "day_high": info.get("dayHigh"),
+            "day_low": info.get("dayLow"),
+            "week_52_high": info.get("fiftyTwoWeekHigh"),
+            "week_52_low": info.get("fiftyTwoWeekLow"),
+        },
+        "valuation": {
+            "market_cap": info.get("marketCap"),
+            "pe_ratio": info.get("trailingPE"),
+            "enterprise_value": info.get("enterpriseValue"),
+            "price_to_book": info.get("priceToBook"),
+            "price_to_sales": info.get("priceToSalesTrailing12Months"),
+        },
+        "financials": {
+            "revenue": info.get("totalRevenue"),
+            "eps_trailing": info.get("trailingEps"),
+            "net_income": info.get("netIncomeToCommon"),
+            "profit_margin": info.get("profitMargins"),
+            "return_on_equity": info.get("returnOnEquity"),
+        },
+        "dividends": {
+            "dividend_yield": info.get("dividendYield"),
+        },
+        "volume": {
+            "current": info.get("volume"),
+            "avg_3m": info.get("averageVolume"),
+        },
+        "trading": {
+            "beta": info.get("beta"),
+        },
+        "balance_sheet": {
+            "total_debt": info.get("totalDebt"),
+        },
+        "analyst": {
+            "recommendation": info.get("recommendationKey"),
+            "target_mean": info.get("targetMeanPrice"),
+            "num_analysts": info.get("numberOfAnalystOpinions"),
+        },
+        "company": {
+            "description": info.get("longBusinessSummary"),
+            "website": info.get("website"),
+            "employees": info.get("fullTimeEmployees"),
+            "country": info.get("country"),
+        }
+    })
+
+# --- Performance and Treemap routes ---
+
+@router.get("/performance")
 def get_sector_performance():
     data = fetch_sector_performance()
     return {"name": "Market", "children": data}
 
 # --- Legacy /api/sector-intel routes ---
 
-@router.get("/sector-intel/latest")
+@router.get("/intel/latest")
 def get_intel_latest(market: str = Query(None), sector: str = Query(None), db=Depends(get_db)):
     if sector:
         snapshots = [s for s in list_latest_snapshots(db, market) if s.sector.lower() == sector.lower()]
@@ -101,7 +186,7 @@ def get_intel_latest(market: str = Query(None), sector: str = Query(None), db=De
     snapshots = list_latest_snapshots(db, market)
     return [_snapshot_to_dict(s) for s in snapshots]
 
-@router.post("/sector-intel/refresh")
+@router.post("/intel/refresh")
 def refresh_intel(payload: dict = Body(...), db=Depends(get_db)):
     market = (payload.get("market") or "").upper() or None
     sector = payload.get("sector")
@@ -114,7 +199,7 @@ def refresh_intel(payload: dict = Body(...), db=Depends(get_db)):
     db.commit()
     return res
 
-@router.post("/sector-intel/recommend")
+@router.post("/intel/recommend")
 def recommend_intel(payload: dict = Body(...), db=Depends(get_db)):
     return recommend_sectors_for_user(
         db, 
@@ -123,7 +208,7 @@ def recommend_intel(payload: dict = Body(...), db=Depends(get_db)):
         limit=int(payload.get("limit", 5))
     )
 
-@router.get("/sector-intel/sector/{sector}/stocks")
+@router.get("/intel/stocks/{sector}")
 def sector_intel_stocks(
     sector: str,
     market: str = Query("US"),
@@ -137,9 +222,10 @@ def sector_intel_stocks(
     for stock in stocks:
         sym = stock["symbol"]
         item = {**stock, "market": market_code}
-        if include_fundamentals: item["fundamentals"] = get_fundamentals_summary(sym)
         if include_technicals: 
-             indicators = calculate_indicators(sym, range="6mo", interval="1d")
-             item["technicals"] = {"rsi": indicators.get("rsi")[-1] if indicators.get("rsi") else None}
+             # Use the NEW unified TechnicalAnalysisService
+             indicators = technical_service.calculate_indicators(sym, range_period="6mo", interval="1d", market=market_code)
+             rsi_list = indicators.get("rsi")
+             item["technicals"] = {"rsi": rsi_list[-1] if rsi_list else None}
         enriched.append(item)
     return {"sector": sector, "market": market_code, "stocks": enriched}

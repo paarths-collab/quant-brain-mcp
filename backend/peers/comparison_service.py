@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import requests
 import yfinance as yf
+from backend.services.market_data import market_service
 from typing import Dict, Any, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

@@ -104,9 +104,12 @@ def load_profile(user_id: str = "default", db=Depends(get_db)):
 # ---------------------------------------------------------------------------
 # Portfolio / Trading
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Portfolio / Trading
+# ---------------------------------------------------------------------------
 import json
 from datetime import datetime
-from .core.market_data_service import get_current_price
+from backend.services.market_data import market_service
 
 class TradeRequest(BaseModel):
     user_id: str = "default"
@@ -139,7 +142,7 @@ def execute_trade(trade: TradeRequest, db=Depends(get_db)):
         # 2. Get Price
         exec_price = trade.price
         if not exec_price:
-            live_price = get_current_price(trade.symbol)
+            live_price = market_service.get_price(trade.symbol)
             if not live_price:
                 raise HTTPException(status_code=400, detail=f"Could not fetch price for {trade.symbol}")
             exec_price = live_price
@@ -238,7 +241,7 @@ def get_portfolio(user_id: str = "default", db=Depends(get_db)):
             invested = data.get("total_invested", 0)
             
             # Fetch live price
-            current_price = get_current_price(symbol) or avg # performant fallback? Maybe 0
+            current_price = market_service.get_price(symbol) or avg # performant fallback? Maybe 0
             
             current_val = qty * current_price
             pl = current_val - invested

@@ -6,13 +6,13 @@ from pathlib import Path
 root = Path(__file__).resolve().parent
 sys.path.insert(0, str(root))
 
-
 import uvicorn
 
 if __name__ == "__main__":
-    print(f"🚀 Starting Quant Intelligence Backend from {root}...")
-    print(f"📡 PYTHONPATH: {os.environ.get('PYTHONPATH', 'None')}")
-    print(f"🗺️ SYS.PATH: {sys.path[:3]}...")
+    # Remove emojis to prevent UnicodeEncodeError on Windows redirects
+    print(f"Starting Quant Intelligence Backend from {root}...")
+    print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'None')}")
+    print(f"SYS.PATH: {sys.path[:3]}...")
     
     uvicorn.run(
         "backend.main:app", 
@@ -20,4 +20,3 @@ if __name__ == "__main__":
         port=8001, 
         reload=False
     )
-

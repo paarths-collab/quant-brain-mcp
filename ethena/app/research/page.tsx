@@ -22,6 +22,82 @@ const CARD = 'shine-surface group relative rounded-2xl border border-white/10 bg
 const CARD_GLOW = 'shine-surface group relative rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl shadow-[0_0_24px_rgba(79,70,229,0.08)] hover:shadow-[0_0_32px_rgba(79,70,229,0.16)] transition-all duration-500 overflow-hidden'
 const CONTROL_BTN = 'shine-btn relative overflow-hidden rounded-xl text-[12px] font-dm-mono font-bold tracking-widest uppercase transition-all duration-300'
 
+const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value))
+
+const riskTone = (value: number) => {
+  if (value >= 70) return { label: 'HIGH', cls: 'text-red-400 border-red-500/30 bg-red-500/10' }
+  if (value >= 40) return { label: 'MEDIUM', cls: 'text-amber-300 border-amber-400/30 bg-amber-400/10' }
+  return { label: 'LOW', cls: 'text-emerald-300 border-emerald-400/30 bg-emerald-400/10' }
+}
+
+const formatDate = (raw: unknown) => {
+  if (!raw || typeof raw !== 'string') return 'TBD'
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return 'TBD'
+  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+}
+
+const normalizeSentimentResponse = (raw: any): SentimentAnalysisResponse => {
+  const sentimentOverall =
+    typeof raw?.sentiment?.overall === 'number'
+      ? raw.sentiment.overall
+      : typeof raw?.sentiment === 'number'
+        ? raw.sentiment
+        : typeof raw?.score === 'number'
+          ? raw.score
+          : 0.5
+
+  const sentimentSummary =
+    typeof raw?.sentiment?.summary === 'string'
+      ? raw.sentiment.summary
+      : typeof raw?.outlook === 'string'
+        ? raw.outlook
+        : typeof raw?.label === 'string'
+          ? raw.label
+          : 'Neutral'
+
+  const redditMentions =
+    typeof raw?.reddit_sentiment?.mentions === 'number'
+      ? raw.reddit_sentiment.mentions
+      : typeof raw?.reddit_posts_count === 'number'
+        ? raw.reddit_posts_count
+        : 0
+
+  const redditScore =
+    typeof raw?.reddit_sentiment?.score === 'number'
+      ? raw.reddit_sentiment.score
+      : sentimentOverall
+
+  const marketData =
+    raw?.market_data && typeof raw.market_data === 'object'
+      ? raw.market_data
+      : {}
+
+  const normalized: SentimentAnalysisResponse = {
+    ...raw,
+    symbol: raw?.symbol || raw?.ticker,
+    sentiment: {
+      overall: sentimentOverall,
+      summary: sentimentSummary,
+    },
+    reddit_sentiment: {
+      score: redditScore,
+      mentions: redditMentions,
+    },
+    market_data: marketData,
+    recommendation: raw?.recommendation || 'HOLD',
+    outlook: raw?.outlook || sentimentSummary || 'Neutral',
+    news: raw?.news && typeof raw.news === 'object'
+      ? raw.news
+      : { articles: [] },
+    supply_chain: raw?.supply_chain && typeof raw.supply_chain === 'object'
+      ? raw.supply_chain
+      : { customers: [], suppliers: [] },
+  }
+
+  return normalized
+}
+
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatBox({ label, value, sub, color = 'white' }: { label: string; value: string; sub?: string; color?: string }) {
   return (
@@ -44,6 +120,7 @@ export default function ResearchPage() {
   const [data, setData] = useState<SentimentAnalysisResponse | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportLink, setReportLink] = useState<string | null>(null)
+  const [reportFilename, setReportFilename] = useState<string | null>(null)
   const [reportError, setReportError] = useState<string | null>(null)
   const [pageAnalyzeLoading, setPageAnalyzeLoading] = useState(false)
   const [pageAnalyzeError, setPageAnalyzeError] = useState<string | null>(null)
@@ -66,25 +143,144 @@ export default function ResearchPage() {
   const fmtLarge = (v: any) => {
     const n = Number(v)
     if (!v || isNaN(n)) return '—'
-    if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`
-    if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
-    if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`
-    return `$${n.toLocaleString()}`
+    const currency = sym
+    if (n >= 1e12) return `${currency}${(n / 1e12).toFixed(2)}T`
+    if (n >= 1e9) return `${currency}${(n / 1e9).toFixed(2)}B`
+    if (n >= 1e6) return `${currency}${(n / 1e6).toFixed(2)}M`
+    return `${currency}${n.toLocaleString()}`
   }
   const numOrNull = (v: unknown) => {
     const n = Number(v)
     return Number.isFinite(n) ? n : null
   }
 
+  const targetPrice = numOrNull(marketData.target_mean_price)
+  const wkHigh = numOrNull(marketData['52w_high'] || marketData.fiftyTwoWeekHigh)
+  const wkLow = numOrNull(marketData['52w_low'] || marketData.fiftyTwoWeekLow)
+
+  const valuationGapPct = targetPrice && currentPrice
+    ? ((targetPrice - currentPrice) / currentPrice) * 100
+    : null
+
+  const valuationState =
+    valuationGapPct === null
+      ? 'No target data'
+      : valuationGapPct >= 12
+        ? 'Undervalued vs target'
+        : valuationGapPct <= -12
+          ? 'Overvalued vs target'
+          : 'Near fair value'
+
+  const rangeProgress = (wkHigh && wkLow && wkHigh > wkLow && currentPrice)
+    ? clamp(((currentPrice - wkLow) / (wkHigh - wkLow)) * 100)
+    : null
+
+  const beta = numOrNull(marketData.beta)
+  const debtToEq = numOrNull(marketData.debt_to_equity)
+  const currentRatio = numOrNull(marketData.current_ratio)
+  const dayMoveAbs = Math.abs(dayChangePct || 0)
+
+  const riskScore = clamp(
+    (beta !== null ? Math.min(40, Math.abs(beta - 1) * 35) : 10) +
+    (debtToEq !== null ? Math.min(30, debtToEq / 8) : 8) +
+    (currentRatio !== null ? (currentRatio < 1 ? 18 : 6) : 10) +
+    Math.min(20, dayMoveAbs * 2)
+  )
+  const riskMeta = riskTone(riskScore)
+
+  const earningsDate = typeof marketData.earnings_date === 'string' ? marketData.earnings_date : null
+  const daysToEarnings = numOrNull(marketData.days_to_earnings)
+  const exDividendDate = typeof marketData.ex_dividend_date === 'string' ? marketData.ex_dividend_date : null
+  const volatility30d = numOrNull(marketData.volatility_30d)
+  const fiftyDayAvg = numOrNull(marketData.fifty_day_avg)
+  const twoHundredDayAvg = numOrNull(marketData.two_hundred_day_avg)
+
+  const revenueGrowthPct = numOrNull(marketData.revenue_growth)
+  const epsGrowthPct = numOrNull(marketData.eps_growth)
+  const operatingMarginPct = numOrNull(marketData.operating_margins)
+  const fcf = numOrNull(marketData.free_cashflow)
+
+  const earningsQualityScore = clamp(
+    (revenueGrowthPct !== null ? Math.max(0, Math.min(35, revenueGrowthPct * 120)) : 12) +
+    (epsGrowthPct !== null ? Math.max(0, Math.min(30, epsGrowthPct * 100)) : 10) +
+    (operatingMarginPct !== null ? Math.max(0, Math.min(20, operatingMarginPct * 90)) : 8) +
+    (fcf !== null ? (fcf > 0 ? 15 : 4) : 8)
+  )
+  const earningsQualityTier = earningsQualityScore >= 70 ? 'STRONG' : earningsQualityScore >= 45 ? 'MODERATE' : 'WEAK'
+
+  const trendTag = (() => {
+    if (!currentPrice || fiftyDayAvg === null || twoHundredDayAvg === null) return 'Insufficient trend data'
+    if (currentPrice > fiftyDayAvg && fiftyDayAvg > twoHundredDayAvg) return 'Strong Uptrend'
+    if (currentPrice < fiftyDayAvg && fiftyDayAvg < twoHundredDayAvg) return 'Downtrend'
+    return 'Range / Transition'
+  })()
+
+  const analystCount = numOrNull(marketData.analyst_count)
+  const targetHigh = numOrNull(marketData.target_high_price)
+  const targetLow = numOrNull(marketData.target_low_price)
+  const targetMedian = numOrNull(marketData.target_median_price)
+  const targetSpreadPct =
+    targetHigh !== null && targetLow !== null && currentPrice
+      ? ((targetHigh - targetLow) / currentPrice) * 100
+      : null
+  const analystConfidence = clamp(
+    (analystCount !== null ? Math.min(60, analystCount * 4) : 12) +
+    (targetSpreadPct !== null ? Math.max(0, 40 - targetSpreadPct) : 12)
+  )
+
+  const quickRatio = numOrNull(marketData.quick_ratio)
+  const interestCoverage = numOrNull(marketData.interest_coverage)
+  const balanceSheetSafety = clamp(
+    (currentRatio !== null ? Math.min(35, currentRatio * 18) : 12) +
+    (quickRatio !== null ? Math.min(25, quickRatio * 14) : 10) +
+    (debtToEq !== null ? Math.max(0, 30 - debtToEq / 6) : 12) +
+    (interestCoverage !== null ? Math.min(10, Math.max(0, interestCoverage)) : 6)
+  )
+  const balanceSheetTier = balanceSheetSafety >= 70 ? 'SAFE' : balanceSheetSafety >= 45 ? 'WATCH' : 'FRAGILE'
+
+  const eventRiskLevel = (() => {
+    if (daysToEarnings === null) return 'MEDIUM'
+    if (daysToEarnings >= 0 && daysToEarnings <= 7) return 'HIGH'
+    if (daysToEarnings >= 8 && daysToEarnings <= 21) return 'MEDIUM'
+    return 'LOW'
+  })()
+  const eventRiskCls =
+    eventRiskLevel === 'HIGH'
+      ? 'text-red-300 border-red-500/40 bg-red-500/10'
+      : eventRiskLevel === 'MEDIUM'
+        ? 'text-amber-300 border-amber-400/40 bg-amber-400/10'
+        : 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10'
+
+  const catalysts = [
+    {
+      label: 'Earnings',
+      date: formatDate(earningsDate),
+      sub: daysToEarnings === null
+        ? 'Date unavailable'
+        : daysToEarnings === 0
+          ? 'Today'
+        : daysToEarnings < 0
+          ? `Occurred ${Math.abs(daysToEarnings)} days ago`
+          : `In ${daysToEarnings} days`,
+    },
+    {
+      label: 'Ex-Dividend',
+      date: formatDate(exDividendDate),
+      sub: exDividendDate ? 'Dividend eligibility cutoff' : 'Not announced',
+    },
+  ]
+
   const fetchSentiment = async (sym: string, mkt: string) => {
     setIsLoading(true)
     setError(null)
     setReportLink(null)
+    setReportFilename(null)
     setReportError(null)
     try {
       const json = await sentimentAPI.analyze(sym, mkt)
-      setData(json)
-      setSymbol(json?.symbol ?? sym)
+      const normalized = normalizeSentimentResponse(json)
+      setData(normalized)
+      setSymbol(normalized?.symbol ?? sym)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to fetch analysis')
       setData(null)
@@ -122,6 +318,7 @@ export default function ResearchPage() {
         ? researchAPI.downloadReport(filename)
         : (downloadUrl.startsWith('/') ? `${API_BASE}${downloadUrl}` : downloadUrl)
       setReportLink(fullUrl)
+      setReportFilename(filename || null)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Report generation failed'
       if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(message)) {
@@ -269,7 +466,7 @@ export default function ResearchPage() {
                 <p className="text-white/40 text-sm mt-0.5">{companyName}</p>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-mono font-bold text-white">${currentPrice.toFixed(2)}</div>
+                <div className="text-3xl font-mono font-bold text-white">{sym}{currentPrice.toFixed(2)}</div>
                 <div className={`flex items-center justify-end gap-1 text-sm font-mono mt-0.5 ${dayChangePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {dayChangePct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                   {dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%
@@ -291,9 +488,18 @@ export default function ResearchPage() {
                 {pageAnalyzeLoading ? 'ANALYZING_THIS_PAGE…' : 'ANALYZE_THIS_PAGE'}
               </button>
               {reportLink && (
-                <a href={reportLink} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[11px] font-dm-mono text-indigo-300 hover:text-indigo-200 uppercase tracking-widest">
-                  OPEN <ExternalLink size={11} />
-                </a>
+                <div className="flex items-center gap-3">
+                  <a href={reportLink} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[11px] font-dm-mono text-indigo-300 hover:text-indigo-200 uppercase tracking-widest">
+                    OPEN <ExternalLink size={11} />
+                  </a>
+                  <a
+                    href={reportLink}
+                    download={reportFilename || undefined}
+                    className="flex items-center gap-1 text-[11px] font-dm-mono text-emerald-300 hover:text-emerald-200 uppercase tracking-widest"
+                  >
+                    DOWNLOAD <Download size={11} />
+                  </a>
+                </div>
               )}
               {reportError && <span className="text-[11px] font-dm-mono text-red-400 uppercase tracking-widest">{reportError}</span>}
             </div>
@@ -322,11 +528,34 @@ export default function ResearchPage() {
             </div>
           )}
 
+          <div className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-4 ${eventRiskCls}`}>
+            <div>
+              <div className="text-[10px] font-dm-mono uppercase tracking-[0.2em]">Event Risk Banner</div>
+              <div className="text-[12px] text-white/85 mt-0.5">
+                {daysToEarnings === null
+                  ? 'Upcoming earnings date unavailable from yfinance.'
+                  : daysToEarnings === 0
+                    ? 'Earnings today. Expect elevated intraday and post-close volatility.'
+                  : daysToEarnings < 0
+                    ? `Earnings event passed ${Math.abs(daysToEarnings)} days ago.`
+                    : `Earnings in ${daysToEarnings} days. Expect volatility expansion around event window.`}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] font-dm-mono uppercase tracking-widest">Risk</div>
+              <div className="text-[14px] font-dm-mono font-bold">{eventRiskLevel}</div>
+            </div>
+          </div>
+
           {/* Sentiment Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               { label: 'AI Sentiment', score: data.sentiment?.overall ?? 0.5, sub: data.sentiment?.summary ?? 'Neutral' },
-              { label: 'Reddit Sentiment', score: data.reddit_sentiment?.score ?? 0.5, sub: `${data.reddit_sentiment?.mentions ?? 0} mentions` },
+              {
+                label: 'Reddit Sentiment',
+                score: data.reddit_sentiment?.score ?? 0.5,
+                sub: (data.reddit_sentiment?.mentions ?? 0) > 0 ? `${data.reddit_sentiment?.mentions ?? 0} mentions` : '-',
+              },
             ].map(card => (
               <div key={card.label} className={`${CARD} p-4 ${sentimentBg(card.score)}`}>
                 <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-2">{card.label}</div>
@@ -391,6 +620,127 @@ export default function ResearchPage() {
             </div>
           </div>
 
+          {/* Valuation / Risk / Catalysts */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className={`${CARD_GLOW} p-5`}>
+              <div className="text-[11px] font-dm-mono text-white/30 uppercase tracking-[0.2em] mb-4">Valuation Band</div>
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[11px] text-white/45">Current</span>
+                  <span className="font-dm-mono text-white">{sym}{fmt(currentPrice)}</span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[11px] text-white/45">Target Mean</span>
+                  <span className="font-dm-mono text-indigo-300">{sym}{fmt(targetPrice)}</span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[11px] text-white/45">Gap</span>
+                  <span className={`font-dm-mono ${valuationGapPct !== null && valuationGapPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                    {valuationGapPct === null ? '—' : `${valuationGapPct >= 0 ? '+' : ''}${valuationGapPct.toFixed(1)}%`}
+                  </span>
+                </div>
+                <div className="pt-2">
+                  <div className="h-2 rounded-full bg-white/10 border border-white/10 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500/70 via-indigo-400/70 to-cyan-300/70"
+                      style={{ width: `${rangeProgress ?? 0}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 text-[11px] text-white/45">52W Position: {rangeProgress === null ? 'N/A' : `${rangeProgress.toFixed(0)}%`}</div>
+                  <div className="text-[11px] text-indigo-300 mt-1">{valuationState}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`${CARD_GLOW} p-5`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[11px] font-dm-mono text-white/30 uppercase tracking-[0.2em]">Risk Dashboard</div>
+                <span className={`px-2 py-1 text-[10px] font-dm-mono rounded border uppercase tracking-widest ${riskMeta.cls}`}>{riskMeta.label}</span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Risk Score</span><span className="font-dm-mono text-white">{riskScore.toFixed(0)}/100</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Beta</span><span className="font-dm-mono text-white">{fmt(beta)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Debt / Equity</span><span className="font-dm-mono text-white">{fmt(debtToEq)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Current Ratio</span><span className="font-dm-mono text-white">{fmt(currentRatio)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">1D Volatility</span><span className="font-dm-mono text-white">{Math.abs(dayChangePct).toFixed(2)}%</span></div>
+              </div>
+            </div>
+
+            <div className={`${CARD_GLOW} p-5`}>
+              <div className="text-[11px] font-dm-mono text-white/30 uppercase tracking-[0.2em] mb-4">Catalyst Timeline</div>
+              <div className="space-y-3">
+                {catalysts.map((event) => (
+                  <div key={event.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] text-white/55 uppercase tracking-widest font-dm-mono">{event.label}</span>
+                      <span className="text-[12px] font-dm-mono text-white">{event.date}</span>
+                    </div>
+                    <div className="text-[11px] text-indigo-300 mt-1">{event.sub}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className={`${CARD_GLOW} p-5`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[11px] font-dm-mono text-white/30 uppercase tracking-[0.2em]">Earnings & Quality</div>
+                <span className="text-[10px] font-dm-mono uppercase tracking-widest text-indigo-300">{earningsQualityTier}</span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Earnings Date</span><span className="font-dm-mono text-white">{formatDate(earningsDate)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Days to Earnings</span><span className="font-dm-mono text-white">{daysToEarnings === null ? 'N/A' : daysToEarnings === 0 ? 'Today' : String(daysToEarnings)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Quality Score</span><span className="font-dm-mono text-white">{earningsQualityScore.toFixed(0)}/100</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Revenue Growth</span><span className="font-dm-mono text-white">{fmt(revenueGrowthPct !== null ? revenueGrowthPct * 100 : null, '%')}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">EPS Growth</span><span className="font-dm-mono text-white">{fmt(epsGrowthPct !== null ? epsGrowthPct * 100 : null, '%')}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Operating Margin</span><span className="font-dm-mono text-white">{fmt(operatingMarginPct !== null ? operatingMarginPct * 100 : null, '%')}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Free Cash Flow</span><span className="font-dm-mono text-white">{fmtLarge(fcf)}</span></div>
+              </div>
+            </div>
+
+            <div className={`${CARD_GLOW} p-5`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[11px] font-dm-mono text-white/30 uppercase tracking-[0.2em]">Trend Regime Tag</div>
+                <span className="text-[10px] font-dm-mono uppercase tracking-widest text-indigo-300">{trendTag}</span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Current Price</span><span className="font-dm-mono text-white">{sym}{fmt(currentPrice)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">50D Average</span><span className="font-dm-mono text-white">{sym}{fmt(fiftyDayAvg)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">200D Average</span><span className="font-dm-mono text-white">{sym}{fmt(twoHundredDayAvg)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">30D Volatility</span><span className="font-dm-mono text-white">{fmt(volatility30d !== null ? volatility30d * 100 : null, '%')}</span></div>
+              </div>
+            </div>
+
+            <div className={`${CARD_GLOW} p-5`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[11px] font-dm-mono text-white/30 uppercase tracking-[0.2em]">Analyst Dispersion</div>
+                <span className="text-[10px] font-dm-mono uppercase tracking-widest text-indigo-300">{analystConfidence.toFixed(0)}% confidence</span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Analyst Count</span><span className="font-dm-mono text-white">{fmt(analystCount)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Target Low</span><span className="font-dm-mono text-white">{sym}{fmt(targetLow)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Target Median</span><span className="font-dm-mono text-white">{sym}{fmt(targetMedian)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Target High</span><span className="font-dm-mono text-white">{sym}{fmt(targetHigh)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Spread %</span><span className="font-dm-mono text-white">{fmt(targetSpreadPct, '%')}</span></div>
+              </div>
+            </div>
+
+            <div className={`${CARD_GLOW} p-5`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[11px] font-dm-mono text-white/30 uppercase tracking-[0.2em]">Balance Sheet Safety</div>
+                <span className="text-[10px] font-dm-mono uppercase tracking-widest text-indigo-300">{balanceSheetTier}</span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Safety Score</span><span className="font-dm-mono text-white">{balanceSheetSafety.toFixed(0)}/100</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Debt / Equity</span><span className="font-dm-mono text-white">{fmt(debtToEq)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Current Ratio</span><span className="font-dm-mono text-white">{fmt(currentRatio)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Quick Ratio</span><span className="font-dm-mono text-white">{fmt(quickRatio)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="text-[11px] text-white/45">Interest Coverage</span><span className="font-dm-mono text-white">{fmt(interestCoverage)}</span></div>
+              </div>
+            </div>
+          </div>
+
           {/* Recent News */}
           {(data.news?.articles || []).length > 0 && (
               <div className={`${CARD_GLOW} p-5`}>
@@ -418,34 +768,6 @@ export default function ResearchPage() {
             </div>
           )}
 
-          {/* Supply Chain */}
-          {data.supply_chain && (
-            <div className={`${CARD_GLOW} p-5`}>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="text-[11px] font-dm-mono text-white/30 uppercase tracking-widest">Supply Chain Intelligence</div>
-                <span className="text-[10px] font-dm-mono px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 rounded text-indigo-400 uppercase tracking-widest">Experimental</span>
-              </div>
-              <p className="text-[11px] font-dm-mono text-white/20 mb-4 tracking-tight uppercase">US: SEC filings · India: public source crawler</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(['customers', 'suppliers'] as const).map(type => (
-                  <div key={type} className={`${CARD} p-5`}>
-                    <div className="text-[10px] font-dm-mono text-white/30 uppercase tracking-[0.2em] mb-4 capitalize">{type}</div>
-                    <div className="space-y-2">
-                      {(data.supply_chain?.[type] || []).map((item: any, i: number) => (
-                        <div key={i} className="p-2.5 bg-white/[0.02] border border-white/[0.05] rounded-lg">
-                          <div className="text-[12px] font-semibold text-white">{item.name}</div>
-                          {item.evidence && <div className="text-[10px] text-white/40 mt-0.5">{item.evidence}</div>}
-                        </div>
-                      ))}
-                      {(data.supply_chain?.[type] || []).length === 0 && (
-                        <div className="text-[11px] text-white/25 py-2">No {type} found.</div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
       {expandedModalContent && (

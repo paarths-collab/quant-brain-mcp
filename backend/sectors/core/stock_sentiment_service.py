@@ -10,7 +10,6 @@ import json
 import re
 
 import yfinance as yf
-from .supply_chain_service import fetch_supply_chain
 
 try:
     from duckduckgo_search import DDGS as DDGSClient
@@ -130,6 +129,17 @@ def fetch_stock_data(symbol: str) -> Dict:
         (latest["Close"] - oldest["Close"]) / oldest["Close"]
     ) * 100 if oldest["Close"] else 0
 
+    # Realized volatility (annualized) from daily returns over ~30 sessions.
+    volatility_30d = None
+    try:
+        close_series = hist["Close"].dropna()
+        if len(close_series) >= 20:
+            ret = close_series.pct_change().dropna().tail(30)
+            if len(ret) >= 5:
+                volatility_30d = float(ret.std() * (252 ** 0.5))
+    except Exception:
+        volatility_30d = None
+
     # Get 1-day change
     day_change = 0
     day_change_pct = 0
@@ -145,6 +155,48 @@ def fetch_stock_data(symbol: str) -> Dict:
             ex_dividend_date = datetime.utcfromtimestamp(int(ex_dividend_raw)).strftime("%Y-%m-%d")
         except Exception:
             ex_dividend_date = None
+
+    def _parse_date_like(value) -> Optional[datetime]:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, (int, float)):
+            try:
+                return datetime.utcfromtimestamp(int(value))
+            except Exception:
+                return None
+        if isinstance(value, (list, tuple)) and len(value) > 0:
+            return _parse_date_like(value[0])
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return None
+            try:
+                # Try unix timestamp encoded as string first.
+                if raw.isdigit():
+                    return datetime.utcfromtimestamp(int(raw))
+            except Exception:
+                pass
+            try:
+                return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except Exception:
+                return None
+        return None
+
+    earnings_raw = (
+        info.get("earningsDate")
+        or info.get("nextEarningsDate")
+        or info.get("earningsTimestamp")
+    )
+    earnings_dt = _parse_date_like(earnings_raw)
+    earnings_date = earnings_dt.date().isoformat() if earnings_dt else None
+    days_to_earnings = None
+    if earnings_dt:
+        try:
+            days_to_earnings = (earnings_dt.date() - datetime.utcnow().date()).days
+        except Exception:
+            days_to_earnings = None
 
     # Quarterly snapshot (best-effort)
     quarterly = {}
@@ -234,7 +286,16 @@ def fetch_stock_data(symbol: str) -> Dict:
         # Financial health
         "debt_to_equity": info.get("debtToEquity"),
         "current_ratio": info.get("currentRatio"),
+        "quick_ratio": info.get("quickRatio"),
         "free_cashflow": info.get("freeCashflow"),
+        "operating_cashflow": info.get("operatingCashflow"),
+        "interest_expense": info.get("interestExpense"),
+        "ebit": info.get("ebit"),
+        "interest_coverage": (
+            (float(info.get("ebit")) / abs(float(info.get("interestExpense"))))
+            if info.get("ebit") not in (None, 0) and info.get("interestExpense") not in (None, 0)
+            else None
+        ),
         # Profitability
         "roe": info.get("returnOnEquity"),
         "operating_margins": info.get("operatingMargins"),
@@ -242,6 +303,8 @@ def fetch_stock_data(symbol: str) -> Dict:
         "dividend_yield": info.get("dividendYield"),
         "payout_ratio": info.get("payoutRatio"),
         "ex_dividend_date": ex_dividend_date,
+        "earnings_date": earnings_date,
+        "days_to_earnings": days_to_earnings,
         # Risk
         "beta": info.get("beta"),
         "short_ratio": info.get("shortRatio"),
@@ -249,6 +312,9 @@ def fetch_stock_data(symbol: str) -> Dict:
         # Growth
         "52w_high": info.get("fiftyTwoWeekHigh"),
         "52w_low": info.get("fiftyTwoWeekLow"),
+        "fifty_day_avg": info.get("fiftyDayAverage"),
+        "two_hundred_day_avg": info.get("twoHundredDayAverage"),
+        "volatility_30d": volatility_30d,
         "revenue": info.get("totalRevenue"),
         "revenue_formatted": format_large_number(info.get("totalRevenue"), market),
         "profit_margin": info.get("profitMargins"),
@@ -256,6 +322,9 @@ def fetch_stock_data(symbol: str) -> Dict:
         "eps_growth": info.get("earningsGrowth"),
         # Analyst
         "target_mean_price": info.get("targetMeanPrice"),
+        "target_high_price": info.get("targetHighPrice"),
+        "target_low_price": info.get("targetLowPrice"),
+        "target_median_price": info.get("targetMedianPrice"),
         "recommendation_key": info.get("recommendationKey", "").upper(),
         "analyst_count": info.get("numberOfAnalystOpinions"),
         # Quarterly snapshot
@@ -562,12 +631,8 @@ def analyze_stock_sentiment(symbol: str) -> Dict:
         print(f"Warning: Failed to fetch news for {symbol}: {e}")
         news = {"articles": []}
 
-    # Supply chain extraction (SEC for US, DDG crawler for India)
-    try:
-        supply_chain = fetch_supply_chain(symbol, stock_data.get("company_name", ""))
-    except Exception as e:
-        print(f"Warning: Failed to fetch supply chain for {symbol}: {e}")
-        supply_chain = {"customers": [], "suppliers": []}
+    # Supply chain intentionally disabled for research page simplification.
+    supply_chain = {"customers": [], "suppliers": []}
     
     # Run AI analysis
     try:

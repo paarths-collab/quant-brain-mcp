@@ -6,7 +6,7 @@ from .live_service import live_news_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/news", tags=["News"])
+router = APIRouter(prefix="", tags=["News"])
 
 _NEWS_SERVICE = NewsService()
 
@@ -27,16 +27,31 @@ def get_latest_news(
 @router.get("/live")
 def get_live_news(
     query: str = Query("stock market"),
-    limit: int = 12
+    limit: int = Query(12, ge=1, le=50),
+    cached_only: bool = Query(False)
 ):
     """
     Fetches real-time market headlines from DuckDuckGo News.
     """
     try:
+        if cached_only:
+            return live_news_service.get_cached_news(query=query, limit=limit)
         return live_news_service.get_news(query=query, limit=limit)
     except Exception as e:
-        logger.exception("Live news failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Live news failed; returning cached fallback")
+        try:
+            return live_news_service.get_cached_news(query=query, limit=limit)
+        except Exception:
+            # Do not hard-fail the UI on upstream scrape/provider issues.
+            return {
+                "status": "success",
+                "query": query,
+                "cached": True,
+                "stale": True,
+                "articles": [],
+                "source_count": 0,
+                "message": f"Live news temporarily unavailable: {str(e)}",
+            }
 
 @router.get("/article-summary")
 def get_article_summary(url: str = Query(...)):

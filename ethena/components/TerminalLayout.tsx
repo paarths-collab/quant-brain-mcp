@@ -122,7 +122,7 @@ export default function TerminalLayout({ children }: { children: React.ReactNode
           </div>
         </header>
 
-        <div className={`min-h-[calc(100vh-70px)] flex flex-col ${pathname === '/technical' ? '' : 'px-8 pt-4 pb-8'}`}>
+        <div className={`min-h-[calc(100vh-70px)] flex flex-col ${['/technical', '/chat'].includes(pathname) ? '' : 'px-8 pt-4 pb-8'}`}>
           {children}
         </div>
       </main>

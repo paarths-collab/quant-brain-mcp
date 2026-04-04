@@ -165,7 +165,7 @@ class InvestmentPipeline:
                 prompt = f"Analyze: {query}"
                 if yf_ticker:
                     prompt += f" for {yf_ticker} ({resolved_market} market)"
-                report = await asyncio.to_thread(self._agent.query, prompt)
+                report = await asyncio.to_thread(self._agent.run, prompt)
         except Exception as e:
             print(f"[InvestmentPipeline] AI analysis failed: {e}")
             report = f"Analysis for {yf_ticker or query}: Unable to generate AI report at this time."

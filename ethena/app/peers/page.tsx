@@ -5,27 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, RefreshCw, ArrowUpRight, X, Building2, Globe, BarChart3 } from 'lucide-react';
 import { peersAPI, fundamentalsAPI, type PeerRow, type FundamentalsSummaryResponse } from '@/lib/api';
 
-// Mock peer data for both markets (structure for future API integration)
-const PEERS_US = [
-  { symbol: 'AAPL', name: 'Apple Inc.', price: 175.24, pe: 28.5, market_cap: 2.71e12, div_yield: 0.005, net_profit_q: 33900000000, profit_q_var: 0.13, sales_q: 119575000000, sales_q_var: 0.02, roce: 0.52 },
-  { symbol: 'MSFT', name: 'Microsoft Corp.', price: 415.50, pe: 35.2, market_cap: 3.12e12, div_yield: 0.007, net_profit_q: 21900000000, profit_q_var: 0.27, sales_q: 62020000000, sales_q_var: 0.18, roce: 0.38 },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 147.60, pe: 24.8, market_cap: 1.84e12, div_yield: 0, net_profit_q: 20687000000, profit_q_var: 0.52, sales_q: 86310000000, sales_q_var: 0.13, roce: 0.26 },
-  { symbol: 'NVDA', name: 'NVIDIA', price: 897.50, pe: 72.4, market_cap: 2.21e12, div_yield: 0.003, net_profit_q: 12285000000, profit_q_var: 8.43, sales_q: 22103000000, sales_q_var: 2.65, roce: 1.15 },
-  { symbol: 'AMD', name: 'Advanced Micro', price: 165.30, pe: 310.2, market_cap: 2.67e11, div_yield: 0.01, net_profit_q: 800000000, profit_q_var: -0.08, sales_q: 5500000000, sales_q_var: 0.03, roce: 0.12 },
-  { symbol: 'INTC', name: 'Intel', price: 44.20, pe: 29.8, market_cap: 1.87e11, div_yield: 0.125, net_profit_q: 1200000000, profit_q_var: -0.15, sales_q: 18000000000, sales_q_var: -0.04, roce: 0.09 },
-  { symbol: 'TSLA', name: 'Tesla Inc.', price: 172.63, pe: 41.2, market_cap: 5.50e11, div_yield: 0, net_profit_q: 7928000000, profit_q_var: -0.35, sales_q: 25167000000, sales_q_var: 0.03, roce: 0.18 },
-  { symbol: 'META', name: 'Meta Platforms', price: 505.50, pe: 32.1, market_cap: 1.29e12, div_yield: 0.003, net_profit_q: 14000000000, profit_q_var: 2.01, sales_q: 40111000000, sales_q_var: 0.25, roce: 0.28 },
-];
-const PEERS_IN = [
-  { symbol: 'RELIANCE', name: 'Reliance Ind.', price: 2975.30, pe: 28.4, market_cap: 2.01e14, div_yield: 0.003, net_profit_q: 172650000000, profit_q_var: 0.09, sales_q: 2279700000000, sales_q_var: 0.12, roce: 0.10 },
-  { symbol: 'TCS', name: 'Tata Consultancy', price: 4012.30, pe: 32.4, market_cap: 1.46e13, div_yield: 0.015, net_profit_q: 11000000000, profit_q_var: 0.07, sales_q: 60000000000, sales_q_var: 0.05, roce: 0.41 },
-  { symbol: 'INFY', name: 'Infosys', price: 1389.40, pe: 26.2, market_cap: 5.8e12, div_yield: 0.032, net_profit_q: 8000000000, profit_q_var: -0.03, sales_q: 35000000000, sales_q_var: 0.01, roce: 0.31 },
-  { symbol: 'WIPRO', name: 'Wipro', price: 480.15, pe: 22.8, market_cap: 2.5e12, div_yield: 0.011, net_profit_q: 27000000000, profit_q_var: 0.02, sales_q: 223000000000, sales_q_var: -0.01, roce: 0.18 },
-  { symbol: 'HDFCBANK', name: 'HDFC Bank', price: 1445.60, pe: 18.5, market_cap: 1.12e13, div_yield: 0.013, net_profit_q: 163720000000, profit_q_var: 1.33, sales_q: 784000000000, sales_q_var: 0.26, roce: 0.08 },
-  { symbol: 'ICICIBANK', name: 'ICICI Bank', price: 1089.40, pe: 17.2, market_cap: 7.6e12, div_yield: 0.009, net_profit_q: 102710000000, profit_q_var: 0.23, sales_q: 489000000000, sales_q_var: 0.21, roce: 0.08 },
-  { symbol: 'ADANIENT', name: 'Adani Enterprises', price: 3145.20, pe: 142.5, market_cap: 3.5e12, div_yield: 0.001, net_profit_q: 18880000000, profit_q_var: 1.30, sales_q: 283500000000, sales_q_var: -0.07, roce: 0.11 },
-];
-
 function formatNumber(n: number | null | undefined) {
   if (n == null) return '-';
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -83,6 +62,7 @@ export default function PeerComparisonPage() {
   const [query, setQuery] = useState('');
   const [symbol, setSymbol] = useState('AAPL');
   const [rows, setRows] = useState<PeerRow[]>([]);
+  const [hasDiscovered, setHasDiscovered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -91,11 +71,7 @@ export default function PeerComparisonPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
-  const fallbackPeers = (market === 'us' ? PEERS_US : PEERS_IN).filter(p =>
-    !query.trim() || p.symbol.toLowerCase().includes(query.trim().toLowerCase())
-  );
-
-  const peers = rows.length ? rows : fallbackPeers;
+  const peers = rows;
   const sym = market === 'us' ? '$' : '₹';
 
   const fetchPeers = async (symInput: string) => {
@@ -103,11 +79,39 @@ export default function PeerComparisonPage() {
     setError(null);
     try {
       const response = await peersAPI.compare(symInput, 12);
-      setRows(response?.rows || []);
-      setSymbol(symInput.toUpperCase());
+      const discoveredRows = response?.rows || [];
+      const normalizedInput = symInput.toUpperCase();
+
+      const singleFallbackRow =
+        discoveredRows.length === 1 &&
+        String(discoveredRows[0]?.symbol || '').toUpperCase() === normalizedInput &&
+        [
+          discoveredRows[0]?.price,
+          discoveredRows[0]?.pe,
+          discoveredRows[0]?.market_cap,
+          discoveredRows[0]?.div_yield,
+          discoveredRows[0]?.net_profit_q,
+          discoveredRows[0]?.sales_q,
+          discoveredRows[0]?.roce,
+        ].every((v) => v == null);
+
+      const backendMessage =
+        (response as { message?: string; partial?: boolean; restricted?: boolean })?.message || null;
+
+      setRows(discoveredRows);
+      setSymbol(normalizedInput);
+
+      if (backendMessage || singleFallbackRow) {
+        setError(
+          backendMessage ||
+            `Could not discover peers for ${normalizedInput}. Check the ticker symbol (example: NVDA, AAPL, RELIANCE.NS).`
+        );
+      }
+      setHasDiscovered(true);
     } catch (err: unknown) {
-      setRows(fallbackPeers);
+      setRows([]);
       setError(err instanceof Error ? err.message : 'Failed to load peer comparison.');
+      setHasDiscovered(true);
     } finally {
       setLoading(false);
     }
@@ -138,7 +142,9 @@ export default function PeerComparisonPage() {
     const defaultSymbol = market === 'india' ? 'RELIANCE.NS' : 'AAPL';
     setSymbol(defaultSymbol);
     setQuery(defaultSymbol.replace('.NS', ''));
-    fetchPeers(defaultSymbol);
+    setRows([]);
+    setError(null);
+    setHasDiscovered(false);
   }, [market]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -186,7 +192,7 @@ export default function PeerComparisonPage() {
             <button
               onClick={() => setMarket('us')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${market === 'us'
-                ? 'bg-blue-500/20 text-white shadow-[0_0_14px_rgba(96,165,250,0.25)]'
+                ? 'bg-indigo-500/20 text-white shadow-[0_0_14px_rgba(99,102,241,0.25)]'
                 : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
             >
@@ -195,7 +201,7 @@ export default function PeerComparisonPage() {
             <button
               onClick={() => setMarket('india')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${market === 'india'
-                ? 'bg-blue-500/20 text-white shadow-[0_0_14px_rgba(96,165,250,0.25)]'
+                ? 'bg-indigo-500/20 text-white shadow-[0_0_14px_rgba(99,102,241,0.25)]'
                 : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
             >
@@ -215,7 +221,7 @@ export default function PeerComparisonPage() {
             </div>
             <button
               type="submit"
-              className="relative overflow-hidden px-8 py-2.5 bg-blue-600/20 backdrop-blur-xl border border-blue-400/40 text-blue-200 hover:bg-blue-600/30 hover:border-blue-300/60 rounded-2xl text-[14px] font-dm-mono font-bold transition-all duration-300 shadow-[0_0_20px_rgba(59,130,246,0.2)] tracking-widest uppercase after:absolute after:inset-0 after:-translate-x-full hover:after:translate-x-full after:transition-transform after:duration-700 after:bg-gradient-to-r after:from-transparent after:via-blue-300/25 after:to-transparent"
+              className="relative overflow-hidden px-8 py-2.5 bg-indigo-600/20 backdrop-blur-xl border border-indigo-400/40 text-indigo-200 hover:bg-indigo-600/30 hover:border-indigo-300/60 rounded-2xl text-[14px] font-dm-mono font-bold transition-all duration-300 shadow-[0_0_20px_rgba(99,102,241,0.2)] tracking-widest uppercase after:absolute after:inset-0 after:-translate-x-full hover:after:translate-x-full after:transition-transform after:duration-700 after:bg-gradient-to-r after:from-transparent after:via-indigo-300/25 after:to-transparent"
             >
               DISCOVER_PEERS
             </button>
@@ -232,11 +238,13 @@ export default function PeerComparisonPage() {
         className="bg-white/5 border border-white/20 rounded-2xl overflow-hidden backdrop-blur-xl"
       >
         <div className="px-6 py-4 border-b border-white/20 flex items-center justify-between">
-          <div className="text-sm text-white/60">Showing peers for <span className="text-white font-semibold">{symbol || (market === 'us' ? 'US Market' : 'India Market')}</span></div>
+          <div className="text-sm text-white/60">Showing peers for <span className="text-white font-semibold">{hasDiscovered ? symbol : '-'}</span></div>
           <div className="text-xs text-white/40">{peers.length} companies</div>
         </div>
 
-        {loading ? (
+        {!hasDiscovered ? (
+          <div className="p-12 text-center text-white/60">Enter a ticker and click DISCOVER_PEERS to run discovery.</div>
+        ) : loading ? (
           <div className="p-12 text-center text-white/60">Loading comparison...</div>
         ) : peers.length === 0 ? (
           <div className="p-12 text-center text-white/60">No peer data available.</div>
@@ -263,10 +271,10 @@ export default function PeerComparisonPage() {
                 {peers.map((row, idx) => (
                   <tr key={row.symbol} 
                       onClick={() => { setQuery(row.symbol); fetchPeers(row.symbol); }}
-                      className={`hover:bg-white/5 cursor-pointer group/row transition-colors ${query.toUpperCase() === row.symbol ? 'bg-blue-500/5' : ''}`}>
+                      className={`hover:bg-white/5 cursor-pointer group/row transition-colors ${query.toUpperCase() === row.symbol ? 'bg-indigo-500/5' : ''}`}>
                     <td className="px-4 py-3 text-white/50 group-hover/row:text-white transition-colors">{idx + 1}</td>
                     <td className="px-4 py-3">
-                      <div className="text-white font-semibold group-hover/row:text-blue-300 transition-colors">{row.name}</div>
+                      <div className="text-white font-semibold group-hover/row:text-indigo-300 transition-colors">{row.name}</div>
                       <div className="text-xs text-white/40 tracking-wider font-mono">{row.symbol}</div>
                     </td>
                     <td className="px-4 py-3 text-right text-white">{sym}{formatNumber(row.price)}</td>
@@ -305,7 +313,7 @@ export default function PeerComparisonPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm p-4 md:p-8"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm p-4 md:p-8"
             onClick={() => setDetailOpen(false)}
           >
             <motion.div
@@ -314,7 +322,7 @@ export default function PeerComparisonPage() {
               exit={{ opacity: 0, y: 10, scale: 0.98 }}
               transition={{ duration: 0.22 }}
               onClick={(e) => e.stopPropagation()}
-              className="mx-auto h-full max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/20 bg-slate-950/95 shadow-[0_0_60px_rgba(56,189,248,0.2)]"
+              className="mx-auto my-2 flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/20 bg-slate-950/95 shadow-[0_0_60px_rgba(56,189,248,0.2)]"
             >
               <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5 md:p-6">
                 <div>
@@ -334,7 +342,7 @@ export default function PeerComparisonPage() {
                 </button>
               </div>
 
-              <div className="h-[calc(92vh-98px)] overflow-y-auto p-5 md:p-6">
+              <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
                 {detailLoading ? (
                   <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 p-6 text-blue-100">Loading stock fundamentals...</div>
                 ) : detailError ? (

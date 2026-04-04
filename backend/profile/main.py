@@ -6,13 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-# Localized services (Redundant Isolation)
+# Unified services
+from backend.services.market_data import market_service
 from backend.database.connection import get_db
-from .core.market_data_service import get_current_price
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/investor-profile", tags=["Investor Profile"])
+router = APIRouter(prefix="", tags=["Investor Profile"])
 
 
 class ProfilePayload(BaseModel):
@@ -103,7 +103,6 @@ def load_profile(user_id: str = "default", db=Depends(get_db)):
 # ---------------------------------------------------------------------------
 import json
 from datetime import datetime
-from .core.market_data_service import get_current_price
 
 class TradeRequest(BaseModel):
     user_id: str = "default"
@@ -134,11 +133,12 @@ def execute_trade(trade: TradeRequest, db=Depends(get_db)):
         portfolio = json.loads(investments_json) if investments_json else {}
 
         # 2. Get Price
+        symbol = trade.symbol.upper()
         exec_price = trade.price
         if not exec_price:
-            live_price = get_current_price(trade.symbol)
+            live_price = market_service.get_current_price(symbol)
             if not live_price:
-                raise HTTPException(status_code=400, detail=f"Could not fetch price for {trade.symbol}")
+                raise HTTPException(status_code=400, detail=f"Could not fetch price for {symbol}")
             exec_price = live_price
 
         # 3. Calculate Quantity/Amount
@@ -150,8 +150,6 @@ def execute_trade(trade: TradeRequest, db=Depends(get_db)):
             qty = amount / exec_price
         else:
             raise HTTPException(status_code=400, detail="Must specify amount or quantity")
-
-        symbol = trade.symbol.upper()
         current_holding = portfolio.get(symbol, {"quantity": 0, "avg_price": 0, "total_invested": 0})
         
         # 4. Update Logic
@@ -235,7 +233,7 @@ def get_portfolio(user_id: str = "default", db=Depends(get_db)):
             invested = data.get("total_invested", 0)
             
             # Fetch live price
-            current_price = get_current_price(symbol) or avg # performant fallback? Maybe 0
+            current_price = market_service.get_current_price(symbol) or avg
             
             current_val = qty * current_price
             pl = current_val - invested

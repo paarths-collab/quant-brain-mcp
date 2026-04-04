@@ -16,8 +16,6 @@ export default function NavWrapper({ children }: { children: React.ReactNode }) 
     '/research',
     '/backtest',
     '/chat',
-    '/peers',
-    '/news',
     '/portfolio',
     '/profile',
     '/settings',
@@ -28,7 +26,7 @@ export default function NavWrapper({ children }: { children: React.ReactNode }) 
   // Define routes where we want to hide the landing page Navbar and Footer
   const hideNavFooter =
     isTerminalRoute ||
-    pathname.startsWith('/sector') // keep the existing sector hide logic
+    pathname.startsWith('/sector')
 
   return (
     <>

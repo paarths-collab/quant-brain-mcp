@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Body
 from fastapi.responses import FileResponse
 from .service import generate_research_report
 from .core.groq_agent import GroqAgent
+from backend.services.market_data import market_service
 from typing import Dict, Any
 from pathlib import Path
 from datetime import datetime
@@ -9,7 +10,7 @@ from datetime import datetime
 REPORTS_DIR = Path(__file__).parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
 
-router = APIRouter(prefix="/api/research", tags=["Research Agent"])
+router = APIRouter(prefix="", tags=["Research Agent"])
 
 @router.post("/analyze")
 def analyze_stock(
@@ -51,13 +52,12 @@ def generate_research_report_file(payload: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=400, detail="Only 'quantstats' report format is supported.")
     try:
         import pandas as pd
-        import yfinance as yf
         import quantstats as qs
 
         if not benchmark:
             benchmark = "^NSEI" if market and market.lower() == "india" else "SPY"
 
-        price_df = yf.Ticker(symbol).history(period=range_period)
+        price_df = market_service.get_history(symbol, period=range_period)
         if price_df is None or price_df.empty:
             raise HTTPException(status_code=400, detail=f"No market data found for {symbol}")
 
@@ -69,7 +69,7 @@ def generate_research_report_file(payload: Dict[str, Any] = Body(...)):
         if returns.empty or len(returns) < 10:
             raise HTTPException(status_code=400, detail="Not enough return data to generate QuantStats report")
 
-        benchmark_df = yf.Ticker(str(benchmark)).history(period=range_period)
+        benchmark_df = market_service.get_history(str(benchmark), period=range_period)
         benchmark_returns = None
         if benchmark_df is not None and not benchmark_df.empty:
             benchmark_returns = benchmark_df["Close"].pct_change().dropna()
@@ -161,27 +161,49 @@ def interpret_research_image(payload: Dict[str, Any] = Body(...)):
             "- Do not invent values missing from BOTH screenshot and context\n\n"
             f"Context:\nSymbol: {symbol}\nMarket: {market}\nData context: {context}"
         )
+    elif source == "global_page_analyzer":
+        prompt = (
+            "You are a senior market analyst reviewing a full-page investment dashboard screenshot. "
+            "Write a concise, meaningful narrative for a user, not a raw extraction dump.\n\n"
+            "OUTPUT FORMAT (use markdown):\n"
+            "## Executive View\n"
+            "Write one short paragraph (3-5 sentences) covering: overall market tone, whether data is complete/incomplete, and the most important directional takeaway.\n\n"
+            "## Recommendation\n"
+            "Write one short paragraph with: Verdict (BUY/HOLD/SELL), confidence (Low/Medium/High), and one-line thesis embedded naturally in prose.\n\n"
+            "## Evidence From Screen\n"
+            "Write one paragraph summarizing visible movers and breadth. Mention at most 6 symbols total: strongest gainers, weakest losers, and 1-2 mixed/flat names. "
+            "Do not list every symbol on screen.\n\n"
+            "## QuantStats Fit\n"
+            "Write one paragraph on whether a QuantStats report is appropriate now, and include benchmark alignment (SPY for US, ^NSEI for India).\n\n"
+            "## Risks\n"
+            "Write exactly 3 bullet points with concrete downside risks based only on visible evidence.\n\n"
+            "## Next Steps\n"
+            "Write exactly 3 numbered, practical steps that are specific and immediately actionable.\n\n"
+            "Rules:\n"
+            "- Prefer paragraphs over long bullet dumps\n"
+            "- If values are missing, mention data gaps briefly in prose (avoid repeating 'not visible' many times)\n"
+            "- Use only what is visible in screenshot + provided context\n"
+            "- Do not invent numbers or indicators not visible\n\n"
+            f"Context:\nSymbol: {symbol}\nMarket: {market}\nData context: {context}"
+        )
     else:
         prompt = (
             "You are a senior equity research analyst reviewing a dashboard screenshot. "
-            "Extract all visible values and provide a structured report for a trader.\n\n"
+            "Provide a structured report for a trader with clear narrative paragraphs and concise evidence.\n\n"
             "OUTPUT FORMAT (use markdown):\n"
             "## Recommendation\n"
-            "- Verdict: BUY / HOLD / SELL\n"
-            "- Confidence: Low / Medium / High\n"
-            "- One-line thesis\n\n"
+            "Write one paragraph with verdict (BUY/HOLD/SELL), confidence, and one-line thesis.\n\n"
             "## What Is Visible\n"
-            "- Company / symbol / price / trend / sentiment / recommendation values exactly as seen\n"
-            "- Mention any values not readable as 'not visible'\n\n"
+            "Write one paragraph summarizing what is visible. Mention only the most relevant symbols/moves; do not dump every row.\n\n"
             "## QuantStats Fit Check\n"
-            "- Whether visible momentum/risk setup supports generating a quantstats report now\n"
-            "- Mention benchmark alignment (SPY for US, ^NSEI for India)\n\n"
+            "Write one short paragraph on whether current visible setup supports generating a QuantStats report now, and mention benchmark alignment (SPY for US, ^NSEI for India).\n\n"
             "## Risk Signals\n"
-            "- 3 specific downside risks from visible data\n\n"
+            "Write exactly 3 concise bullet points with specific downside risks from visible data.\n\n"
             "## Action Plan\n"
-            "- Immediate next 3 steps for the user\n\n"
+            "Write exactly 3 numbered immediate next steps.\n\n"
             "Rules:\n"
             "- Use only what is visible in the screenshot + provided context\n"
+            "- Prefer paragraph narrative over long bullet lists\n"
             "- Be precise and concise\n"
             "- Do not invent metrics that are not visible\n\n"
             f"Context:\nSymbol: {symbol}\nMarket: {market}\nData context: {context}"

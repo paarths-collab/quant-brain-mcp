@@ -2,8 +2,55 @@ import math
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List, Optional
-from .core.market_data_service import fetch_candles
 from .core.strategy_adapter import get_strategy
+from .core.data_loader import get_history, format_ticker
+
+
+def fetch_candles(
+    symbol: str,
+    interval: str = "1d",
+    period: str = "1mo",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    market: str = "us",
+) -> List[Dict[str, Any]]:
+    """Backtest-local candle fetcher to keep this module self-contained."""
+    try:
+        ticker = format_ticker(symbol, market)
+
+        if not (start and end):
+            end_ts = pd.Timestamp.now(tz="UTC").normalize()
+            period_map = {
+                "1d": pd.DateOffset(days=1),
+                "5d": pd.DateOffset(days=5),
+                "1mo": pd.DateOffset(months=1),
+                "3mo": pd.DateOffset(months=3),
+                "6mo": pd.DateOffset(months=6),
+                "1y": pd.DateOffset(years=1),
+                "2y": pd.DateOffset(years=2),
+                "5y": pd.DateOffset(years=5),
+            }
+            start_ts = end_ts - period_map.get(period, pd.DateOffset(months=1))
+            start = start_ts.strftime("%Y-%m-%d")
+            end = end_ts.strftime("%Y-%m-%d")
+
+        df = get_history(ticker=ticker, start=start, end=end, market=market, interval=interval)
+        if df is None or df.empty:
+            return []
+
+        candles: List[Dict[str, Any]] = []
+        for idx, row in df.iterrows():
+            candles.append({
+                "date": idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx),
+                "open": float(row.get("Open", 0)),
+                "high": float(row.get("High", 0)),
+                "low": float(row.get("Low", 0)),
+                "close": float(row.get("Close", 0)),
+                "volume": int(row.get("Volume", 0)),
+            })
+        return candles
+    except Exception:
+        return []
 
 
 def _safe_number(value: Any) -> Optional[float]:

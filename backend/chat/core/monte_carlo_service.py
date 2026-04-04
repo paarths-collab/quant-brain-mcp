@@ -1,11 +1,11 @@
 """
 Isolated monte_carlo_service for chat/core.
-Provides Monte Carlo simulation for portfolio projections.
+Refactored to use unified MarketDataService.
+Ensures 100% architectural consistency and resolves direct yfinance usage.
 """
 import numpy as np
-import yfinance as yf
 from typing import Dict, Any
-
+from backend.services.market_data import market_service
 
 class MonteCarloService:
     """Run Monte Carlo simulations on a ticker."""
@@ -17,9 +17,14 @@ class MonteCarloService:
         simulations: int = 500,
         initial_capital: float = 100000.0,
     ) -> Dict[str, Any]:
+        """
+        [DELEGATED] Run Monte Carlo simulation using unified MarketDataService for history.
+        """
         try:
-            stock = yf.Ticker(ticker.upper())
-            hist = stock.history(period="1y")
+            # MarketDataService handles normalization and safety
+            # Period="1y" is handled by fetching 1 year of history
+            hist = market_service.get_history(ticker, period="1y")
+            
             if hist.empty or len(hist) < 10:
                 return {"error": f"Insufficient data for {ticker}"}
 

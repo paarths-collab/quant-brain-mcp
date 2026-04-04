@@ -448,6 +448,8 @@ class LiveNewsService:
             }
 
         all_items: List[Dict[str, Any]] = []
+        start_ts = time.time()
+        max_runtime_seconds = 12.0
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -455,6 +457,8 @@ class LiveNewsService:
 
         with httpx.Client(timeout=8.0, headers=headers) as client:
             for source in self._sources:
+                if time.time() - start_ts > max_runtime_seconds:
+                    break
                 source_items: List[Dict[str, Any]] = []
                 if source.mode == "rss":
                     text = self._http_get(client, source.url)
@@ -463,6 +467,8 @@ class LiveNewsService:
                 else:
                     urls = [source.url, *source.seed_urls][: max(1, source.max_pages)]
                     for u in urls:
+                        if time.time() - start_ts > max_runtime_seconds:
+                            break
                         html = self._http_get(client, u)
                         # Dynamic sites may require JS rendering.
                         if not html:

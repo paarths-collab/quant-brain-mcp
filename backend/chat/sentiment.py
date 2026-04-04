@@ -12,7 +12,7 @@ from .core.stock_sentiment_service import (
     analyze_multiple_stocks,
 )
 
-router = APIRouter(prefix="/api/sentiment", tags=["Sentiment Analysis"])
+router = APIRouter(prefix="/sentiment", tags=["Sentiment Analysis"])
 
 
 def _sanitize_floats(obj):

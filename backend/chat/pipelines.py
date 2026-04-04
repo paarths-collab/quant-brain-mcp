@@ -61,17 +61,29 @@ except ImportError:
     CREWAI_AVAILABLE = False
     print("⚠️ CrewAI not installed - using direct service calls")
 
-# Import existing services (try both import patterns for compatibility)
+# Import existing services (Unified Architecture)
 try:
+    from backend.services.emotion_advisor_service import analyze_emotion_safe_advice
+    from backend.services.market_data import market_service
+    # Keep function names if used in localized code
+    get_history = market_service.get_history
+    get_company_snapshot = market_service.get_fundamentals
+    format_ticker = market_service.normalize_ticker
+    get_comprehensive_stock_data = market_service.get_fundamentals # Wait, check if this is correct
     
-    
-    
-    
-    
+    from backend.services.backtest_service import run_backtest_service
+    from backend.services.emotion_data_scraper import EmotionDataScraper
+    from backend.services.company_resolver import resolve_company_identity
     from backend.tools.duckduckgo_mcp import DuckDuckGoMCPTool
 except ImportError:
+    # Fallback for localized testing (To be retired)
     from services.emotion_advisor_service import analyze_emotion_safe_advice
-    from services.data_loader import get_history, get_company_snapshot, format_ticker, get_comprehensive_stock_data
+    from backend.services.market_data import market_service as ms
+    get_history = ms.get_history
+    get_company_snapshot = ms.get_fundamentals
+    format_ticker = ms.normalize_ticker
+    get_comprehensive_stock_data = ms.get_fundamentals
+    
     from services.backtest_service import run_backtest_service
     from services.emotion_data_scraper import EmotionDataScraper
     from services.company_resolver import resolve_company_identity

@@ -192,3 +192,10 @@ backend/data/*.csv
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# Visual Terminal Diagnostic/Temp Files
+*.bak
+original_*.txt
+instruction.md
+inspect_routes.py
+validate_startup.py

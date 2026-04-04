@@ -47,6 +47,14 @@ body {
   font-family: 'DM Sans', sans-serif;
 }
 
+.font-google-sans {
+  font-family: 'Google Sans', 'Google Sans Text', 'Product Sans', 'DM Sans', sans-serif;
+}
+
+.font-google-sans * {
+  font-family: inherit;
+}
+
 /* ── Typography ── */
 .tight-heading {
   letter-spacing: -0.04em;

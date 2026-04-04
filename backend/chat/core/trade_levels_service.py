@@ -1,22 +1,23 @@
 """
 Isolated trade_levels_service for chat/core.
-Calculates support/resistance and risk levels for trade setup.
+Refactored to use unified MarketDataService.
+Ensures 100% architectural consistency and resolves direct yfinance usage.
 """
-import yfinance as yf
 import pandas as pd
-from typing import Dict, Any, Optional
-
+from typing import Dict, Any
+from backend.services.market_data import market_service
 
 class TradeLevelsService:
     """Calculate trade entry, target, and stop-loss levels."""
 
     def get_levels(self, ticker: str, risk_reward: float = 2.0) -> Dict[str, Any]:
         """
-        Calculate trade levels using ATR-based stops and targets.
+        [DELEGATED] Calculate trade levels using ATR-based stops and targets via unified MarketDataService.
         """
         try:
-            stock = yf.Ticker(ticker.upper())
-            hist = stock.history(period="3mo")
+            # MarketDataService handles normalization and safety
+            # Period="3mo" is handled by fetching 3 months of history
+            hist = market_service.get_history(ticker, period="3mo")
 
             if hist.empty:
                 return {"error": f"No data for {ticker}"}
@@ -25,6 +26,7 @@ class TradeLevelsService:
 
             # ATR for stop calculation
             atr_period = 14
+            # We use the same calculation as before but with hist from market_service
             high_low = hist["High"] - hist["Low"]
             high_close = (hist["High"] - hist["Close"].shift()).abs()
             low_close = (hist["Low"] - hist["Close"].shift()).abs()

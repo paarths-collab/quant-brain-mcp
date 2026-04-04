@@ -4,7 +4,7 @@ from .service import fetch_stock_peers
 from .comparison_service import fetch_peer_comparison
 from .core.json_utils import make_json_safe
 
-router = APIRouter(prefix="/api/peers", tags=["Peers"])
+router = APIRouter(prefix="", tags=["Peers"])
 
 
 @router.get("/compare/{symbol}")
