@@ -6,7 +6,7 @@ import {
   Terminal, Send, Loader2, GripVertical,
   TrendingUp, BarChart3, AlertTriangle, Activity, Globe
 } from 'lucide-react'
-import { getWsUrl, stockAdvisorAPI, superAgentAPI, type SuperAgentResponse } from '@/lib/api'
+import { getWsUrl, stockAdvisorAPI, superAgentAPI, API_BASE, backtestAPI, type SuperAgentResponse } from '@/lib/api'
 import { MessageBubble, AnalysisRack, type Message, type RackSnapshot, type ChartPoint } from '@/components/ChatComponents'
 
 const WS_URL = getWsUrl('/ws/live')
@@ -92,25 +92,132 @@ const formatAgentSection = (title: string, payload: Record<string, unknown> | un
   return lines.join(' ')
 }
 
+const buildBullBearTable = (bull?: Record<string, unknown>, bear?: Record<string, unknown>, neutral?: Record<string, unknown>) => {
+  const rows = [
+    { name: 'Bull Agent', payload: bull },
+    { name: 'Bear Agent', payload: bear },
+    { name: 'Neutral Agent', payload: neutral },
+  ]
+
+  const lines = [
+    '| Agent | Provider | Verdict | Confidence | Reasoning | Key Factors |',
+    '| --- | --- | --- | --- | --- | --- |',
+  ]
+
+  for (const row of rows) {
+    if (!row.payload) continue
+    const verdict = typeof row.payload.verdict === 'string' ? row.payload.verdict : 'HOLD'
+    const confidence = typeof row.payload.confidence === 'number' ? `${(row.payload.confidence * 100).toFixed(0)}%` : 'N/A'
+    const provider = typeof row.payload.provider === 'string' ? row.payload.provider : 'N/A'
+    const reasoning = typeof row.payload.reasoning === 'string' && row.payload.reasoning.trim()
+      ? row.payload.reasoning.trim().split(/\s+/).slice(0, 22).join(' ') + (row.payload.reasoning.trim().split(/\s+/).length > 22 ? '...' : '')
+      : 'Analysis provided'
+    const factors = Array.isArray(row.payload.key_factors)
+      ? row.payload.key_factors.filter((item): item is string => typeof item === 'string').slice(0, 3).join('; ')
+      : 'Analysis provided'
+
+    lines.push(`| ${row.name} | ${provider} | ${verdict} | ${confidence} | ${reasoning} | ${factors} |`)
+  }
+
+  return lines.join('\n')
+}
+
+const buildFinalVerdict = (bull?: Record<string, unknown>, bear?: Record<string, unknown>, neutral?: Record<string, unknown>) => {
+  const options = [
+    { label: 'Bull', payload: bull },
+    { label: 'Bear', payload: bear },
+    { label: 'Neutral', payload: neutral },
+  ]
+    .map(item => {
+      const verdict = typeof item.payload?.verdict === 'string' ? item.payload.verdict.toUpperCase() : 'HOLD'
+      const confidence = typeof item.payload?.confidence === 'number' ? item.payload.confidence : 0.5
+      const provider = typeof item.payload?.provider === 'string' ? item.payload.provider : 'N/A'
+      return { ...item, verdict, confidence, provider }
+    })
+
+  const ranked = options
+    .filter(item => item.verdict === 'BUY' || item.verdict === 'SELL')
+    .sort((a, b) => b.confidence - a.confidence)
+
+  const winner = ranked[0] || options.find(item => item.label === 'Neutral') || options[0]
+  const confidencePct = `${(winner.confidence * 100).toFixed(0)}%`
+
+  return `## Final Verdict\n\n${winner.verdict} (${confidencePct}) based on the ${winner.label.toLowerCase()} signal from ${winner.provider}.`
+}
+
 const formatMultiPovContent = (data: SuperAgentResponse | Record<string, unknown>) => {
   const symbol = typeof data.symbol === 'string' ? data.symbol : 'UNKNOWN'
   const bull = data.bull && typeof data.bull === 'object' ? (data.bull as Record<string, unknown>) : undefined
   const bear = data.bear && typeof data.bear === 'object' ? (data.bear as Record<string, unknown>) : undefined
   const neutral = data.neutral && typeof data.neutral === 'object' ? (data.neutral as Record<string, unknown>) : undefined
 
+  const table = buildBullBearTable(bull, bear, neutral)
+  const finalVerdict = buildFinalVerdict(bull, bear, neutral)
+
   return [
     `## Bull / Bear / Neutral Debates`,
     `**Symbol:** ${symbol}`,
     '',
-    formatAgentSection('Bull verdict', bull),
+    table,
     '',
-    formatAgentSection('Bear verdict', bear),
+    formatAgentSection('Bull analysis', bull),
     '',
-    formatAgentSection('Neutral verdict', neutral),
-  ].filter(Boolean).join('\n\n')
+    formatAgentSection('Bear analysis', bear),
+    '',
+    formatAgentSection('Neutral analysis', neutral),
+    '',
+    finalVerdict,
+  ].join('\n\n')
 }
 
 const looksLikeMultiPovQuery = (query: string) => !!parseTickerFromQuery(query)
+
+const detectBacktestQuery = (query: string): { isBacktest: boolean; ticker: string | null; strategies: string[] } => {
+  const isBacktest = /backtest|test\s+strategy|run\s+strategy/i.test(query)
+  if (!isBacktest) return { isBacktest: false, ticker: null, strategies: [] }
+
+  const ticker = parseTickerFromQuery(query)
+  const availableStrategies = ['rsi_momentum', 'sma_crossover', 'ema_crossover', 'macd', 'momentum', 'mean_reversion', 'breakout']
+  const strategies = availableStrategies.filter(s => new RegExp(s.replace(/_/g, '\\s+'), 'i').test(query))
+  
+  if (!strategies.length) {
+    strategies.push('rsi_momentum', 'sma_crossover', 'macd')
+  }
+
+  return { isBacktest: true, ticker, strategies }
+}
+
+const formatBacktestContent = (data: Record<string, unknown>, ticker: string, strategies: string[]) => {
+  const stratDetails = data.strategies as Record<string, any> || {}
+  const stratEntries = Object.entries(stratDetails).slice(0, 3)
+
+  const lines = [
+    `## Backtest Results`,
+    `**Symbol:** ${ticker}`,
+    `**Strategies Tested:** ${strategies.join(', ')}`,
+    '',
+  ]
+
+  for (const [stratName, stratData] of stratEntries) {
+    const metrics = stratData?.metrics || {}
+    const totalReturn = typeof metrics.totalReturn === 'number' ? `${(metrics.totalReturn * 100).toFixed(2)}%` : 'N/A'
+    const sharpe = typeof metrics.sharpeRatio === 'number' ? metrics.sharpeRatio.toFixed(2) : 'N/A'
+    const winRate = typeof metrics.winRate === 'number' ? `${(metrics.winRate * 100).toFixed(1)}%` : 'N/A'
+    const trades = typeof metrics.totalTrades === 'number' ? metrics.totalTrades : 0
+
+    lines.push(
+      `### ${stratName.replace(/_/g, ' ').toUpperCase()}`,
+      `- **Return:** ${totalReturn}`,
+      `- **Sharpe Ratio:** ${sharpe}`,
+      `- **Win Rate:** ${winRate}`,
+      `- **Trades:** ${trades}`,
+      ''
+    )
+  }
+
+  lines.push('*View full results on the Backtest page.*')
+  return lines.filter(Boolean).join('\n')
+}
 
 const buildMonteCurve = (samples: unknown): ChartPoint[] => {
   if (!Array.isArray(samples)) return DEFAULT_RACK_SNAPSHOT.monteData
@@ -339,7 +446,43 @@ export default function ChatPage() {
     setIsLoading(true)
 
     const ticker = parseTickerFromQuery(query.trim())
+    const { isBacktest, ticker: btTicker, strategies } = detectBacktestQuery(query.trim())
+    const shouldUseBacktest = isBacktest && btTicker
     const shouldUseMultiPov = Boolean(ticker && looksLikeMultiPovQuery(query.trim()))
+
+    if (shouldUseBacktest) {
+      try {
+        const response = await fetch(`${API_BASE}/backtest/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: btTicker!,
+            market: getMarketFromTicker(btTicker!),
+            strategies,
+            interval: '1d',
+            lookback_days: 365,
+          }),
+        }).then(r => r.json())
+        const content = formatBacktestContent(response, btTicker!, strategies)
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.isStreaming)
+          return [...filtered, { id: uid(), role: 'assistant', content, timestamp: new Date() }]
+        })
+      } catch (err) {
+        const reason = err instanceof Error && err.message ? err.message : 'Backtest Failed'
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.isStreaming)
+          return [...filtered, {
+            id: uid(), role: 'assistant',
+            content: `⚠️ **Backtest Error** — ${reason}`,
+            timestamp: new Date()
+          }]
+        })
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
 
     if (shouldUseMultiPov) {
       try {
@@ -395,35 +538,43 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-20px)] overflow-hidden bg-transparent select-none">
-      <div className="flex-1 flex min-h-0 relative z-10 overflow-hidden px-4 pt-4">
+    <div className="flex flex-col h-[calc(100vh-70px)] overflow-hidden bg-transparent select-none">
+      <div className="flex-1 flex min-h-0 relative z-10 overflow-hidden">
         
         {/* Messages Pane */}
         <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto pr-6 custom-scrollbar scroll-smooth">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 custom-scrollbar scroll-smooth">
             <AnimatePresence mode="popLayout">
               {messages.length === 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto"
+                  className="flex flex-col items-center justify-center h-full max-w-5xl mx-auto py-24"
                 >
-                  <div className="flex flex-col items-center gap-6 mb-16 text-center">
+                  <div className="flex flex-col items-center gap-10 mb-20 text-center">
                     <div className="relative group">
-                      <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-indigo-600/10 to-indigo-500/5 border border-white/10 flex items-center justify-center backdrop-blur-3xl transition-transform duration-500 group-hover:scale-110">
-                        <Terminal size={36} className="text-indigo-400" />
-                        <div className="absolute inset-0 rounded-[2rem] bg-indigo-500/20 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="w-28 h-28 rounded-[2.5rem] bg-gradient-to-br from-indigo-600/10 to-indigo-500/5 border border-white/10 flex items-center justify-center backdrop-blur-3xl transition-transform duration-500 group-hover:scale-110">
+                        <Terminal size={42} className="text-indigo-400" />
+                        <div className="absolute inset-0 rounded-[2.5rem] bg-indigo-500/20 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
-                      <div className="absolute -inset-4 bg-indigo-500/5 blur-2xl rounded-full -z-10 animate-pulse" />
+                      <div className="absolute -inset-6 bg-indigo-500/5 blur-3xl rounded-full -z-10 animate-pulse" />
                     </div>
-                    <div>
-                      <h2 className="text-3xl font-syne font-extrabold text-white/90 tracking-tight mb-2">NEURAL_TERMINAL</h2>
-                      <p className="text-[12px] font-mono text-white/20 uppercase tracking-[0.4em]">Decentralized Quant Intelligence Unit</p>
+
+                    <div className="space-y-4">
+                      <h2 className="text-4xl md:text-5xl font-syne font-bold tracking-[0.3em] text-white/90 uppercase">
+                        NEURAL<span className="text-indigo-400">_</span>TERMINAL
+                      </h2>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-px w-24 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+                        <p className="text-[10px] font-mono text-white/20 uppercase tracking-[0.4em] font-medium leading-relaxed">
+                          DECENTRALIZED QUANTITATIVE INTELLIGENCE NODE // BQ_V2.0
+                        </p>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
                     {QUICK_COMMANDS.map((qc, i) => {
                       const Icon = qc.icon
                       return (
@@ -433,19 +584,19 @@ export default function ChatPage() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.4 + (i * 0.05) }}
                           onClick={() => sendMessage(qc.cmd)}
-                          className="flex items-center justify-between p-5 bg-white/[0.02] hover:bg-indigo-500/10 border border-white/5 hover:border-indigo-500/30 rounded-2xl transition-all group backdrop-blur-2xl"
+                          className="flex items-center justify-between p-6 bg-white/[0.02] hover:bg-indigo-500/10 border border-white/5 hover:border-indigo-500/30 rounded-2xl transition-all group backdrop-blur-2xl"
                         >
-                          <div className="flex items-center gap-4">
-                            <div className="p-2 rounded-lg bg-white/5 group-hover:bg-indigo-500/20 transition-colors">
-                              <Icon size={14} className="text-white/40 group-hover:text-indigo-400" />
+                          <div className="flex items-center gap-5">
+                            <div className="p-2.5 rounded-xl bg-white/5 group-hover:bg-indigo-500/20 transition-colors">
+                              <Icon size={16} className="text-white/40 group-hover:text-indigo-400" />
                             </div>
-                            <span className="text-[11px] font-mono text-white/30 group-hover:text-white/80 transition-colors uppercase tracking-widest leading-relaxed text-left">{qc.label}</span>
+                            <span className="text-[12px] font-mono text-white/30 group-hover:text-white/80 transition-colors uppercase tracking-widest leading-relaxed text-left">{qc.label}</span>
                           </div>
                           <motion.div 
                             whileHover={{ scale: 1.1 }}
                             className="text-[10px] font-mono text-indigo-500/0 group-hover:text-indigo-400/100 transition-all font-bold tracking-tighter"
                           >
-                            RUN_EXEC
+                            EXE
                           </motion.div>
                         </motion.button>
                       )
@@ -453,7 +604,7 @@ export default function ChatPage() {
                   </div>
                 </motion.div>
               ) : (
-                <div className="py-6 space-y-2 max-w-4xl mx-auto w-full">
+                <div className="py-8 space-y-4 max-w-5xl mx-auto w-full">
                   {messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
                 </div>
               )}
@@ -461,18 +612,16 @@ export default function ChatPage() {
           </div>
 
           {/* Premium Floating Command Bar */}
-          <div className="relative pt-6 pb-8 mr-6">
+          <div className="relative pt-6 pb-6 px-12 max-w-5xl mx-auto w-full">
             <div className="absolute inset-x-0 bottom-full h-24 bg-gradient-to-t from-background to-transparent pointer-events-none z-10" />
             
             <form onSubmit={handleSubmit} className="relative z-20">
               <motion.div 
                 layout
-                className="group relative flex items-center gap-4 bg-[#0d0d10]/80 border border-white/10 focus-within:border-indigo-500/40 rounded-[1.5rem] px-6 py-4 transition-all backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+                className="group relative flex items-center gap-4 bg-white/[0.03] border border-white/10 focus-within:border-indigo-500/40 rounded-2xl px-8 py-5 transition-all backdrop-blur-3xl shadow-2xl"
               >
                 <div className="flex items-center gap-2 shrink-0">
-                  <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'} animate-pulse`} />
-                  <span className="text-indigo-500/80 font-mono text-[11px] font-bold tracking-widest hidden sm:block">SYS_PROMPT</span>
-                  <span className="text-white/10 font-mono text-sm ml-1 select-none">|</span>
+                  <div className={`w-2.5 h-2.5 rounded-full ${wsConnected ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'} animate-pulse`} />
                 </div>
                 
                 <input
@@ -481,33 +630,32 @@ export default function ChatPage() {
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   placeholder="DEPLOY INTEL COMMAND..."
-                  className="flex-1 bg-transparent text-white placeholder:text-white/10 font-mono text-[13px] focus:outline-none tracking-[0.1em] placeholder:tracking-widest uppercase"
+                  className="flex-1 bg-transparent text-white placeholder:text-white/10 font-mono text-[14px] focus:outline-none tracking-[0.1em] placeholder:tracking-widest uppercase"
                   disabled={isLoading}
                 />
 
-                <div className="flex items-center gap-2">
-                   <span className="hidden md:block text-[9px] font-mono text-white/10 uppercase tracking-widest mr-2">ENTER_TO_EXEC</span>
+                <div className="flex items-center gap-3">
                    <button
                     type="submit"
                     disabled={!input.trim() || isLoading}
-                    className="shrink-0 w-12 h-12 rounded-2xl bg-indigo-600/10 hover:bg-indigo-600/30 disabled:opacity-20 flex items-center justify-center border border-indigo-500/30 transition-all shadow-[0_0_15px_rgba(79,70,229,0.1)] group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]"
+                    className="shrink-0 w-12 h-12 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/30 disabled:opacity-20 flex items-center justify-center border border-indigo-500/30 transition-all shadow-lg"
                   >
                     {isLoading
                       ? <Loader2 size={18} className="text-indigo-400 animate-spin" />
                       : <Send size={18} className="text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />}
                   </button>
                 </div>
-
-                {/* Inner Glow focus effect */}
-                <div className="absolute inset-0 rounded-[1.5rem] bg-indigo-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity" />
               </motion.div>
               
-              <div className="mt-3 px-6 flex justify-between items-center">
-                <div className="flex gap-4">
-                  <span className="text-[9px] font-mono text-white/5 uppercase tracking-[0.2em]">{messages.length} NODES_IN_THREAD</span>
-                  <span className="text-[9px] font-mono text-white/5 uppercase tracking-[0.2em]">LATENCY: 12ms</span>
+              <div className="mt-4 px-4 flex justify-between items-center opacity-30 group-focus-within:opacity-100 transition-opacity">
+                <div className="flex gap-6">
+                  <span className="text-[10px] font-mono text-white/50 uppercase tracking-[0.2em]">{messages.length} ACTIVE_NODES</span>
+                  <span className="text-[10px] font-mono text-white/50 uppercase tracking-[0.2em]">LATENCY_PING: 12MS</span>
                 </div>
-                <div className="text-[9px] font-mono text-white/5 uppercase tracking-[0.2em]">CORE_AUTH: LEVEL_4</div>
+                <div className="flex gap-4">
+                   <span className="text-[10px] font-mono text-white/50 uppercase tracking-[0.2em]">AUTH_LVL: 4</span>
+                   <span className="text-[10px] font-mono text-white/50 uppercase tracking-[0.2em]">ENCR: AES_256</span>
+                </div>
               </div>
             </form>
           </div>
@@ -516,11 +664,11 @@ export default function ChatPage() {
         {/* Dynamic Resizer Handle */}
         <div 
           onMouseDown={handleMouseDown}
-          className={`group relative w-2 bg-transparent hover:bg-indigo-500/30 cursor-col-resize transition-all shrink-0 flex items-center justify-center z-30 ${isResizing ? 'bg-indigo-500/50 w-3' : ''}`}
+          className={`group relative w-1.5 bg-transparent hover:bg-indigo-500/30 cursor-col-resize transition-all shrink-0 flex items-center justify-center z-30 ${isResizing ? 'bg-indigo-500/50 w-2' : ''}`}
         >
-          <div className="absolute h-1/2 w-px bg-white/5 group-hover:bg-indigo-500/40" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-10 bg-black/60 border border-white/10 rounded-xl flex items-center justify-center backdrop-blur-xl group-hover:border-indigo-500/40 transition-all opacity-0 group-hover:opacity-100">
-             <GripVertical size={12} className="text-white/20 group-hover:text-indigo-400/50" />
+          <div className="absolute h-1/2 w-px bg-white/10 group-hover:bg-indigo-500/40" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-12 bg-black/80 border border-white/10 rounded-xl flex items-center justify-center backdrop-blur-3xl group-hover:border-indigo-500/40 transition-all opacity-0 group-hover:opacity-100">
+             <GripVertical size={14} className="text-white/30 group-hover:text-indigo-400/70" />
           </div>
         </div>
 
