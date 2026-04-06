@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import time
 from typing import Dict, Any, List, Optional
 import logging
 from .market_data import market_service
@@ -12,6 +13,24 @@ class TechnicalAnalysisService:
     Consolidates indicator calculations (RSI, EMA, MACD) into one location for all modules.
     """
 
+    def __init__(self):
+        self._indicator_cache: Dict[str, Dict[str, Any]] = {}
+        self._indicator_cache_ttl = 180
+
+    def _cache_key(self, ticker: str, range_period: str, interval: str, market: str) -> str:
+        return f"{ticker.upper()}:{range_period}:{interval}:{market.lower()}"
+
+    def _select_history_period(self, range_period: str) -> str:
+        period_map = {
+            "1mo": "3mo",
+            "3mo": "6mo",
+            "6mo": "1y",
+            "1y": "1y",
+            "2y": "2y",
+            "5y": "5y",
+        }
+        return period_map.get((range_period or "6mo").lower(), "1y")
+
     def calculate_indicators(
         self, 
         ticker: str, 
@@ -23,12 +42,18 @@ class TechnicalAnalysisService:
         Calculate a comprehensive set of technical indicators for a given ticker.
         """
         try:
+            cache_key = self._cache_key(ticker, range_period, interval, market)
+            cached = self._indicator_cache.get(cache_key)
+            if cached and (time.time() - cached.get("cached_at", 0) < self._indicator_cache_ttl):
+                return cached.get("data", {})
+
             # 1. Ticker Normalization
             ticker = market_service.normalize_ticker(ticker, market)
             
             # 2. Fetch history with buffer for indicator warmup
             # (e.g., 200 EMA needs 200+ data points)
-            df = market_service.get_history(ticker, period="2y", interval=interval)
+            history_period = self._select_history_period(range_period)
+            df = market_service.get_history(ticker, period=history_period, interval=interval)
             
             if df.empty:
                 return {}
@@ -83,7 +108,7 @@ class TechnicalAnalysisService:
             
             dates = result_df.index.strftime('%Y-%m-%d').tolist()
             
-            return {
+            result = {
                 "dates": dates,
                 "rsi": result_df['rsi'].tolist(),
                 "macd": {
@@ -99,6 +124,8 @@ class TechnicalAnalysisService:
                 "atr": result_df['atr'].tolist(),
                 "vwap": result_df['vwap'].tolist()
             }
+            self._indicator_cache[cache_key] = {"data": result, "cached_at": time.time()}
+            return result
                 
         except Exception as e:
             logger.error(f"Error calculating indicators for {ticker}: {e}")

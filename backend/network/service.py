@@ -2,9 +2,11 @@ import requests
 import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import logging
 
 # --- Configuration (Local duplication for isolation) ---
 FMP_API_KEY = os.getenv("FMP_API_KEY", "78b77a7605d81aa4f107f90f230cc00d")
+logger = logging.getLogger(__name__)
 
 def fetch_stock_peers(symbol: str) -> List[Dict]:
     """
@@ -12,14 +14,29 @@ def fetch_stock_peers(symbol: str) -> List[Dict]:
     """
     url = f"https://financialmodelingprep.com/api/v4/stock_peers"
     params = {"symbol": symbol.upper(), "apikey": FMP_API_KEY}
+    if not FMP_API_KEY:
+        logger.warning("FMP API key is missing; returning empty peers for %s", symbol)
+        return []
+
     try:
         response = requests.get(url, params=params, timeout=10)
-        if response.status_code == 403: return []
+        if response.status_code == 403:
+            logger.warning("FMP returned 403 for symbol=%s", symbol)
+            return []
         response.raise_for_status()
         data = response.json()
-        if not isinstance(data, list): return []
+        if not isinstance(data, list):
+            logger.warning("Unexpected FMP payload type for symbol=%s: %s", symbol, type(data).__name__)
+            return []
         return [{"symbol": item.get("symbol"), "companyName": item.get("companyName"), "marketCap": item.get("mktCap")} for item in data]
-    except:
+    except requests.RequestException as exc:
+        logger.warning("FMP request failed for symbol=%s: %s", symbol, exc)
+        return []
+    except ValueError as exc:
+        logger.warning("FMP JSON decode failed for symbol=%s: %s", symbol, exc)
+        return []
+    except Exception as exc:
+        logger.exception("Unexpected peer fetch error for symbol=%s: %s", symbol, exc)
         return []
 
 class NetworkService:

@@ -27,6 +27,27 @@ class MarketDataService:
             return ticker
             
         ticker = ticker.upper().strip()
+        ticker = ticker.replace(" ", "_")
+
+        # Normalize common index-feed prefixes like "INDEXNSE: NIFTY_AUTO".
+        if ticker.startswith("INDEXNSE:"):
+            ticker = ticker.split(":", 1)[1].strip()
+
+        index_alias_map = {
+            "NIFTY_AUTO": "^CNXAUTO",
+            "NIFTY_BANK": "^NSEBANK",
+            "BANK_NIFTY": "^NSEBANK",
+            "NIFTY_IT": "^CNXIT",
+            "NIFTY_METAL": "^CNXMETAL",
+            "NIFTY_PHARMA": "^CNXPHARMA",
+            "NIFTY_FIN_SERVICE": "^NSEBANK",
+            "NIFTY_NEXT_50": "^NSMID50",
+            "NIFTY_50": "^NSEI",
+            "SENSEX": "^BSESN",
+        }
+
+        if ticker in index_alias_map:
+            return index_alias_map[ticker]
         
         # Handle index mapping (e.g. NIFTY_50 -> ^NSEI)
         index_map = {

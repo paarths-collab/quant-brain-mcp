@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import praw
 import yfinance as yf
 import pandas as pd
@@ -21,6 +22,8 @@ WealthState = dict
 # from ..utils.data_loader import DataLoader
 from .llm_manager import LLMManager
 
+logger = logging.getLogger(__name__)
+
 class StockSelectionAgent:
     """Stage 3: Select, Validate (Reddit), Backtest, and Deep Dive (Supply Chain)"""
     
@@ -29,12 +32,14 @@ class StockSelectionAgent:
         # Clients
         try:
             self.tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-        except:
+        except Exception as exc:
+            logger.debug("Tavily client initialization failed: %s", exc)
             self.tavily = None
             
         try:
             self.finnhub_client = finnhub.Client(api_key=os.getenv("FINNHUB_API_KEY"))
-        except:
+        except Exception as exc:
+            logger.debug("Finnhub client initialization failed: %s", exc)
             self.finnhub_client = None
             
         # Initialize Reddit (Fail silently if credentials missing)
@@ -44,7 +49,8 @@ class StockSelectionAgent:
                 client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
                 user_agent=os.getenv("REDDIT_USER_AGENT")
             )
-        except:
+        except Exception as exc:
+            logger.debug("Reddit client initialization failed: %s", exc)
             self.reddit = None
         
     def __call__(self, state: WealthState) -> WealthState:
@@ -125,8 +131,8 @@ class StockSelectionAgent:
             if beta > 1.3:
                 mode = "SIP (Staggered Entry)" # High volatility -> SIP to average cost
                 reason = "High Stock Volatility"
-        except:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to compute beta for %s: %s", ticker, exc)
             
         return f"{mode} - Reason: {reason}"
 
@@ -139,7 +145,8 @@ class StockSelectionAgent:
             
             response = self.llm_manager.invoke([HumanMessage(content=prompt)])
             return json.loads(response.content.replace('```json', '').replace('```', '').strip())
-        except:
+        except Exception as exc:
+            logger.warning("Screener LLM failed for sector=%s market=%s: %s", sector, market, exc)
             print("ΓÜá∩╕Å Screener LLM failed. No candidates generated.")
             return []
 
@@ -159,10 +166,12 @@ class StockSelectionAgent:
                         for post in subreddit.search(ticker, time_filter='week', limit=5):
                             score += post.score 
                             count += 1
-                    except:
+                    except Exception as exc:
+                        logger.debug("Reddit sentiment subquery failed for %s/%s: %s", ticker, sub, exc)
                         continue # Skip individual sub failures
                 scores[ticker] = score / count if count > 0 else 0
-            except:
+            except Exception as exc:
+                logger.debug("Reddit sentiment failed for %s: %s", ticker, exc)
                 scores[ticker] = 0 # Silent fail per ticker
         return scores
 
@@ -176,7 +185,8 @@ class StockSelectionAgent:
                     results[ticker] = {"return_1y": round(float(ret), 2)}
                 else:
                     results[ticker] = {"return_1y": 0.0}
-            except:
+            except Exception as exc:
+                logger.debug("Backtest download failed for %s: %s", ticker, exc)
                 results[ticker] = {"return_1y": 0.0}
         return results
 
@@ -205,7 +215,8 @@ class StockSelectionAgent:
             query_prompt = f"Generate 1 targeted search query to find {ticker}'s key suppliers, risks, or major recent contracts. Return ONLY the raw query string."
             search_query = self.llm_manager.invoke([HumanMessage(content=query_prompt)]).content.strip().replace('"', '')
             print(f"   Γ₧ñ Gemini suggested: '{search_query}'")
-        except:
+        except Exception as exc:
+            logger.debug("Search query generation failed for %s: %s", ticker, exc)
             search_query = f"{ticker} supply chain risks and major contracts"
 
         # 1. Try Tavily (Primary)
@@ -263,8 +274,8 @@ class StockSelectionAgent:
                     research['summary'] = [n['headline'] for n in news[:3]]
                     research['source'] = 'Finnhub'
                     return research
-            except:
-                pass
+            except Exception as exc:
+                logger.debug("Finnhub research fallback failed for %s: %s", ticker, exc)
         
         research['summary'] = ["No specific supply chain data found."]
         return research
@@ -274,8 +285,8 @@ class StockSelectionAgent:
         # 1. YFinance
         try:
             return yf.Ticker(ticker).fast_info.last_price
-        except:
-            pass
+        except Exception as exc:
+            logger.debug("YFinance price fetch failed for %s: %s", ticker, exc)
             
         # 2. Finnhub
         if self.finnhub_client:
@@ -283,8 +294,8 @@ class StockSelectionAgent:
                 quote = self.finnhub_client.quote(ticker)
                 if quote and quote['c']:
                     return quote['c']
-            except:
-                pass
+            except Exception as exc:
+                logger.debug("Finnhub price fallback failed for %s: %s", ticker, exc)
         
         return 0.0
 

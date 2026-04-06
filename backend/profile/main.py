@@ -218,7 +218,13 @@ def get_portfolio(user_id: str = "default", db=Depends(get_db)):
         ).mappings().first()
 
         if not row:
-            return {"pairtfolio": [], "total_value": 0, "total_pl": 0}
+            return {
+                "holdings": [],
+                "total_value": 0.0,
+                "total_invested": 0.0,
+                "total_pl": 0.0,
+                "total_pl_pct": 0.0,
+            }
 
         investments_json = row.get("existing_investments")
         portfolio_map = json.loads(investments_json) if investments_json else {}

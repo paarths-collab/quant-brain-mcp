@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import html2canvas from 'html2canvas'
 import ReactMarkdown from 'react-markdown'
 import { Camera, Loader2, Sparkles, X } from 'lucide-react'
-import { researchAPI } from '@/lib/api'
+import { researchAPI, extractErrorMessage } from '@/lib/api'
 
 const BTN_BASE =
   'fixed bottom-6 right-6 z-[90] flex items-center gap-2 px-4 py-2 rounded-xl border border-indigo-400/35 bg-indigo-500/12 text-indigo-200 text-[11px] font-dm-mono tracking-widest uppercase backdrop-blur-xl shadow-[0_0_20px_rgba(99,102,241,0.25)] hover:bg-indigo-500/20 hover:border-indigo-300/55 transition-all duration-300'
@@ -88,7 +88,7 @@ export default function GlobalPageAnalyzer() {
       setReport(res.analysis || 'Analysis complete.')
       setOpen(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Screenshot analysis failed')
+      setError(extractErrorMessage(err, 'Screenshot analysis failed'))
       setOpen(true)
     } finally {
       setLoading(false)

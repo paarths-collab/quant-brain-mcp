@@ -186,6 +186,85 @@ class MomentumStrategy(BaseStrategy):
 
 
 # ─────────────────────────────────────────
+# RSI REVERSAL
+# ─────────────────────────────────────────
+
+class RSIReversalStrategy(BaseStrategy):
+    name = "RSI Reversal"
+
+    def __init__(self, window: int = 14, lower: int = 30, upper: int = 70):
+        self.window = int(window)
+        self.lower = int(lower)
+        self.upper = int(upper)
+        self.parameters = {"window": self.window, "lower": self.lower, "upper": self.upper}
+
+    def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        delta = df["Close"].diff()
+        gain = delta.where(delta > 0, 0).rolling(self.window).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(self.window).mean()
+        rs = gain / loss.replace(0, np.nan)
+        df["rsi"] = 100 - (100 / (1 + rs))
+        
+        df["signal"] = 0
+        # Buy when RSI crosses above lower threshold
+        df.loc[(df["rsi"].shift(1) < self.lower) & (df["rsi"] >= self.lower), "signal"] = 1
+        # Sell when RSI crosses below upper threshold
+        df.loc[(df["rsi"].shift(1) > self.upper) & (df["rsi"] <= self.upper), "signal"] = -1
+        return df
+
+
+# ─────────────────────────────────────────
+# FIBONACCI PULLBACK
+# ─────────────────────────────────────────
+
+class FibonacciPullbackStrategy(BaseStrategy):
+    name = "Fibonacci Pullback"
+
+    def __init__(self, lookback: int = 50):
+        self.lookback = int(lookback)
+        self.parameters = {"lookback": self.lookback}
+
+    def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df["hh"] = df["High"].rolling(self.lookback).max()
+        df["ll"] = df["Low"].rolling(self.lookback).min()
+        df["fib_618"] = df["hh"] - (df["hh"] - df["ll"]) * 0.618
+        
+        df["signal"] = 0
+        # Buy on pullback to 61.8% level
+        df.loc[(df["Close"] <= df["fib_618"]) & (df["Close"].shift(1) > df["fib_618"]), "signal"] = 1
+        # Exit when reaching old high
+        df.loc[df["Close"] >= df["hh"].shift(1), "signal"] = -1
+        return df
+
+
+# ─────────────────────────────────────────
+# SUPPORT & RESISTANCE
+# ─────────────────────────────────────────
+
+class SupportResistanceStrategy(BaseStrategy):
+    name = "Support & Resistance"
+
+    def __init__(self, lookback: int = 30, tolerance_pct: float = 0.01):
+        self.lookback = int(lookback)
+        self.tolerance = float(tolerance_pct)
+        self.parameters = {"lookback": self.lookback, "tolerance_pct": self.tolerance}
+
+    def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df["support"] = df["Low"].rolling(self.lookback).min()
+        df["resistance"] = df["High"].rolling(self.lookback).max()
+        
+        df["signal"] = 0
+        # Buy when near support
+        df.loc[df["Close"] <= df["support"] * (1 + self.tolerance), "signal"] = 1
+        # Sell when near resistance
+        df.loc[df["Close"] >= df["resistance"] * (1 - self.tolerance), "signal"] = -1
+        return df
+
+
+# ─────────────────────────────────────────
 # REGISTRY & FACTORY
 # ─────────────────────────────────────────
 
@@ -197,6 +276,9 @@ STRATEGY_REGISTRY = {
     "breakout": BreakoutStrategy,
     "mean_reversion": MeanReversionStrategy,
     "momentum": MomentumStrategy,
+    "rsi_reversal": RSIReversalStrategy,
+    "fibonacci_pullback": FibonacciPullbackStrategy,
+    "support_resistance": SupportResistanceStrategy,
 }
 
 

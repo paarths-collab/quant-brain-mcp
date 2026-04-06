@@ -30,8 +30,10 @@ router = APIRouter(prefix="", tags=["Sectors & Treemaps"])
 def _sanitize_for_json(value):
     """Recursively replace non-finite floats with None for JSON compliance."""
     if hasattr(value, "item"):
-        try: value = value.item()
-        except: pass
+        try:
+            value = value.item()
+        except Exception as exc:
+            logger.debug("Failed to coerce scalar value %r: %s", value, exc)
     if isinstance(value, float):
         return value if math.isfinite(value) else None
     if isinstance(value, (int, str, bool)) or value is None:

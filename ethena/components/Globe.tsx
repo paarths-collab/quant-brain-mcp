@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useInView } from 'framer-motion'
+import { extractErrorMessage } from '@/lib/api'
 
 interface Point {
   x: number; y: number; z: number;
@@ -88,7 +89,7 @@ export default function ContinentGlobe() {
         
         loadBatch()
       } catch (err) {
-        console.error("Failed to load map asset for globe.", err)
+        console.error('Failed to load map asset for globe:', extractErrorMessage(err, 'Unknown globe asset error'))
       }
     }
 

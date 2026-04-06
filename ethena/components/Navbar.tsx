@@ -3,23 +3,21 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronDown, Box, Info } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronDown, Info } from 'lucide-react'
 
 export default function Navbar() {
   const pathname = usePathname()
   const [scrolled, setScrolled] = useState(false)
-  const [hoveredLink, setHoveredLink] = useState<string | null>(null)
-
-  // Hide Navbar on Terminal routes
-  const terminalRoutes = ['/dashboard', '/chat', '/research', '/backtest', '/technical', '/portfolio']
-  if (terminalRoutes.some(route => pathname?.startsWith(route))) return null
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Hide Navbar on Terminal routes
+  const terminalRoutes = ['/dashboard', '/chat', '/research', '/backtest', '/technical', '/portfolio']
+  if (terminalRoutes.some(route => pathname?.startsWith(route))) return null
 
   return (
     <div className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4 w-full pointer-events-none">
@@ -55,8 +53,6 @@ export default function Navbar() {
                 key={link.label}
                 href={link.href}
                 className="relative flex items-center h-full px-3.5 group"
-                onMouseEnter={() => setHoveredLink(link.label)}
-                onMouseLeave={() => setHoveredLink(null)}
               >
                 <div className={`flex items-center gap-1.5 text-[13px] font-sans font-medium transition-colors duration-200 z-10 ${isActive ? 'text-white' : 'text-white/60 group-hover:text-white/90'
                   }`}>

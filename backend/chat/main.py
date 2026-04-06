@@ -19,6 +19,6 @@ router.include_router(sentiment_router)
 router.include_router(research_router)
 
 # Example of a new, unified endpoint if needed later
-@router.get("/chat/status")
+@router.get("/status")
 def get_chat_status():
     return {"status": "AI modules fully operational"}

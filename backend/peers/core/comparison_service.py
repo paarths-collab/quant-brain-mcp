@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import logging
 import requests
 import yfinance as yf
 from backend.services.market_data import market_service
@@ -10,6 +11,7 @@ FMP_API_KEY = os.getenv("FMP_API_KEY", "")
 FMP_BASE_URL = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com/api/v4")
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 PEERS_PREMIUM = False
+logger = logging.getLogger(__name__)
 
 try:
     import finnhub
@@ -349,8 +351,8 @@ def fetch_peer_comparison(symbol: str, limit: int = 12, debug: bool = False) -> 
                 name = _finnhub_company_name(p)
                 if name:
                     name_map[p] = name
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Finnhub peers lookup failed for %s: %s", fh_sym, exc)
 
     peers_data = None
     if not symbols and FMP_API_KEY:

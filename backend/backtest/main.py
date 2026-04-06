@@ -12,21 +12,19 @@ import numpy as np
 import json
 import asyncio
 import os
+import logging
 
 # Use a non-GUI backend for server-side chart/report generation.
 matplotlib.use("Agg")
 
 router = APIRouter(prefix="", tags=["Backtest"])
+logger = logging.getLogger(__name__)
 REPORTS_DIR = Path(__file__).parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
 
 
 def _normalize_strategy_name(strategy: str) -> str:
-    s = (strategy or "").strip().lower()
-    aliases = {
-        "rsi_reversal": "rsi_momentum",
-    }
-    return aliases.get(s, s)
+    return (strategy or "").strip().lower()
 
 
 def _normalize_strategy_params(strategy: str, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -44,27 +42,35 @@ def _normalize_strategy_params(strategy: str, params: Dict[str, Any]) -> Dict[st
         if "long_window" in normalized and "slow_period" not in normalized:
             normalized["slow_period"] = normalized.pop("long_window")
 
-    if s == "momentum":
+    if s in {"momentum", "fibonacci_pullback", "support_resistance"}:
         if "lookback" in normalized and "period" not in normalized:
-            normalized["period"] = normalized.pop("lookback")
+            # momentum uses 'period', others use 'lookback' in ctor
+            if s == "momentum":
+                normalized["period"] = normalized.pop("lookback")
         if "lookback_period" in normalized and "period" not in normalized:
-            normalized["period"] = normalized.pop("lookback_period")
+            if s == "momentum":
+                normalized["period"] = normalized.pop("lookback_period")
         if "window" in normalized and "period" not in normalized:
-            normalized["period"] = normalized.pop("window")
+            if s == "momentum":
+                normalized["period"] = normalized.pop("window")
 
-    if s in {"mean_reversion", "rsi_momentum"}:
-        if "window" in normalized and "period" not in normalized:
-            normalized["period"] = normalized.pop("window")
-        if "rsi_window" in normalized and "period" not in normalized:
-            normalized["period"] = normalized.pop("rsi_window")
+    if s in {"mean_reversion", "rsi_momentum", "rsi_reversal"}:
+        # Note: rsi_reversal ctor uses 'window', 'lower', 'upper' directly
+        # rsi_momentum and mean_reversion use 'period', 'oversold', 'overbought'
+        if s != "rsi_reversal":
+            if "window" in normalized and "period" not in normalized:
+                normalized["period"] = normalized.pop("window")
+            if "rsi_window" in normalized and "period" not in normalized:
+                normalized["period"] = normalized.pop("rsi_window")
+            if "lower" in normalized and "oversold" not in normalized:
+                normalized["oversold"] = normalized.pop("lower")
+            if "upper" in normalized and "overbought" not in normalized:
+                normalized["overbought"] = normalized.pop("upper")
+
         if "num_std" in normalized and "std_dev" not in normalized:
             normalized["std_dev"] = normalized.pop("num_std")
         if "std" in normalized and "std_dev" not in normalized:
             normalized["std_dev"] = normalized.pop("std")
-        if "lower" in normalized and "oversold" not in normalized:
-            normalized["oversold"] = normalized.pop("lower")
-        if "upper" in normalized and "overbought" not in normalized:
-            normalized["overbought"] = normalized.pop("upper")
 
     return normalized
 
@@ -404,12 +410,12 @@ async def backtest_websocket(websocket: WebSocket):
                 })
                 
     except WebSocketDisconnect:
-        pass
+        logger.info("Backtest websocket disconnected")
     except Exception as e:
         try:
             await websocket.send_json({"error": str(e)})
-        except:
-            pass
+        except Exception as send_error:
+            logger.debug("Failed to send websocket error payload: %s", send_error)
 
 
 def _sanitize_floats(obj):

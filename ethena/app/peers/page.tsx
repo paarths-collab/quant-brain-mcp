@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, RefreshCw, ArrowUpRight, X, Building2, Globe, BarChart3 } from 'lucide-react';
-import { peersAPI, fundamentalsAPI, type PeerRow, type FundamentalsSummaryResponse } from '@/lib/api';
+import { peersAPI, fundamentalsAPI, extractErrorMessage, type PeerRow, type FundamentalsSummaryResponse } from '@/lib/api';
 
 function formatNumber(n: number | null | undefined) {
   if (n == null) return '-';
@@ -110,7 +110,7 @@ export default function PeerComparisonPage() {
       setHasDiscovered(true);
     } catch (err: unknown) {
       setRows([]);
-      setError(err instanceof Error ? err.message : 'Failed to load peer comparison.');
+      setError(extractErrorMessage(err, 'Failed to load peer comparison.'));
       setHasDiscovered(true);
     } finally {
       setLoading(false);
@@ -132,7 +132,7 @@ export default function PeerComparisonPage() {
       setStockDetail(details || null);
     } catch (err: unknown) {
       setStockDetail(null);
-      setDetailError(err instanceof Error ? err.message : 'Failed to load stock details.');
+      setDetailError(extractErrorMessage(err, 'Failed to load stock details.'));
     } finally {
       setDetailLoading(false);
     }

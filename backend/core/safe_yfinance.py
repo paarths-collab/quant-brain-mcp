@@ -270,7 +270,8 @@ def safe_fetch_multiple_quotes(
     if not symbols_to_fetch:
         return results
 
-    batch_size = 20
+    # Smaller batches reduce the chance that a single slow ticker stalls the whole snapshot.
+    batch_size = 5
     batches = [symbols_to_fetch[i:i + batch_size] for i in range(0, len(symbols_to_fetch), batch_size)]
     
     def fetch_batch(batch_symbols):
@@ -324,8 +325,8 @@ def safe_fetch_multiple_quotes(
                     if r.get("price") is not None:
                         cache_key = _cache_key(s, "7d")
                         _cache[cache_key] = {"status": "ok", "quote_data": r, "cached_at": now}
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Quote batch future failed: %s", exc)
 
     return results
 

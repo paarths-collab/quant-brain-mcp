@@ -13,6 +13,11 @@ export default function NavWrapper({ children }: { children: React.ReactNode }) 
     '/technical',
     '/markets',
     '/sectors',
+    '/sector',
+    '/peers',
+    '/peer',
+    '/news',
+    '/network',
     '/research',
     '/backtest',
     '/chat',
@@ -22,21 +27,20 @@ export default function NavWrapper({ children }: { children: React.ReactNode }) 
   ]
 
   const isTerminalRoute = terminalRoutes.some((route) => pathname.startsWith(route))
+  const isHomePage = pathname === '/'
 
-  // Define routes where we want to hide the landing page Navbar and Footer
-  const hideNavFooter =
-    isTerminalRoute ||
-    pathname.startsWith('/sector')
+  // Show landing chrome only on the main front page.
+  const showLandingChrome = isHomePage
 
   return (
     <>
-      {!hideNavFooter && <Navbar />}
+      {showLandingChrome && <Navbar />}
       {isTerminalRoute ? (
         <TerminalLayout>{children}</TerminalLayout>
       ) : (
         children
       )}
-      {!hideNavFooter && <Footer />}
+      {showLandingChrome && <Footer />}
     </>
   )
 }

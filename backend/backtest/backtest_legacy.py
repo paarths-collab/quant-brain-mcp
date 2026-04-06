@@ -12,8 +12,10 @@ import numpy as np
 import json
 import asyncio
 import os
+import logging
 
 router = APIRouter(prefix="/api/backtest", tags=["Backtest"])
+logger = logging.getLogger(__name__)
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
 
@@ -353,12 +355,12 @@ async def backtest_websocket(websocket: WebSocket):
                 })
                 
     except WebSocketDisconnect:
-        pass
+        logger.info("Backtest websocket disconnected")
     except Exception as e:
         try:
             await websocket.send_json({"error": str(e)})
-        except:
-            pass
+        except Exception as send_error:
+            logger.debug("Failed to send websocket error payload: %s", send_error)
 
 
 def _sanitize_floats(obj):

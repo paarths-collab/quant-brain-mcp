@@ -154,7 +154,7 @@ def _parse_dt(value: Any) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except Exception:
-        pass
+        logger.debug("ISO datetime parse failed for value=%r", raw)
     for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M:%S"):
         try:
             return datetime.strptime(raw, fmt)

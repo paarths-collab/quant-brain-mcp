@@ -1,50 +1,82 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { RefreshCw, Briefcase, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, PieChart } from 'lucide-react'
-import { PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { investorProfileAPI } from '@/lib/api'
-
-// Mock data for UI — real app fetches from backend's investorProfileAPI
-const MOCK = {
-  total_value: 124830.55,
-  total_invested: 100000,
-  total_pl: 24830.55,
-  total_pl_pct: 24.83,
-  holdings: [
-    { symbol: 'NVDA', quantity: 50, avg_price: 420.0, current_price: 897.5, current_value: 44875, pl: 23875, pl_pct: 113.69 },
-    { symbol: 'MSFT', quantity: 30, avg_price: 310.0, current_price: 415.8, current_value: 12474, pl: 3174, pl_pct: 34.13 },
-    { symbol: 'AAPL', quantity: 40, avg_price: 155.0, current_price: 189.4, current_value: 7576, pl: 1376, pl_pct: 22.19 },
-    { symbol: 'TSLA', quantity: 20, avg_price: 200.0, current_price: 171.0, current_value: 3420, pl: -580, pl_pct: -14.5 },
-    { symbol: 'META', quantity: 15, avg_price: 400.0, current_price: 502.3, current_value: 7534.5, pl: 1534.5, pl_pct: 25.58 },
-  ],
-}
+import { useState, useEffect, useCallback } from 'react'
+import { RefreshCw, Briefcase, ArrowUpRight, ArrowDownRight, PieChart } from 'lucide-react'
+import { PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { investorProfileAPI, extractErrorMessage } from '@/lib/api'
 
 const COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6', '#ef4444', '#06b6d4']
 
-export default function PortfolioPage() {
-  const [portfolio, setPortfolio] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+type Holding = {
+  symbol: string
+  quantity: number
+  avg_price: number
+  current_price: number
+  current_value: number
+  pl: number
+  pl_pct: number
+}
 
-  const fetchPortfolio = async () => {
-    setLoading(true)
-    try {
-      const data = await investorProfileAPI.getPortfolio()
-      setPortfolio(data)
-    } catch {
-      setPortfolio(MOCK) // fallback to mock
-    } finally {
-      setLoading(false)
+type PortfolioData = {
+  total_value: number
+  total_invested: number
+  total_pl: number
+  total_pl_pct: number
+  holdings: Holding[]
+}
+
+type PieDatum = {
+  name: string
+  value: number
+  pct: string
+}
+
+export default function PortfolioPage() {
+  const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const normalizePortfolio = (data: unknown): PortfolioData => {
+    const obj = (typeof data === 'object' && data !== null) ? (data as Partial<PortfolioData>) : {}
+    const holdings = Array.isArray(obj.holdings) ? obj.holdings : []
+    return {
+      total_value: Number(obj.total_value ?? 0),
+      total_invested: Number(obj.total_invested ?? 0),
+      total_pl: Number(obj.total_pl ?? 0),
+      total_pl_pct: Number(obj.total_pl_pct ?? 0),
+      holdings: holdings.map((h) => ({
+        symbol: String((h as Partial<Holding>).symbol ?? ''),
+        quantity: Number((h as Partial<Holding>).quantity ?? 0),
+        avg_price: Number((h as Partial<Holding>).avg_price ?? 0),
+        current_price: Number((h as Partial<Holding>).current_price ?? 0),
+        current_value: Number((h as Partial<Holding>).current_value ?? 0),
+        pl: Number((h as Partial<Holding>).pl ?? 0),
+        pl_pct: Number((h as Partial<Holding>).pl_pct ?? 0),
+      })),
     }
   }
 
-  useEffect(() => { fetchPortfolio() }, [])
+  const fetchPortfolio = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await investorProfileAPI.getPortfolio()
+      setPortfolio(normalizePortfolio(data))
+    } catch (err) {
+      setPortfolio(normalizePortfolio(null))
+      setError(extractErrorMessage(err, 'Portfolio service unavailable'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void fetchPortfolio() }, [fetchPortfolio])
 
   const holdings = portfolio?.holdings ?? []
   const totalValue = portfolio?.total_value ?? 0
 
   // Pie chart data
-  const pieData = holdings.map((h: any) => ({
+  const pieData: PieDatum[] = holdings.map((h) => ({
     name: h.symbol,
     value: h.current_value,
     pct: ((h.current_value / totalValue) * 100).toFixed(1),
@@ -84,6 +116,12 @@ export default function PortfolioPage() {
         </div>
       ) : (
         <>
+          {error && (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+              {error}
+            </div>
+          )}
+
           {/* Summary Cards */}
           <div className="grid grid-cols-3 gap-4">
             <div className="p-5 rounded-xl border border-white/[0.07] bg-white/[0.02]">
@@ -120,7 +158,7 @@ export default function PortfolioPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {holdings.map((h: any) => {
+                    {holdings.map((h) => {
                       const hUp = h.pl >= 0
                       return (
                         <tr key={h.symbol} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
@@ -164,16 +202,16 @@ export default function PortfolioPage() {
               <ResponsiveContainer width="100%" height={200}>
                 <RechartsPie>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value" paddingAngle={2}>
-                    {pieData.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    {pieData.map((_, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip
                     contentStyle={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11, fontFamily: 'monospace' }}
-                    formatter={(value: any, name: any, props: any) => [`$${value.toLocaleString()} (${props.payload.pct}%)`, props.payload.name]}
+                    formatter={(value: number, _name: string, props: { payload?: PieDatum }) => [`$${value.toLocaleString()} (${props.payload?.pct ?? '0.0'}%)`, props.payload?.name ?? '-']}
                   />
                 </RechartsPie>
               </ResponsiveContainer>
               <div className="mt-4 space-y-2">
-                {pieData.map((d: any, i: number) => (
+                {pieData.map((d, i: number) => (
                   <div key={d.name} className="flex items-center justify-between text-[11px] font-mono">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS[i % COLORS.length] }} />

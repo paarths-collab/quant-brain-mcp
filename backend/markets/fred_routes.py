@@ -5,6 +5,7 @@ from datetime import date, timedelta, datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import json
+import logging
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from pydantic import BaseModel
 
@@ -19,6 +20,7 @@ router = APIRouter(
 )
 
 GOLD_SERIES_IDS = {"GOLDAMGBD228NLBM"}
+logger = logging.getLogger(__name__)
 
 
 def _fetch_gold_price_from_yf(max_age_hours: int = 12) -> Optional[Dict[str, Any]]:
@@ -32,12 +34,13 @@ def _fetch_gold_price_from_yf(max_age_hours: int = 12) -> Optional[Dict[str, Any
                 cached_dt = datetime.fromisoformat(cached_at)
                 if datetime.utcnow() - cached_dt < timedelta(hours=max_age_hours):
                     return payload.get("payload")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to read cached gold price payload: %s", exc)
 
     try:
         import yfinance as yf
-    except Exception:
+    except Exception as exc:
+        logger.debug("Failed to fetch gold price from yfinance: %s", exc)
         return None
 
     try:

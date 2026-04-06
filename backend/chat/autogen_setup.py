@@ -14,7 +14,8 @@ try:
     env_path = Path(__file__).parent.parent / ".env"
     load_dotenv(env_path)
 except ImportError:
-    pass
+    logger = logging.getLogger(__name__)
+    logger.debug("python-dotenv not installed; skipping .env load in autogen setup")
 
 logger = logging.getLogger(__name__)
 

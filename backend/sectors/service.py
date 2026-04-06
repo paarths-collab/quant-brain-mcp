@@ -1,6 +1,7 @@
 import csv
 import json
 import logging
+import time
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -19,7 +20,10 @@ class SectorsService:
         self._redis = redis_client
         self._indices_cache = {}
         self._constituents_cache = {}
+        self._market_indices_cache = {}
+        self._live_indices_cache = {}
         self._cache_ttl = 3600
+        self._live_cache_ttl = 60
 
     def _candidate_tickers(self, symbol: str, market: str) -> List[str]:
         """Build fallback ticker candidates for a symbol."""
@@ -44,10 +48,9 @@ class SectorsService:
 
     def _resolve_quote(self, symbol: str, market: str, quotes: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         """Resolve a quote from existing batch result, then retry with ticker fallbacks."""
-        for t in self._candidate_tickers(symbol, market):
-            q = quotes.get(t, {})
-            if q.get("price") is not None or q.get("change_percent") is not None:
-                return q
+        q = self._lookup_quote_from_prefetched(symbol, market, quotes)
+        if q:
+            return q
 
         # Retry once with fallback tickers for stubborn symbols.
         candidates = self._candidate_tickers(symbol, market)
@@ -56,10 +59,54 @@ class SectorsService:
 
         for t in candidates:
             q = retried.get(t, {})
-            if q.get("price") is not None or q.get("change_percent") is not None:
+            if q.get("price") is not None or self._extract_change_percent(q) is not None:
                 return q
 
         return {}
+
+    def _lookup_quote_from_prefetched(
+        self,
+        symbol: str,
+        market: str,
+        quotes: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Resolve quote from existing prefetched batch only (no network retries)."""
+        for t in self._candidate_tickers(symbol, market):
+            q = quotes.get(t, {})
+            if q.get("price") is not None or self._extract_change_percent(q) is not None:
+                return q
+        return {}
+
+    def _extract_change_percent(self, quote: Dict[str, Any]) -> Any:
+        """Read normalized change percent from multiple possible key names."""
+        if not isinstance(quote, dict):
+            return None
+        cp = quote.get("change_percent")
+        if cp is None:
+            cp = quote.get("change_pct")
+        return cp
+
+    def _constituent_avg_change(
+        self,
+        constituents: List[Dict[str, Any]],
+        market: str,
+        quotes: Dict[str, Dict[str, Any]],
+        sample_size: int = 12,
+    ) -> Any:
+        """Compute average change from a sample of constituent quotes."""
+        valid_changes = []
+        for c in constituents[:sample_size]:
+            sym = c.get("symbol")
+            if not sym:
+                continue
+            q = self._lookup_quote_from_prefetched(sym, market, quotes)
+            cp = self._extract_change_percent(q)
+            if isinstance(cp, (int, float)):
+                valid_changes.append(cp)
+
+        if not valid_changes:
+            return None
+        return sum(valid_changes) / len(valid_changes)
         
         # Premium naming map for consistent display.
         self.INDEX_NAME_MAP = {
@@ -98,6 +145,10 @@ class SectorsService:
 
     def _get_market_indices(self, market: str) -> List[Dict[str, Any]]:
         market = market.lower()
+        cached = self._market_indices_cache.get(market)
+        if cached and (time.time() - cached.get("cached_at", 0) < self._cache_ttl):
+            return cached.get("data", [])
+
         file_name = "us_indices.json" if market == "us" else "indian_indices.json"
         file_path = Path(__file__).resolve().parents[1] / "data" / file_name
         
@@ -106,14 +157,21 @@ class SectorsService:
                 with open(file_path, "r") as f:
                     data = json.load(f)
                     if isinstance(data, dict) and "indices" in data:
-                        return data.get("indices", [])
-                    return data if isinstance(data, list) else []
+                        result = data.get("indices", [])
+                    else:
+                        result = data if isinstance(data, list) else []
+                    self._market_indices_cache[market] = {"data": result, "cached_at": time.time()}
+                    return result
             except Exception as e:
                 logger.error(f"Error loading {file_name}: {e}")
         return []
 
     def _load_csv_constituents(self, file_name: str) -> List[Dict[str, Any]]:
         if not file_name: return []
+        cached = self._constituents_cache.get(file_name)
+        if cached and (time.time() - cached.get("cached_at", 0) < self._cache_ttl):
+            return cached.get("data", [])
+
         file_path = Path(__file__).resolve().parents[1] / "data" / file_name
         if not file_path.exists(): return []
         
@@ -126,55 +184,90 @@ class SectorsService:
                     name = row.get("Company Name", row.get("name", ""))
                     if symbol:
                         results.append({"symbol": symbol, "name": name})
+            self._constituents_cache[file_name] = {"data": results, "cached_at": time.time()}
         except Exception as e:
             logger.error(f"Error loading CSV {file_name}: {e}")
         return results
 
     def get_indices_live(self, market: str = "india") -> List[Dict[str, Any]]:
         """[OPTIMIZED] Get all indices with real-time performance."""
+        market_key = (market or "india").lower()
+        cached = self._live_indices_cache.get(market_key)
+        if cached and (time.time() - cached.get("cached_at", 0) < self._live_cache_ttl):
+            return cached.get("data", [])
+
+        previous_snapshot = cached.get("data", []) if cached else []
+        previous_by_id = {
+            item.get("id"): item
+            for item in previous_snapshot
+            if isinstance(item, dict) and item.get("id")
+        }
+
         indices = self._get_market_indices(market)
-        
-        # Collect symbols and their likely fallbacks so India/US values populate more reliably.
+
+        # Fetch index symbols first, then a small constituent sample per index.
         symbols_to_fetch = set()
         for idx in indices:
             sym = idx.get("symbol")
             if sym:
                 for t in self._candidate_tickers(sym, market):
                     symbols_to_fetch.add(t)
-            else:
-                constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
-                for c in constituents[:5]:
-                    for t in self._candidate_tickers(c["symbol"], market):
-                        symbols_to_fetch.add(t)
+
+            constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
+            for constituent in constituents[:2]:
+                constituent_symbol = constituent.get("symbol")
+                if constituent_symbol:
+                    symbols_to_fetch.add(market_service.normalize_ticker(constituent_symbol, market))
 
         # Bulk fetch using unified service
-        # Validator is now standard in MarketDataService if we need it, 
-        # but normalize_ticker handles most cases.
         quotes = market_service.fetch_multiple_quotes(list(symbols_to_fetch))
-        
+
         results = []
         for idx in indices:
             sym = idx.get("symbol")
+            q = {}
+            cp = None
+            price = None
             if sym:
-                q = self._resolve_quote(sym, market, quotes)
+                q = self._lookup_quote_from_prefetched(sym, market, quotes)
+                cp = self._extract_change_percent(q)
+                price = q.get("price")
+
+                if cp is None:
+                    constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
+                    cp = self._constituent_avg_change(constituents, market, quotes, sample_size=6)
+
+                if price is None:
+                    constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
+                    sample_prices = []
+                    for c in constituents[:6]:
+                        csym = c.get("symbol") if isinstance(c, dict) else None
+                        if not csym:
+                            continue
+                        cq = self._lookup_quote_from_prefetched(csym, market, quotes)
+                        cprice = cq.get("price")
+                        if isinstance(cprice, (int, float)):
+                            sample_prices.append(cprice)
+                    if sample_prices:
+                        price = round(sum(sample_prices) / len(sample_prices), 2)
             else:
                 # Derive from sample
                 constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
-                valid_changes = []
-                for c in constituents[:5]:
-                    q = self._resolve_quote(c["symbol"], market, quotes)
-                    cp = q.get("change_percent")
-                    if isinstance(cp, (int, float)):
-                        valid_changes.append(cp)
-                
-                avg_change = sum(valid_changes) / len(valid_changes) if valid_changes else None
-                q = {"price": None, "change_percent": avg_change}
+                cp = self._constituent_avg_change(constituents, market, quotes, sample_size=6)
+
+            prev = previous_by_id.get(idx.get("id"), {})
+            if price is None and prev.get("price") is not None:
+                price = prev.get("price")
+            if cp is None and prev.get("change_percent") is not None:
+                cp = prev.get("change_percent")
 
             results.append({
                 **idx,
-                "change_percent": q.get("change_percent"),
-                "price": q.get("price")
+                "change_percent": cp,
+                "price": price
             })
+
+        self._live_indices_cache[market_key] = {"data": results, "cached_at": time.time()}
         return results
 
     def get_index_constituents(self, index_id: str, market: str = "india", include_prices: bool = True) -> Dict[str, Any]:
@@ -202,16 +295,33 @@ class SectorsService:
         
         # Batch fetch primary symbols.
         quotes = market_service.fetch_multiple_quotes(symbols)
+
+        # Build a single fallback retry batch for symbols that still have no quote.
+        missing_symbols = []
+        for c in constituents:
+            if not isinstance(c, dict) or not c.get("symbol"):
+                continue
+            q = self._lookup_quote_from_prefetched(c["symbol"], market, quotes)
+            if q.get("price") is None and self._extract_change_percent(q) is None:
+                missing_symbols.append(c["symbol"])
+
+        if missing_symbols:
+            fallback_candidates = []
+            for symbol in missing_symbols[:20]:
+                fallback_candidates.extend(self._candidate_tickers(symbol, market))
+
+            retry_quotes = market_service.fetch_multiple_quotes(list(set(fallback_candidates)), max_workers=10)
+            quotes.update(retry_quotes)
         
         stocks = []
         for c in constituents:
             if not isinstance(c, dict) or not c.get("symbol"):
                 continue
-            q = self._resolve_quote(c["symbol"], market, quotes)
+            q = self._lookup_quote_from_prefetched(c["symbol"], market, quotes)
             stocks.append({
                 **c,
                 "price": q.get("price"),
-                "change_percent": q.get("change_percent")
+                "change_percent": self._extract_change_percent(q)
             })
             
         return {"index": idx_data, "stocks": stocks}

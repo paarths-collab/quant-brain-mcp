@@ -3,6 +3,7 @@ Stock Sentiment Pipeline Service
 Fetches stock data from yfinance, Reddit sentiment, and AI analysis via Gemini.
 """
 import os
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -33,6 +34,8 @@ except ImportError:
 # LLM functionality can be added via modern provider (OpenAI, Groq, etc.)
 GEMINI_AVAILABLE = False
 genai = None  # Stub
+
+logger = logging.getLogger(__name__)
 
 
 # =====================================================
@@ -176,8 +179,8 @@ def fetch_stock_data(symbol: str) -> Dict:
                 # Try unix timestamp encoded as string first.
                 if raw.isdigit():
                     return datetime.utcfromtimestamp(int(raw))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Failed to parse unix-style earnings timestamp %r: %s", raw, exc)
             try:
                 return datetime.fromisoformat(raw.replace("Z", "+00:00"))
             except Exception:

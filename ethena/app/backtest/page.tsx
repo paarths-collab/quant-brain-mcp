@@ -6,7 +6,7 @@ import html2canvas from 'html2canvas'
 import { animate, motion, useMotionValue, useSpring } from 'framer-motion'
 import {
   Play, TrendingUp, Activity, Zap, Target, BarChart3,
-  Layers, ArrowUpDown, Crosshair, GitBranch, Shield, DollarSign, X
+  Layers, ArrowUpDown, Crosshair, GitBranch, Shield, DollarSign, X, Check
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -15,6 +15,8 @@ import {
 import {
   backtestAPI,
   API_BASE,
+  extractErrorMessage,
+  isLikelyNetworkError,
   type BacktestInterpretImageRequest,
   type BacktestInterpretRequest,
   type BacktestMultiStrategyDetail,
@@ -30,10 +32,12 @@ const CONTROL_BTN = "shine-btn relative overflow-hidden px-4 py-2 rounded-lg tex
 function StrategyCard({
   strat,
   active,
+  selectionOrder,
   onToggle,
 }: {
   strat: { id: string; name: string; color: string; description: string }
   active: boolean
+  selectionOrder: number | null
   onToggle: (id: string) => void
 }) {
   const rotateX = useMotionValue(0)
@@ -65,17 +69,41 @@ function StrategyCard({
         rotateY: smoothY,
         transformPerspective: 900,
         boxShadow: active
-          ? '0 14px 34px rgba(33,61,164,0.42), inset 0 1px 0 rgba(255,255,255,0.18)'
+          ? `0 14px 44px -8px ${selectionOrder === 1 ? '#3b82f6' : strat.color}66, inset 0 1px 0 rgba(255,255,255,0.18)`
           : '0 0 0 rgba(0,0,0,0)',
       }}
-      className={`${CARD} flex flex-col items-start gap-1.5 text-left ${active ? 'border-blue-200/35 bg-gradient-to-br from-[#3b3f86]/88 to-[#262f74]/82' : ''}`}
+      className={`${CARD} flex flex-col items-start gap-1.5 text-left border-2 transition-all duration-500 ${active ? 'bg-gradient-to-br from-indigo-900/30 to-slate-900/40 relative z-20' : 'border-transparent'}`}
     >
+      <div 
+        className="absolute inset-0 transition-opacity duration-500" 
+        style={{ 
+          borderColor: active ? (selectionOrder === 1 ? '#3b82f6' : strat.color) : 'transparent',
+          borderWidth: '2px',
+          opacity: active ? 0.65 : 0,
+          borderRadius: '1rem',
+          boxShadow: active ? `inset 0 0 15px ${selectionOrder === 1 ? '#3b82f6' : strat.color}25` : 'none'
+        }} 
+      />
+      
+      {active && (
+        <motion.div 
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="absolute top-2.5 right-2.5 z-20 flex items-center justify-center"
+        >
+          <div className={`flex items-center gap-1.5 backdrop-blur-md px-1.5 py-0.5 rounded-md border ${selectionOrder === 1 ? 'bg-blue-600/30 border-blue-400/40 shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'bg-white/10 border-white/20'}`}>
+             <Check className={`w-3 h-3 ${selectionOrder === 1 ? 'text-blue-200' : 'text-white'}`} strokeWidth={3} />
+             {selectionOrder && <span className={`text-[9px] font-dm-mono leading-none ${selectionOrder === 1 ? 'text-blue-100 font-bold' : 'text-white/90'}`}>{selectionOrder}</span>}
+          </div>
+        </motion.div>
+      )}
+
       <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_20%_10%,rgba(99,102,241,0.15),transparent_45%)] opacity-0 group-hover:opacity-100 transition-opacity" />
       <div className="flex items-center gap-2 mb-1.5 relative z-10">
         <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: strat.color }} />
-        <div className="text-[13px] font-dm-mono font-semibold text-white">{strat.name}</div>
+        <div className={`text-[13px] font-dm-mono font-semibold transition-colors ${active ? 'text-white' : 'text-white/80'}`}>{strat.name}</div>
       </div>
-      <div className="text-[11px] text-white/60 leading-tight font-inter relative z-10">{strat.description}</div>
+      <div className={`text-[11px] leading-tight font-inter relative z-10 transition-colors ${active ? 'text-white/90 font-medium' : 'text-white/60'}`}>{strat.description}</div>
     </motion.button>
   )
 }
@@ -531,7 +559,7 @@ export default function BacktestPage() {
           const res = await backtestAPI.interpret(payload)
           setAiExplanation(res.analysis)
         } catch (err) {
-          setAiError(err instanceof Error ? err.message : 'AI explanation failed')
+          setAiError(extractErrorMessage(err, 'AI explanation failed'))
         } finally {
           setAiLoading(false)
         }
@@ -556,11 +584,14 @@ export default function BacktestPage() {
         const res = await backtestAPI.interpretImage(payload)
         setAiVisionExplanation(res.analysis)
       } catch (err) {
-        setAiVisionError(err instanceof Error ? err.message : 'AI screenshot interpretation failed')
+        setAiVisionError(extractErrorMessage(err, 'AI screenshot interpretation failed'))
       } finally {
         setAiVisionLoading(false)
       }
     } catch (err) {
+      const reason = extractErrorMessage(err, 'Combined analysis failed')
+      setAiError(reason)
+      setAiVisionError(reason)
       setAiLoading(false)
       setAiVisionLoading(false)
     }
@@ -610,19 +641,25 @@ export default function BacktestPage() {
       if (data.mode === 'multi_strategy') {
         const multiData = data as BacktestMultiStrategyResponse
         const stratResults = multiData.strategies || {}
-        const strategies = Object.entries(stratResults).map(([id, d]) => {
-          const detail = d as BacktestMultiStrategyDetail
+        
+        // Preserve selection order and apply blue theme to selection 1
+        const strategies = selectedStrategies.map((id, index) => {
+          const d = stratResults[id] as BacktestMultiStrategyDetail
           const def = STRATEGIES.find(s => s.id === id)
+          const isFirst = index === 0
+          
           return {
             id,
             displayName: def?.name || id,
-            color: detail?.color || def?.color,
-            metrics: detail?.metrics,
-            trades: detail?.trades || [],
-            monteCarlo: detail?.monteCarlo,
-            equityCurve: detail?.equityCurve || [],
+            // Override first strategy to be blue-themed per user request
+            color: isFirst ? '#3b82f6' : (d?.color || def?.color || '#f59e0b'),
+            metrics: d?.metrics,
+            trades: d?.trades || [],
+            monteCarlo: d?.monteCarlo,
+            equityCurve: d?.equityCurve || [],
           }
         })
+
         const ranking = (multiData.ranking || []).map((r) => {
           const def = STRATEGIES.find(s => s.id === r.strategy)
           return { name: def?.name || r.strategy, totalReturn: r.return, sharpe: stratResults[r.strategy]?.metrics?.sharpeRatio ?? '—' }
@@ -641,12 +678,14 @@ export default function BacktestPage() {
           metrics: singleData.metrics || {},
           trades: singleData.trades || [],
           monteCarlo: singleData.monteCarlo || null,
+          color: '#3b82f6' // Single strategy also defaults to blue theme
         })
         setDetailStrategy(selectedStrategies[0])
       }
     } catch (err) {
       console.error('Backtest error:', err)
-      setRunError(err instanceof Error ? err.message : 'Backtest failed')
+      const message = extractErrorMessage(err, 'Backtest failed')
+      setRunError(isLikelyNetworkError(err) ? 'Backend is unreachable. Start FastAPI on port 8001 and try again.' : message)
       setResults(null)
     } finally {
       window.clearTimeout(timeoutId)
@@ -691,8 +730,8 @@ export default function BacktestPage() {
       setQuantReportLink(fullUrl)
       window.open(fullUrl, '_blank', 'noopener,noreferrer')
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'QuantStats report generation failed'
-      if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(message)) {
+      const message = extractErrorMessage(err, 'QuantStats report generation failed')
+      if (isLikelyNetworkError(err)) {
         setQuantReportError('Backend is unreachable. Start FastAPI on port 8001 and try again.')
       } else {
         setQuantReportError(message)
@@ -732,9 +771,16 @@ export default function BacktestPage() {
         <div className="text-[11px] font-dm-mono text-white/60 uppercase tracking-widest mb-3">Select Strategies (Max 4 · 5th click replaces oldest)</div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {STRATEGIES.map(strat => {
-            const active = selectedStrategies.includes(strat.id)
+            const index = selectedStrategies.indexOf(strat.id)
+            const active = index !== -1
             return (
-              <StrategyCard key={strat.id} strat={strat} active={active} onToggle={toggleStrategy} />
+              <StrategyCard 
+                key={strat.id} 
+                strat={strat} 
+                active={active} 
+                selectionOrder={active ? index + 1 : null}
+                onToggle={toggleStrategy} 
+              />
             )
           })}
         </div>

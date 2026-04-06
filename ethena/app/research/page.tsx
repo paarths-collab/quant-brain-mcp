@@ -9,7 +9,7 @@ import {
   RefreshCw, AlertTriangle, ExternalLink, Download, FileText,
   BarChart3, Shield, Activity, Camera, X
 } from 'lucide-react'
-import { API_BASE, researchAPI, sentimentAPI, type SentimentAnalysisResponse } from '@/lib/api'
+import { API_BASE, researchAPI, sentimentAPI, extractErrorMessage, isLikelyNetworkError, type SentimentAnalysisResponse } from '@/lib/api'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const sentimentColor = (score: number) =>
@@ -282,7 +282,7 @@ export default function ResearchPage() {
       setData(normalized)
       setSymbol(normalized?.symbol ?? sym)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch analysis')
+      setError(extractErrorMessage(err, 'Failed to fetch analysis'))
       setData(null)
     } finally {
       setIsLoading(false)
@@ -320,8 +320,8 @@ export default function ResearchPage() {
       setReportLink(fullUrl)
       setReportFilename(filename || null)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Report generation failed'
-      if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(message)) {
+      const message = extractErrorMessage(err, 'Report generation failed')
+      if (isLikelyNetworkError(err)) {
         setReportError('Backend is unreachable. Start FastAPI on port 8001 and try again.')
       } else {
         setReportError(message)
@@ -364,7 +364,7 @@ export default function ResearchPage() {
       })
       setPageAnalyzeReport(res.analysis)
     } catch (err) {
-      setPageAnalyzeError(err instanceof Error ? err.message : 'Screenshot analysis failed')
+      setPageAnalyzeError(extractErrorMessage(err, 'Screenshot analysis failed'))
     } finally {
       setPageAnalyzeLoading(false)
     }

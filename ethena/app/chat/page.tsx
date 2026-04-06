@@ -6,7 +6,7 @@ import {
   Terminal, Send, Loader2, GripVertical,
   TrendingUp, BarChart3, AlertTriangle, Activity, Globe
 } from 'lucide-react'
-import { getWsUrl, stockAdvisorAPI, superAgentAPI, API_BASE, backtestAPI, type SuperAgentResponse } from '@/lib/api'
+import { getWsUrl, stockAdvisorAPI, superAgentAPI, API_BASE, backtestAPI, extractErrorMessage, type SuperAgentResponse } from '@/lib/api'
 import { MessageBubble, AnalysisRack, type Message, type RackSnapshot, type ChartPoint } from '@/components/ChatComponents'
 
 const WS_URL = getWsUrl('/ws/live')
@@ -190,6 +190,9 @@ const detectBacktestQuery = (query: string): { isBacktest: boolean; ticker: stri
 const formatBacktestContent = (data: Record<string, unknown>, ticker: string, strategies: string[]) => {
   type BacktestEntry = {
     metrics?: Record<string, unknown>
+    error?: string
+    trades?: unknown[]
+    monteCarlo?: Record<string, unknown>
   }
 
   const strategyMap = (data.strategies && typeof data.strategies === 'object')
@@ -202,22 +205,82 @@ const formatBacktestContent = (data: Record<string, unknown>, ticker: string, st
     : null
 
   const stratEntries: Array<[string, BacktestEntry]> = strategyMap
-    ? Object.entries(strategyMap).slice(0, 3)
+    ? Object.entries(strategyMap)
     : (singleStrategyName && singleMetrics ? [[singleStrategyName, { metrics: singleMetrics }]] : [])
+
+  const fmtPct = (value: unknown, digits = 2) => {
+    const pct = pctFromRatioOrPercent(value)
+    return pct === null ? 'N/A' : `${pct.toFixed(digits)}%`
+  }
+
+  const fmtNum = (value: unknown, digits = 2) => {
+    const n = toNum(value)
+    return n === null ? 'N/A' : n.toFixed(digits)
+  }
+
+  const ranking = Array.isArray(data.ranking)
+    ? data.ranking
+        .map((r) => {
+          if (!r || typeof r !== 'object') return null
+          const row = r as Record<string, unknown>
+          const strategy = typeof row.strategy === 'string' ? row.strategy : null
+          const ret = toNum(row.return)
+          if (!strategy || ret === null) return null
+          return { strategy, ret }
+        })
+        .filter((r): r is { strategy: string; ret: number } => r !== null)
+    : []
 
   const lines = [
     `## Backtest Results`,
     `**Symbol:** ${ticker}`,
     `**Strategies Tested:** ${strategies.join(', ')}`,
+    `**Mode:** ${typeof data.mode === 'string' ? data.mode.replace(/_/g, ' ') : 'single strategy'}`,
     '',
   ]
 
+  if (ranking.length) {
+    lines.push('### Strategy Ranking')
+    ranking.forEach((row, idx) => {
+      lines.push(`${idx + 1}. **${row.strategy.replace(/_/g, ' ').toUpperCase()}** — ${row.ret.toFixed(2)}%`)
+    })
+    lines.push('')
+  }
+
   for (const [stratName, stratData] of stratEntries) {
     const metrics = stratData?.metrics || {}
-    const totalReturn = typeof metrics.totalReturn === 'number' ? `${(metrics.totalReturn * 100).toFixed(2)}%` : 'N/A'
-    const sharpe = typeof metrics.sharpeRatio === 'number' ? metrics.sharpeRatio.toFixed(2) : 'N/A'
-    const winRate = typeof metrics.winRate === 'number' ? `${(metrics.winRate * 100).toFixed(1)}%` : 'N/A'
-    const trades = typeof metrics.totalTrades === 'number' ? metrics.totalTrades : 0
+
+    if (stratData?.error) {
+      lines.push(
+        `### ${stratName.replace(/_/g, ' ').toUpperCase()}`,
+        `- **Status:** Failed`,
+        `- **Reason:** ${stratData.error}`,
+        ''
+      )
+      continue
+    }
+
+    const totalReturn = fmtPct(metrics.totalReturn)
+    const sharpe = fmtNum(metrics.sharpeRatio)
+    const winRate = fmtPct(metrics.winRate, 1)
+    const trades = typeof metrics.totalTrades === 'number' ? metrics.totalTrades : Array.isArray(stratData?.trades) ? stratData.trades.length : 0
+    const maxDrawdown = fmtPct(metrics.maxDrawdown)
+    const sortino = fmtNum(metrics.sortinoRatio)
+    const calmar = fmtNum(metrics.calmarRatio)
+    const annualVol = fmtPct(metrics.annualVolatility)
+    const profitFactor = fmtNum(metrics.profitFactor)
+    const expectancy = fmtNum(metrics.expectancy)
+    const avgWin = fmtNum(metrics.avgWin)
+    const avgLoss = fmtNum(metrics.avgLoss)
+    const bestTrade = fmtNum(metrics.bestTrade)
+    const worstTrade = fmtNum(metrics.worstTrade)
+
+    const monte = stratData?.monteCarlo && typeof stratData.monteCarlo === 'object'
+      ? (stratData.monteCarlo as Record<string, unknown>)
+      : null
+    const monteExpected = monte ? fmtPct(monte.expected_return) : 'N/A'
+    const monteVar95 = monte ? fmtPct(monte.var_95) : 'N/A'
+    const monteBest = monte ? fmtPct(monte.best_case) : 'N/A'
 
     lines.push(
       `### ${stratName.replace(/_/g, ' ').toUpperCase()}`,
@@ -225,6 +288,13 @@ const formatBacktestContent = (data: Record<string, unknown>, ticker: string, st
       `- **Sharpe Ratio:** ${sharpe}`,
       `- **Win Rate:** ${winRate}`,
       `- **Trades:** ${trades}`,
+      `- **Max Drawdown:** ${maxDrawdown}`,
+      `- **Sortino / Calmar:** ${sortino} / ${calmar}`,
+      `- **Annual Volatility:** ${annualVol}`,
+      `- **Profit Factor / Expectancy:** ${profitFactor} / ${expectancy}`,
+      `- **Avg Win / Avg Loss:** ${avgWin} / ${avgLoss}`,
+      `- **Best Trade / Worst Trade:** ${bestTrade} / ${worstTrade}`,
+      `- **Monte Carlo (Expected / VaR 95 / Best):** ${monteExpected} / ${monteVar95} / ${monteBest}`,
       ''
     )
   }
@@ -232,8 +302,6 @@ const formatBacktestContent = (data: Record<string, unknown>, ticker: string, st
   if (!stratEntries.length) {
     lines.push('No strategy metrics were returned for this backtest request.', '')
   }
-
-  lines.push('*View full results on the Backtest page.*')
   return lines.filter(Boolean).join('\n')
 }
 
@@ -444,12 +512,18 @@ export default function ChatPage() {
             return [...filtered, { id: uid(), role: 'assistant', content, timestamp: new Date() }]
           })
           setIsLoading(false)
-        } catch {
+        } catch (err) {
+          const reason = extractErrorMessage(err, 'Unable to parse websocket response')
+          setMessages(prev => {
+            const filtered = prev.filter(m => !m.isStreaming)
+            return [...filtered, { id: uid(), role: 'assistant', content: `⚠️ ${reason}`, timestamp: new Date() }]
+          })
           setIsLoading(false)
         }
       }
       return () => { ws.readyState === WebSocket.OPEN && ws.close() }
-    } catch {
+    } catch (err) {
+      console.error('WebSocket initialization failed:', err)
       setWsConnected(false)
     }
   }, [])
@@ -487,7 +561,7 @@ export default function ChatPage() {
           return [...filtered, { id: uid(), role: 'assistant', content, timestamp: new Date() }]
         })
       } catch (err) {
-        const reason = err instanceof Error && err.message ? err.message : 'Backtest Failed'
+        const reason = extractErrorMessage(err, 'Backtest failed')
         setMessages(prev => {
           const filtered = prev.filter(m => !m.isStreaming)
           return [...filtered, {
@@ -515,7 +589,7 @@ export default function ChatPage() {
           return [...filtered, { id: uid(), role: 'assistant', content, timestamp: new Date() }]
         })
       } catch (err) {
-        const reason = err instanceof Error && err.message ? err.message : 'Pipeline Disruption'
+        const reason = extractErrorMessage(err, 'Pipeline disruption')
         setMessages(prev => {
           const filtered = prev.filter(m => !m.isStreaming)
           return [...filtered, {
@@ -542,7 +616,16 @@ export default function ChatPage() {
             const filtered = prev.filter(m => !m.isStreaming)
             return [...filtered, { id: uid(), role: 'assistant', content, timestamp: new Date() }]
         })
-      } catch {
+      } catch (err) {
+        const reason = extractErrorMessage(err, 'Agent service unavailable')
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.isStreaming)
+          return [...filtered, {
+            id: uid(), role: 'assistant',
+            content: `⚠️ **System Error** — ${reason}`,
+            timestamp: new Date(),
+          }]
+        })
         setIsLoading(false)
       } finally {
         setIsLoading(false)

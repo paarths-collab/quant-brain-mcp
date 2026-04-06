@@ -17,6 +17,6 @@ router.include_router(investor_profile_router)
 router.include_router(long_term_router)
 router.include_router(reports_router)
 
-@router.get("/portfolio/overview")
+@router.get("/overview")
 def get_portfolio_overview():
     return {"status": "Portfolio and wealth management services are active"}

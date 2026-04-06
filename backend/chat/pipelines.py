@@ -10,11 +10,14 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="google")
 import os
 import asyncio
 import json
+import logging
 import pandas as pd
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Optional: structured DDG news for relevance filtering
 try:
@@ -29,7 +32,7 @@ try:
     env_path = Path(__file__).parent.parent / ".env"
     load_dotenv(env_path)
 except ImportError:
-    pass
+    logger.debug("python-dotenv not installed; skipping .env load in pipelines")
 
 # Try to import Gemini for structured output formatting
 try:
@@ -1167,8 +1170,8 @@ Format as clean markdown. Be thorough but scannable."""
                 queries = json.loads(text)
                 if isinstance(queries, list) and queries:
                     return queries[:10]
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Failed to generate DDG queries via Gemini: %s", exc)
 
         base = company or ticker
         return [

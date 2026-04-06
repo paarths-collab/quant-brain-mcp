@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -8,9 +8,16 @@ import warnings
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from the expected .env location
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# Load environment variables from environment-specific file when APP_ENV is set.
+app_env = os.getenv("APP_ENV", "").strip().lower()
+env_dir = Path(__file__).parent
+preferred_env_path = env_dir / f".env.{app_env}" if app_env else env_dir / ".env"
+fallback_env_path = env_dir / ".env"
+
+if preferred_env_path.exists():
+    load_dotenv(dotenv_path=preferred_env_path)
+elif fallback_env_path.exists():
+    load_dotenv(dotenv_path=fallback_env_path)
 
 # --- Isolated Page-specific Modules (Page Router Pattern) ---
 from backend.sectors.main import router as sectors_app
@@ -45,13 +52,13 @@ warnings.filterwarnings(
 )
 
 app = FastAPI(title="Agentic Investment OS")
+logger = logging.getLogger(__name__)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    import traceback
-    logging.error(f"Global Error Hook caught: {str(exc)}\n{traceback.format_exc()}")
+    logger.exception("Global error at %s", request.url.path)
     return JSONResponse(
-        status_code=200,
+        status_code=500,
         content={
             "status": "error",
             "message": str(exc)
@@ -66,7 +73,9 @@ default_origins = [
     "http://localhost:5174", 
     "http://localhost:5175",
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -109,7 +118,7 @@ try:
     init_db()
     run_init_sql()
 except Exception as e:
-    print(f"Database init failed: {e}")
+    logger.exception("Database init failed: %s", e)
 
 # Investment Pipeline
 _pipeline = None
@@ -127,14 +136,23 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            msg = json.loads(data)
+            try:
+                msg = json.loads(data)
+            except json.JSONDecodeError:
+                await websocket.send_json({"status": "error", "message": "Invalid JSON payload"})
+                continue
+
             result = await _get_pipeline().run(
                 query=msg.get("query"), 
                 ticker=msg.get("ticker"), 
                 market=msg.get("market", "us")
             )
             await websocket.send_json(result)
+    except WebSocketDisconnect:
+        logger.info("Live websocket disconnected")
     except Exception as e:
-        print(f"WS Error: {e}")
-        try: await websocket.close()
-        except: pass
+        logger.exception("Live websocket error: %s", e)
+        try:
+            await websocket.close()
+        except Exception as close_error:
+            logger.debug("Websocket close failed after error: %s", close_error)

@@ -4,9 +4,11 @@ import numpy as np
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import List, Dict, Any, Optional
+import logging
 
 # --- Configuration ---
 IST = ZoneInfo("Asia/Kolkata")
+logger = logging.getLogger(__name__)
 
 WATCHLIST = [
     "HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "AXISBANK.NS", "KOTAKBANK.NS",
@@ -42,7 +44,8 @@ class ScreenerService:
                 return pd.DataFrame()
             df.index = pd.to_datetime(df.index)
             return df
-        except:
+        except Exception as exc:
+            logger.warning("Failed to fetch OHLCV for %s (%s/%s): %s", ticker, period, interval, exc)
             return pd.DataFrame()
 
     def compute_signals(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
@@ -75,29 +78,33 @@ class ScreenerService:
 
         results = []
         for ticker in WATCHLIST:
-            df = self.fetch_ohlcv(ticker, tf_params["interval"], tf_params["period"])
-            if df.empty:
+            try:
+                df = self.fetch_ohlcv(ticker, tf_params["interval"], tf_params["period"])
+                if df.empty:
+                    continue
+
+                sig = self.compute_signals(df)
+                if not sig:
+                    continue
+
+                # Simple classification logic
+                label = "SKIP"
+                if sig["roc_pct"] >= PARAMS["min_momentum_pct"] and sig["vol_ratio"] >= PARAMS["volume_spike_multiplier"]:
+                    label = "LONG"
+                elif sig["roc_pct"] <= PARAMS["max_momentum_pct"] and sig["vol_ratio"] >= PARAMS["volume_spike_multiplier"]:
+                    label = "SHORT"
+                elif sig["vol_ratio"] >= PARAMS["volume_spike_multiplier"]:
+                    label = "WATCH"
+
+                if label != "SKIP":
+                    results.append({
+                        "ticker": ticker.replace(".NS", ""),
+                        "signal": label,
+                        **sig
+                    })
+            except Exception as exc:
+                logger.warning("Skipping ticker %s due to scan error: %s", ticker, exc)
                 continue
-            
-            sig = self.compute_signals(df)
-            if not sig:
-                continue
-            
-            # Simple classification logic
-            label = "SKIP"
-            if sig["roc_pct"] >= PARAMS["min_momentum_pct"] and sig["vol_ratio"] >= PARAMS["volume_spike_multiplier"]:
-                label = "LONG"
-            elif sig["roc_pct"] <= PARAMS["max_momentum_pct"] and sig["vol_ratio"] >= PARAMS["volume_spike_multiplier"]:
-                label = "SHORT"
-            elif sig["vol_ratio"] >= PARAMS["volume_spike_multiplier"]:
-                label = "WATCH"
-            
-            if label != "SKIP":
-                results.append({
-                    "ticker": ticker.replace(".NS", ""),
-                    "signal": label,
-                    **sig
-                })
         
         # Sort results
         order = {"LONG": 0, "SHORT": 1, "WATCH": 2}

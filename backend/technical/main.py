@@ -20,11 +20,11 @@ router = APIRouter(prefix="", tags=["Technical & Fundamentals"])
 
 # --- Technical Analysis (Legacy /api/technical) ---
 
-@router.get("/technical/strategies")
+@router.get("/strategies")
 async def get_strategies():
     return {"strategies": get_available_strategies()}
 
-@router.get("/technical/analyze")
+@router.get("/analyze")
 async def analyze_strategy(
     symbol: str,
     strategy: str,

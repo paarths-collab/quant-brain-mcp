@@ -9,10 +9,13 @@ import asyncio
 import uuid
 import re
 import os
+import logging
 from typing import Optional, Tuple
 
 from .position_sizing_service import PositionSizingService
 from .trade_levels_service import TradeLevelsService
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -183,8 +186,8 @@ class InvestmentPipeline:
                 stop = trade_levels.get("stop_loss", 0) or 0
                 if entry and stop:
                     sizing = self.sizing.fixed_fraction(capital=capital)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Trade level/sizing computation failed for %s: %s", yf_ticker, exc)
 
         # Store in memory
         self.memory.add(

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
-import { treemapAPI, formatLargeNumber } from '@/lib/api';
+import { treemapAPI, formatLargeNumber, extractErrorMessage } from '@/lib/api';
 
 // ─── Color scale: Indigo-600 for positive, Slate-500 for negative ──────────
 const MAX_ABS_CHANGE_FOR_COLOR = 8;
@@ -315,6 +315,7 @@ export default function SectorsPage() {
   const [stocksData, setStocksData] = useState<any>(null);
   const [hoveredItem, setHoveredItem] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedStock, setSelectedStock] = useState<any>(null);
   const [stockDetails, setStockDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -338,14 +339,24 @@ export default function SectorsPage() {
     setStocksData(null);
 
     let cancelled = false;
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
     const load = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         console.log(`[Sectors] Loading data for market=${market}...`);
         
         // 1. Start both requests in parallel
         const livePromise = treemapAPI.getIndicesLive(market);
         const basePromise = treemapAPI.getIndices(market);
+        let liveSynced = false;
+
+        // Show a gentle delay message if live prices are slow, but do not abandon live sync.
+        delayTimer = setTimeout(() => {
+          if (!cancelled && !liveSynced) {
+            setError((prev) => prev || 'Live price sync is delayed. Showing metadata view.');
+          }
+        }, 8000);
 
         // 2. Handle base (fast) indices as soon as they arrive
         basePromise.then((base: any) => {
@@ -356,29 +367,41 @@ export default function SectorsPage() {
             setIndicesData(baseIndices);
             console.log(`[Sectors] ✓ Rendered base metadata (${baseIndices.length} items)`);
           }
-        }).catch(err => {
+        }).catch((err) => {
           console.error(`[Sectors] Base indices failed:`, err);
+          if (!cancelled) {
+            setError(extractErrorMessage(err, 'Failed to load index metadata.'));
+          }
         });
 
-        // 3. Handle live (with prices) indices when they arrive
-        try {
-          // Wrap in a timeout race to ensure we don't hang if yfinance is slow
-          const live: any = await Promise.race([
-            livePromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Live indices timeout')), 20000)),
-          ]);
-          
-          if (!cancelled && live?.indices?.length > 0) {
-            setIndicesData(live.indices);
-            console.log(`[Sectors] ✓ Sync'd live prices (${live.indices.length} items)`);
-          }
-        } catch (liveErr) {
-          console.warn(`[Sectors] Live indices sync failed or timed out:`, liveErr);
-        }
+        // 3. Handle live (with prices) whenever they arrive, even if delayed.
+        livePromise
+          .then((live: any) => {
+            if (cancelled) return;
+            if (live?.indices?.length > 0) {
+              liveSynced = true;
+              if (delayTimer) clearTimeout(delayTimer);
+              setIndicesData(live.indices);
+              setError(null);
+              console.log(`[Sectors] ✓ Sync'd live prices (${live.indices.length} items)`);
+            }
+          })
+          .catch((liveErr) => {
+            console.warn(`[Sectors] Live indices sync failed:`, liveErr);
+            if (!cancelled) {
+              setError((prev) => prev || 'Live price sync is delayed. Showing metadata view.');
+            }
+          });
+
+        await basePromise.catch(() => null);
 
       } catch (err) {
         console.error(`[Sectors] Primary loading error:`, err);
+        if (!cancelled) {
+          setError(extractErrorMessage(err, 'Failed to load sector treemap data.'));
+        }
       } finally {
+        if (delayTimer) clearTimeout(delayTimer);
         if (!cancelled) setTimeout(() => setIsLoading(false), 600);
       }
     };
@@ -386,6 +409,7 @@ export default function SectorsPage() {
     load();
     return () => {
       cancelled = true;
+      if (delayTimer) clearTimeout(delayTimer);
     };
   }, [market]);
 
@@ -407,7 +431,12 @@ export default function SectorsPage() {
         setStocksData((prev: any) => (prev?.stocks?.length && prev.index?.id === selectedIndex) ? prev : res);
         console.log(`[Sectors] ✓ Rendered stock skeleton for ${selectedIndex}`);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setError(extractErrorMessage(err, `Failed to load ${selectedIndex} constituents.`));
+        }
+      });
 
     // 2. Fetch live prices in the background
     treemapAPI.getIndexStocks(selectedIndex, market, true)
@@ -416,7 +445,12 @@ export default function SectorsPage() {
         setStocksData(res);
         console.log(`[Sectors] ✓ Sync'd live stock prices for ${selectedIndex}`);
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setError((prev) => prev || 'Live stock pricing unavailable. Showing static constituents.');
+        }
+      })
       .finally(() => {
         if (!cancelled) setTimeout(() => setIsLoading(false), 500);
       });
@@ -430,9 +464,13 @@ export default function SectorsPage() {
   useEffect(() => {
     if (!selectedStock) { setStockDetails(null); return; }
     setLoadingDetails(true);
+    setError(null);
     treemapAPI.getStockDetails(selectedStock.symbol, market)
       .then((res: any) => setStockDetails(res))
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        setError(extractErrorMessage(err, 'Failed to load stock details.'));
+      })
       .finally(() => setLoadingDetails(false));
   }, [selectedStock, market]);
 
@@ -728,6 +766,12 @@ export default function SectorsPage() {
             <div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-400 rounded-full animate-spin" />
             <p className="font-mono text-[10px] text-indigo-400/50 tracking-[0.3em] uppercase">Loading…</p>
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
         </div>
       )}
 

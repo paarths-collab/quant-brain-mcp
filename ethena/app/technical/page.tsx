@@ -547,70 +547,66 @@ export default function TechnicalPage() {
       {/* ── AI MODAL ─────────────────────────────────────────────────────── */}
       {showModal && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md pointer-events-auto p-4">
-          <div className="w-full max-w-lg bg-black/80 backdrop-blur-2xl border border-white/20 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden rounded-xl">
+          <div className="w-full max-w-4xl bg-black/90 backdrop-blur-2xl border border-white/15 shadow-2xl relative flex flex-col max-h-[95vh] overflow-hidden rounded-lg">
             <button
               onClick={() => setShowModal(false)}
-              className="absolute top-5 right-5 text-white/40 hover:text-white transition-colors text-xl leading-none z-10"
+              className="absolute top-5 right-5 text-white/30 hover:text-white transition-colors text-2xl leading-none z-10"
             >
-              &times;
+              ✕
             </button>
 
-            <div className="flex items-center gap-3 p-6 border-b border-white/10 shrink-0">
-              <div className="w-8 h-8 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                <Zap size={16} className="text-indigo-400" />
-              </div>
-              <h2 className="text-sm tracking-[0.2em] uppercase font-bold text-white/90">Analysis Engine</h2>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Context Strip */}
-              <div className="space-y-3">
-                <p className="font-mono text-[9px] text-white/20 uppercase tracking-[0.25em]">Data Feed Context</p>
-                <div className="grid grid-cols-2 gap-px bg-white/10 border border-white/10 rounded overflow-hidden font-mono text-[10px]">
-                  {[
-                    { l: 'Ticker', v: symbol, c: 'text-white font-bold' },
-                    { l: 'Price', v: `${cur}${price?.toFixed(2)}`, c: priceUp ? 'text-emerald-400' : 'text-rose-400' },
-                      { l: 'RSI(14)', v: rsi, c: 'text-amber-400' },
-                      { l: 'State', v: `${marketState.state.toUpperCase()} / ${marketState.subtype.toUpperCase()}`, c: sigColor },
-                      { l: 'Confidence', v: `${marketState.confidence}%`, c: 'text-white/80' },
-                    { l: 'Bias', v: mtfBias, c: 'text-white/70' },
-                    { l: 'Support', v: srLevels.support[0] ? `${cur}${srLevels.support[0].toFixed(2)}` : '—', c: 'text-emerald-400' },
-                    { l: 'Resistance', v: srLevels.resistance[0] ? `${cur}${srLevels.resistance[0].toFixed(2)}` : '—', c: 'text-rose-400' }
-                  ].map(x => (
-                    <div key={x.l} className="bg-black/40 p-3 flex justify-between">
-                      <span className="text-white/30 uppercase tracking-widest">{x.l}</span>
-                      <span className={x.c}>{x.v}</span>
-                    </div>
-                  ))}
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 px-8 py-5 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                  <Zap size={16} className="text-indigo-400" />
                 </div>
+                <h2 className="text-base tracking-[0.15em] uppercase font-bold text-white/90">Technical Analysis Report</h2>
               </div>
-
-              {/* Model Output */}
-              <div className="space-y-3">
-                <p className="font-mono text-[9px] text-white/20 uppercase tracking-[0.25em]">Model Inference</p>
-                <div className="bg-white/[0.03] border border-white/10 rounded p-6 min-h-[140px] flex items-center justify-center text-[13px] leading-relaxed text-white/80 font-medium italic">
-                  {aiLoading ? (
-                    <div className="flex flex-col items-center gap-4">
-                      <span className="w-5 h-5 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-                      <span className="font-mono text-[9px] text-indigo-400 animate-pulse tracking-[0.3em]">
-                        SYNTHESIZING...
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="prose prose-invert max-w-none prose-p:text-white/80 prose-headings:text-white prose-strong:text-white">
-                      <ReactMarkdown>{aiText || 'No analysis output available.'}</ReactMarkdown>
-                    </div>
-                  )}
-                </div>
+              <div className="flex items-center gap-3 font-mono text-[11px] text-white/40">
+                <span>{symbol}</span>
+                <span>•</span>
+                <span>{tf.label}</span>
+                <span>•</span>
+                <span className={priceUp ? 'text-emerald-400' : 'text-rose-400'}>{cur}{price?.toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/10 bg-white/[0.02] flex justify-end">
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto px-8 py-8">
+              {aiLoading ? (
+                <div className="h-full flex flex-col items-center justify-center gap-6">
+                  <span className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+                  <span className="font-mono text-[11px] text-indigo-300 animate-pulse tracking-[0.3em]">
+                    ANALYZING MARKET STRUCTURE...
+                  </span>
+                </div>
+              ) : (
+                <div className="prose prose-invert max-w-none
+                  prose-headings:text-white prose-headings:font-bold prose-headings:mt-6 prose-headings:mb-4
+                  prose-h2:text-lg prose-h2:tracking-[0.1em]
+                  prose-p:text-white/85 prose-p:leading-relaxed prose-p:mb-4
+                  prose-strong:text-white prose-strong:font-semibold
+                  prose-code:text-amber-300 prose-code:bg-white/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+                  prose-li:text-white/85
+                  [&>h2:first-child]:mt-0
+                  space-y-4">
+                  <ReactMarkdown>{aiText || 'No analysis output available.'}</ReactMarkdown>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="shrink-0 px-8 py-5 border-t border-white/10 bg-white/[0.02] flex items-center justify-between">
+              <div className="font-mono text-[10px] text-white/25 space-y-1">
+                <div>RSI: <span className="text-amber-400">{rsi}</span> | MTF Bias: <span className="text-white/50">{mtfBias}</span></div>
+                <div>Support: <span className="text-emerald-400">{cur}{srLevels.support[0]?.toFixed(2) || '—'}</span> | Resistance: <span className="text-rose-400">{cur}{srLevels.resistance[0]?.toFixed(2) || '—'}</span></div>
+              </div>
               <button 
                 onClick={() => setShowModal(false)}
-                className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all font-mono text-[10px] tracking-widest uppercase rounded"
+                className="px-6 py-2 bg-white/10 hover:bg-white/15 text-white/70 hover:text-white transition-all font-mono text-[11px] tracking-[0.1em] uppercase rounded"
               >
-                Close Report
+                Close
               </button>
             </div>
           </div>

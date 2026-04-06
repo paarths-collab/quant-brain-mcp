@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { marketAPI, fredAPI, investorProfileAPI, extractErrorMessage } from '@/lib/api'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts'
@@ -168,12 +169,22 @@ function NeonLine({ data, color, id, unit }: { data: { v: number }[]; color: str
             contentStyle={{ background: '#06060a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-mono)', backdropFilter: 'blur(8px)' }}
             itemStyle={{ color }}
             labelFormatter={() => id}
-            formatter={(v: any) => [`${Number(v).toFixed(2)}${unit}`, '']}
+            formatter={(v: number | string) => [`${Number(v).toFixed(2)}${unit}`, '']}
           />
         </LineChart>
       </ResponsiveContainer>
     </div>
   )
+}
+
+type BackendHolding = {
+  symbol: string
+  quantity: number
+  avg_price: number
+  current_price: number
+  current_value: number
+  pl: number
+  pl_pct: number
 }
 
 function IndexCard({ idx, symbol }: { idx: typeof INDICES_US[0]; symbol: string }) {
@@ -223,13 +234,84 @@ type Market = 'us' | 'india'
 export default function DashboardPage() {
   const [market, setMarket] = useState<Market>('us')
   const [refreshing, setRefreshing] = useState(false)
+  const [indices, setIndices] = useState(market === 'us' ? INDICES_US : INDICES_IN)
+  const [holdings, setHoldings] = useState(market === 'us' ? HOLDINGS_US : HOLDINGS_IN)
+  const [watchlist, setWatchlist] = useState(market === 'us' ? WATCHLIST_US : WATCHLIST_IN)
+  const [macro, setMacro] = useState(market === 'us' ? FRED : RBI)
+  const [error, setError] = useState<string | null>(null)
 
   const isUS = market === 'us'
   const sym = isUS ? '$' : '₹'
-  const INDICES = isUS ? INDICES_US : INDICES_IN
-  const HOLDINGS = isUS ? HOLDINGS_US : HOLDINGS_IN
-  const WATCHLIST = isUS ? WATCHLIST_US : WATCHLIST_IN
-  const MACRO = isUS ? FRED : RBI
+  const INDICES = indices
+  const HOLDINGS = holdings
+  const WATCHLIST = watchlist
+  const MACRO = macro
+
+  const loadBackendData = useCallback(async () => {
+    setRefreshing(true)
+    setError(null)
+    try {
+      const [overview, portfolio, fredSnapshot] = await Promise.all([
+        marketAPI.getOverview(),
+        investorProfileAPI.getPortfolio(),
+        fredAPI.getLatestCached(['FEDFUNDS', 'CPIAUCSL', 'UNRATE', 'DGS10']),
+      ])
+
+      const overviewIndices = overview?.indices || {}
+      const fredData = fredSnapshot?.data || {}
+
+      if (market === 'us') {
+        setIndices([
+          { symbol: 'SPY', name: 'S&P 500', price: Number(overviewIndices.SP500?.price ?? INDICES_US[0].price), change: Number(overviewIndices.SP500?.change_pct ?? INDICES_US[0].change), pct: Number(overviewIndices.SP500?.change_pct ?? INDICES_US[0].pct) },
+          { symbol: 'QQQ', name: 'NASDAQ', price: Number(overviewIndices.NASDAQ100?.price ?? INDICES_US[1].price), change: Number(overviewIndices.NASDAQ100?.change_pct ?? INDICES_US[1].change), pct: Number(overviewIndices.NASDAQ100?.change_pct ?? INDICES_US[1].pct) },
+          { symbol: 'DJI', name: 'Dow Jones', price: Number(overviewIndices.DJIA?.price ?? INDICES_US[2].price), change: Number(overviewIndices.DJIA?.change_pct ?? INDICES_US[2].change), pct: Number(overviewIndices.DJIA?.change_pct ?? INDICES_US[2].pct) },
+          { symbol: 'VIX', name: 'Volatility', price: Number(overviewIndices.VIXCLS?.price ?? INDICES_US[3].price), change: Number(overviewIndices.VIXCLS?.change_pct ?? INDICES_US[3].change), pct: Number(overviewIndices.VIXCLS?.change_pct ?? INDICES_US[3].pct) },
+        ])
+        setHoldings(Array.isArray(portfolio?.holdings) && portfolio.holdings.length ? portfolio.holdings.map((h: BackendHolding) => ({
+          symbol: h.symbol,
+          qty: h.quantity,
+          avg: h.avg_price,
+          ltp: h.current_price,
+          value: h.current_value,
+          pl: h.pl,
+          pct: h.pl_pct,
+        })) : HOLDINGS_US)
+        setWatchlist(WATCHLIST_US)
+        setMacro([
+          { id: 'FEDFUNDS', title: 'Fed Funds Rate', value: Number(fredData.FEDFUNDS?.value ?? FRED[0].value), unit: '%' },
+          { id: 'CPIAUCSL', title: 'CPI Inflation', value: Number(fredData.CPIAUCSL?.value ?? FRED[1].value), unit: '%' },
+          { id: 'UNRATE', title: 'Unemployment', value: Number(fredData.UNRATE?.value ?? FRED[2].value), unit: '%' },
+          { id: 'DGS10', title: '10Y Treasury', value: Number(fredData.DGS10?.value ?? FRED[3].value), unit: '%' },
+        ])
+      } else {
+        setIndices([
+          { symbol: 'NIFTY', name: 'Nifty 50', price: Number(overviewIndices['^NSEI']?.price ?? INDICES_IN[0].price), change: Number(overviewIndices['^NSEI']?.change_pct ?? INDICES_IN[0].change), pct: Number(overviewIndices['^NSEI']?.change_pct ?? INDICES_IN[0].pct) },
+          { symbol: 'SENSEX', name: 'Sensex', price: Number(overviewIndices['^BSESN']?.price ?? INDICES_IN[1].price), change: Number(overviewIndices['^BSESN']?.change_pct ?? INDICES_IN[1].change), pct: Number(overviewIndices['^BSESN']?.change_pct ?? INDICES_IN[1].pct) },
+          { symbol: 'BANK', name: 'Bank Nifty', price: Number(overviewIndices['^NSEBANK']?.price ?? INDICES_IN[2].price), change: Number(overviewIndices['^NSEBANK']?.change_pct ?? INDICES_IN[2].change), pct: Number(overviewIndices['^NSEBANK']?.change_pct ?? INDICES_IN[2].pct) },
+          { symbol: 'MIDCAP', name: 'Midcap 100', price: Number(overviewIndices['^NIFTYMCAP100']?.price ?? INDICES_IN[3].price), change: Number(overviewIndices['^NIFTYMCAP100']?.change_pct ?? INDICES_IN[3].change), pct: Number(overviewIndices['^NIFTYMCAP100']?.change_pct ?? INDICES_IN[3].pct) },
+        ])
+        setHoldings(Array.isArray(portfolio?.holdings) && portfolio.holdings.length ? portfolio.holdings.map((h: BackendHolding) => ({
+          symbol: h.symbol,
+          qty: h.quantity,
+          avg: h.avg_price,
+          ltp: h.current_price,
+          value: h.current_value,
+          pl: h.pl,
+          pct: h.pl_pct,
+        })) : HOLDINGS_IN)
+        setWatchlist(WATCHLIST_IN)
+        setMacro(RBI)
+      }
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to load dashboard data from backend.'))
+    } finally {
+      setRefreshing(false)
+    }
+  }, [market])
+
+  useEffect(() => {
+    void loadBackendData()
+  }, [loadBackendData])
 
   const portfolioVal = HOLDINGS.reduce((a, h) => a + h.value, 0)
   const portfolioPL = HOLDINGS.reduce((a, h) => a + h.pl, 0)
@@ -240,9 +322,7 @@ export default function DashboardPage() {
   const animatedRisk = useCountUp(1.87, 700)
 
   const doRefresh = async () => {
-    setRefreshing(true)
-    await new Promise(r => setTimeout(r, 800))
-    setRefreshing(false)
+    await loadBackendData()
   }
 
   const fmtVal = (n: number) =>
@@ -255,6 +335,11 @@ export default function DashboardPage() {
 
       {/* ── Terminal Header ── */}
       <div className="relative z-10 space-y-5">
+        {error && (
+          <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+            {error}
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <span className="w-1.5 h-6 rounded-full bg-indigo-400/80 shadow-[0_0_16px_rgba(129,140,248,0.6)]" />
           <span className="data-text text-[12px] text-white/65 tracking-[0.32em] uppercase">
