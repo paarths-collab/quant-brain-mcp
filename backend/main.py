@@ -113,7 +113,7 @@ def fundamentals_summary_compat(symbol: str):
     return data
 
 # Database Initialization
-from backend.database.connection import init_db, run_init_sql
+from backend.database.connection import init_db, run_init_sql, check_db_connection, get_active_database_url
 try:
     init_db()
     run_init_sql()
@@ -128,7 +128,18 @@ def _get_pipeline() -> InvestmentPipeline:
     return _pipeline
 
 @app.get("/health")
-def health_check(): return {"status": "ok", "version": "2.2.0-modular"}
+def health_check():
+    return {
+        "status": "ok",
+        "version": "2.2.0-modular",
+        "database_connected": check_db_connection(),
+        "database_url": get_active_database_url(),
+    }
+
+
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "backend", "health": "/health"}
 
 @app.websocket("/ws/live")
 async def websocket_endpoint(websocket: WebSocket):

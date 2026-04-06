@@ -229,14 +229,14 @@ export default function MarketsPage() {
       ];
 
       // 1. Fetch FRED Data
-      const fredResponse = force 
+      const fredResponse: any = force 
         ? await fredAPI.getLatestLive(fredSeries)
         : await fredAPI.getLatestCached(fredSeries);
       
       const fredData = (fredResponse?.data as Record<string, QuotePoint> | undefined) || {};
 
       // 2. Fetch yfinance Data (Indices + Gold)
-      const overviewRes = await marketAPI.getOverview();
+      const overviewRes: any = await marketAPI.getOverview();
       const overviewIndices = (overviewRes?.indices as Record<string, QuotePoint> | undefined) || {};
 
       // 3. Mapping Logic
