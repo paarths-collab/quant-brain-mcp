@@ -283,7 +283,7 @@ def safe_fetch_multiple_quotes(
                 group_by='ticker', 
                 auto_adjust=True, 
                 progress=False,
-                timeout=15
+                timeout=6
             )
             
             batch_results = {}

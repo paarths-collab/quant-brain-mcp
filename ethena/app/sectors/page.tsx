@@ -109,10 +109,14 @@ const formatIndexName = (raw: string) => {
 };
 
 const formatChange = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return 'N/A'
   const n = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(n)) return 'N/A'
   return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 }
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
 
 const CARD = 'relative rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-xl';
 const CONTROL_BTN = 'px-4 py-2 rounded-lg text-[12px] font-mono uppercase tracking-widest transition-all duration-300 border border-white/[0.08]';
@@ -177,9 +181,13 @@ function StockDetailModal({
                   {currency}{details.price?.current?.toLocaleString() ?? '—'}
                 </span>
                 <span className={`text-xl font-mono font-bold ${(details.price?.change ?? 0) >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
-                  {(details.price?.change ?? 0) >= 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(details.price?.change ?? 0).toFixed(2)}
-                  {' '}({details.price?.change_percent?.toFixed(2) ?? '0'}%)
+                  {isFiniteNumber(details.price?.change) ? (
+                    <>
+                      {details.price.change >= 0 ? '▲' : '▼'}{' '}
+                      {Math.abs(details.price.change).toFixed(2)}
+                      {' '}({isFiniteNumber(details.price?.change_percent) ? details.price.change_percent.toFixed(2) : 'N/A'}%)
+                    </>
+                  ) : 'N/A'}
                 </span>
               </div>
 
@@ -807,7 +815,7 @@ export default function SectorsPage() {
               )}
               <div className="flex justify-between">
                 <span className="font-mono text-[10px] text-white/20 uppercase">Change</span>
-                <span className={`font-mono text-sm font-bold ${Number(hoveredItem.change) >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
+                <span className={`font-mono text-sm font-bold ${isFiniteNumber(hoveredItem.change) && hoveredItem.change >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
                   {formatChange(hoveredItem.change)}
                 </span>
               </div>
@@ -832,7 +840,7 @@ export default function SectorsPage() {
                   </p>
                   <p className="font-mono text-[9px] text-white/25 uppercase truncate">{stock.name}</p>
                 </div>
-                <span className={`ml-1 shrink-0 font-mono text-[10px] font-bold ${Number(stock.change_percent) >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
+                <span className={`ml-1 shrink-0 font-mono text-[10px] font-bold ${isFiniteNumber(stock.change_percent) && stock.change_percent >= 0 ? 'text-indigo-300' : 'text-indigo-400/80'}`}>
                   {formatChange(stock.change_percent)}
                 </span>
               </div>

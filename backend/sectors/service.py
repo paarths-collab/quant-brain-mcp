@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 # Import from unified service layer
 from backend.services.market_data import market_service
@@ -25,11 +25,35 @@ class SectorsService:
         self._cache_ttl = 3600
         self._live_cache_ttl = 60
 
+    def _sample_constituent_symbols(self, idx: Dict[str, Any], market: str, sample_size: int = 6) -> List[str]:
+        constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
+        sampled = []
+        for constituent in constituents[:sample_size]:
+            constituent_symbol = constituent.get("symbol") if isinstance(constituent, dict) else None
+            if constituent_symbol:
+                sampled.append(market_service.normalize_ticker(constituent_symbol, market))
+        return sampled
+
+    def _get_quote_coverage(self, symbols: List[str], quotes: Dict[str, Dict[str, Any]]) -> Tuple[List[str], List[str]]:
+        covered = []
+        missing = []
+        for symbol in symbols:
+            q = quotes.get(symbol, {}) if isinstance(quotes, dict) else {}
+            if q.get("price") is not None or self._extract_change_percent(q) is not None:
+                covered.append(symbol)
+            else:
+                missing.append(symbol)
+        return covered, missing
+
     def _candidate_tickers(self, symbol: str, market: str) -> List[str]:
         """Build fallback ticker candidates for a symbol."""
         sym = (symbol or "").strip().upper()
         if not sym:
             return []
+
+        # Yahoo index symbols (e.g. ^NSEI) should not be market-normalized with .NS/.BO suffixes.
+        if sym.startswith("^"):
+            return [sym]
 
         candidates = [market_service.normalize_ticker(sym, market), sym]
 
@@ -205,22 +229,73 @@ class SectorsService:
 
         indices = self._get_market_indices(market)
 
-        # Fetch index symbols first, then a small constituent sample per index.
-        symbols_to_fetch = set()
+        # Stage 1: fetch index symbols only.
+        index_symbols = set()
         for idx in indices:
             sym = idx.get("symbol")
-            if sym:
-                for t in self._candidate_tickers(sym, market):
-                    symbols_to_fetch.add(t)
+            if not sym:
+                continue
+            for t in self._candidate_tickers(sym, market):
+                index_symbols.add(t)
 
-            constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
-            for constituent in constituents[:2]:
-                constituent_symbol = constituent.get("symbol")
-                if constituent_symbol:
-                    symbols_to_fetch.add(market_service.normalize_ticker(constituent_symbol, market))
+        index_symbol_list = list(index_symbols)
+        index_quotes = market_service.fetch_multiple_quotes(index_symbol_list, max_workers=8)
 
-        # Bulk fetch using unified service
-        quotes = market_service.fetch_multiple_quotes(list(symbols_to_fetch))
+        # Second pass: retry only unresolved index symbols in a smaller batch.
+        unresolved_index_symbols = []
+        for idx in indices:
+            sym = idx.get("symbol")
+            if not sym:
+                continue
+            q = self._lookup_quote_from_prefetched(sym, market, index_quotes)
+            if q.get("price") is None and self._extract_change_percent(q) is None:
+                unresolved_index_symbols.append(sym)
+
+        if unresolved_index_symbols:
+            retry_quotes = market_service.fetch_multiple_quotes(list(set(unresolved_index_symbols)), max_workers=4)
+            index_quotes.update(retry_quotes)
+
+        # Stage 2: for unresolved indices, fetch only one constituent each as fallback.
+        unresolved_index_ids = []
+        for idx in indices:
+            sym = idx.get("symbol")
+            if not sym:
+                unresolved_index_ids.append(idx.get("id"))
+                continue
+            q = self._lookup_quote_from_prefetched(sym, market, index_quotes)
+            if q.get("price") is None and self._extract_change_percent(q) is None:
+                unresolved_index_ids.append(idx.get("id"))
+
+        fallback_symbol_by_index_id: Dict[str, str] = {}
+        fallback_symbols = set()
+        unresolved_set = {idx_id for idx_id in unresolved_index_ids if idx_id}
+        for idx in indices:
+            idx_id = idx.get("id")
+            if idx_id not in unresolved_set:
+                continue
+            sampled = self._sample_constituent_symbols(idx, market, sample_size=1)
+            if sampled:
+                fallback_symbol_by_index_id[idx_id] = sampled[0]
+                fallback_symbols.add(sampled[0])
+
+        fallback_quotes = market_service.fetch_multiple_quotes(list(fallback_symbols), max_workers=8) if fallback_symbols else {}
+
+        tracked_symbols = index_symbol_list + list(fallback_symbols)
+        merged_quotes = {**index_quotes, **fallback_quotes}
+        _, missing_symbols = self._get_quote_coverage(tracked_symbols, merged_quotes)
+        if missing_symbols:
+            logger.info(
+                "[sectors.live] market=%s missing_quotes=%d symbols=%s",
+                market,
+                len(missing_symbols),
+                missing_symbols[:20],
+            )
+
+        valid_quotes = {
+            k: v
+            for k, v in merged_quotes.items()
+            if isinstance(v, dict) and (v.get("price") is not None or self._extract_change_percent(v) is not None)
+        }
 
         results = []
         for idx in indices:
@@ -229,31 +304,21 @@ class SectorsService:
             cp = None
             price = None
             if sym:
-                q = self._lookup_quote_from_prefetched(sym, market, quotes)
+                q = self._lookup_quote_from_prefetched(sym, market, valid_quotes)
                 cp = self._extract_change_percent(q)
                 price = q.get("price")
 
-                if cp is None:
-                    constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
-                    cp = self._constituent_avg_change(constituents, market, quotes, sample_size=6)
-
-                if price is None:
-                    constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
-                    sample_prices = []
-                    for c in constituents[:6]:
-                        csym = c.get("symbol") if isinstance(c, dict) else None
-                        if not csym:
-                            continue
-                        cq = self._lookup_quote_from_prefetched(csym, market, quotes)
-                        cprice = cq.get("price")
-                        if isinstance(cprice, (int, float)):
-                            sample_prices.append(cprice)
-                    if sample_prices:
-                        price = round(sum(sample_prices) / len(sample_prices), 2)
+                if (cp is None or price is None) and idx.get("id") in fallback_symbol_by_index_id:
+                    fq = valid_quotes.get(fallback_symbol_by_index_id[idx.get("id")], {})
+                    if cp is None:
+                        cp = self._extract_change_percent(fq)
+                    if price is None:
+                        price = fq.get("price")
             else:
-                # Derive from sample
-                constituents = idx.get("constituents") or self._load_csv_constituents(idx.get("csv_file", ""))
-                cp = self._constituent_avg_change(constituents, market, quotes, sample_size=6)
+                if idx.get("id") in fallback_symbol_by_index_id:
+                    fq = valid_quotes.get(fallback_symbol_by_index_id[idx.get("id")], {})
+                    cp = self._extract_change_percent(fq)
+                    price = fq.get("price")
 
             prev = previous_by_id.get(idx.get("id"), {})
             if price is None and prev.get("price") is not None:
@@ -295,29 +360,17 @@ class SectorsService:
         
         # Batch fetch primary symbols.
         quotes = market_service.fetch_multiple_quotes(symbols)
-
-        # Build a single fallback retry batch for symbols that still have no quote.
-        missing_symbols = []
-        for c in constituents:
-            if not isinstance(c, dict) or not c.get("symbol"):
-                continue
-            q = self._lookup_quote_from_prefetched(c["symbol"], market, quotes)
-            if q.get("price") is None and self._extract_change_percent(q) is None:
-                missing_symbols.append(c["symbol"])
-
-        if missing_symbols:
-            fallback_candidates = []
-            for symbol in missing_symbols[:20]:
-                fallback_candidates.extend(self._candidate_tickers(symbol, market))
-
-            retry_quotes = market_service.fetch_multiple_quotes(list(set(fallback_candidates)), max_workers=10)
-            quotes.update(retry_quotes)
+        valid_quotes = {
+            k: v
+            for k, v in quotes.items()
+            if isinstance(v, dict) and (v.get("price") is not None or self._extract_change_percent(v) is not None)
+        }
         
         stocks = []
         for c in constituents:
             if not isinstance(c, dict) or not c.get("symbol"):
                 continue
-            q = self._lookup_quote_from_prefetched(c["symbol"], market, quotes)
+            q = self._lookup_quote_from_prefetched(c["symbol"], market, valid_quotes)
             stocks.append({
                 **c,
                 "price": q.get("price"),
