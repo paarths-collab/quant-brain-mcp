@@ -168,8 +168,7 @@ function NeonLine({ data, color, id, unit }: { data: { v: number }[]; color: str
           <Tooltip
             contentStyle={{ background: '#06060a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-mono)', backdropFilter: 'blur(8px)' }}
             itemStyle={{ color }}
-            labelFormatter={() => id}
-            formatter={(v: number | string) => [`${Number(v).toFixed(2)}${unit}`, '']}
+            formatter={(v: any) => [`${Number(v).toFixed(2)}${unit}`, '']}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -251,7 +250,7 @@ export default function DashboardPage() {
     setRefreshing(true)
     setError(null)
     try {
-      const [overview, portfolio, fredSnapshot] = await Promise.all([
+      const [overview, portfolio, fredSnapshot]: [any, any, any] = await Promise.all([
         marketAPI.getOverview(),
         investorProfileAPI.getPortfolio(),
         fredAPI.getLatestCached(['FEDFUNDS', 'CPIAUCSL', 'UNRATE', 'DGS10']),

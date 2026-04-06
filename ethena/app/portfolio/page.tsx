@@ -206,7 +206,7 @@ export default function PortfolioPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11, fontFamily: 'monospace' }}
-                    formatter={(value: number, _name: string, props: { payload?: PieDatum }) => [`$${value.toLocaleString()} (${props.payload?.pct ?? '0.0'}%)`, props.payload?.name ?? '-']}
+                    formatter={(value: any, _name: any, props: any) => [`$${Number(value).toLocaleString()} (${props.payload?.pct ?? '0.0'}%)`, props.payload?.name ?? '-']}
                   />
                 </RechartsPie>
               </ResponsiveContainer>
