@@ -1,256 +1,103 @@
-# 🚀 Bloomberg Financial Analysis Platform
+# Bloomberg Agentic Investment Platform
 
-<div align="center">
+From market chaos to investment clarity.
 
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)](https://pandas.pydata.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+Bloomberg Agentic Investment Platform is built for modern investors who want conviction, not noise. It combines real-time market context, deep stock intelligence, strategy simulation, and AI-guided decision support in one experience.
 
-*A comprehensive AI-enhanced financial analysis and trading strategy backtesting platform*
+## Why This Platform
 
-</div>
+Most investment workflows are fragmented. One app for charts, another for news, another for screening, another for portfolio checks.
 
-## 📋 Table of Contents
-- [🎯 Overview](#-overview)
-- [✨ Features](#-features)
-- [🏗️ Architecture](#️-architecture)
-- [🛠️ Setup](#️-setup)
-- [🚀 Usage](#-usage)
-- [📊 Strategies](#-strategies)
-- [🤖 AI Agents](#-ai-agents)
-- [📈 Dashboard Preview](#-dashboard-preview)
-- [🔧 Configuration](#-configuration)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
+This platform brings those decisions into a single loop:
 
-## 🎯 Overview
+1. Understand the market regime.
+2. Evaluate a stock from multiple angles.
+3. Test strategy behavior before acting.
+4. Compare peers and sector context.
+5. Validate impact on your portfolio.
+6. Summarize the final call with AI.
 
-Bloomberg is a state-of-the-art financial analysis platform that combines quantitative trading strategies, AI-powered insights, and comprehensive market analysis. Built with Streamlit, it provides investors and analysts with a complete toolkit for market research, strategy backtesting, and AI-driven investment planning.
+## What You Get
 
-The platform features a modular architecture with AI agents, multiple trading strategies, and professional-grade visualization tools that enable users to build and test algorithmic trading strategies efficiently.
+### Market Awareness
+Read the market faster with live index direction, macro indicators, and broad risk signals. Start each day with context before selecting names.
 
-## ✨ Key Features
+### Stock Conviction Engine
+Analyze a stock through trend, momentum, valuation, sentiment, and risk layers so your decision is based on evidence, not a single chart or headline.
 
-### 📈 **Strategy Backtesting**
-- **15+ Trading Strategies**: Including EMA/SMA crossovers, RSI, MACD, Breakout, Pairs Trading, and more
-- **Performance Metrics**: Comprehensive risk-adjusted returns analysis with Sharpe, Sortino, and Calmar ratios
-- **Visual Analysis**: Interactive charts with trade signals, equity curves, and strategy-specific indicators
+### Strategy Confidence Before Capital
+Run backtests across multiple approaches to see how ideas might behave under real market conditions. Compare outcomes and reduce guesswork.
 
-### 🧠 **AI-Powered Analysis**
-- **Multi-Agent System**: Coordinated AI agents for fundamentals, technicals, sentiment, and sector analysis
-- **Deep Dive Analysis**: Multi-dimensional stock evaluation covering 8+ analysis dimensions
-- **AI Investment Planning**: Personalized investment recommendations based on your financial profile
+### Sector and Relative Strength View
+Identify where money is flowing. Spot strong sectors early, then drill into leaders and laggards.
 
-### 🌍 **Global Market Support**
-- **US & Indian Markets**: Full support for both markets with appropriate currency symbols
-- **Real-time Data**: Integration with Yahoo Finance and Finnhub for live market data
-- **Market Overview**: High-level snapshot of global market health and economic indicators
+### Portfolio Clarity
+Track holdings, allocation, and P&L in one place to avoid hidden concentration and keep risk aligned with your goals.
 
-### 💸 **Paper Trading Integration**
-- **Live Portfolio Tracking**: Connect to Alpaca paper trading accounts
-- **Risk Management**: Real-time portfolio risk metrics and analysis
-- **Performance Monitoring**: Track your paper trading performance against benchmarks
+### AI-Guided Decision Support
+Use natural language to ask questions, request summaries, and get structured viewpoints before you act.
 
-### 🎯 **Advanced Analytics**
-- **Risk Metrics**: Alpha, beta, volatility, Value at Risk (VaR), and maximum drawdown
-- **Benchmark Comparisons**: Compare strategies against market indices (SPY, QQQ, NIFTY etc.)
-- **Correlation Analysis**: Understand strategy relationships and portfolio diversification
+## Page Guide: What Each Page Is For
 
-## 🏗️ Architecture
+### Home
+Your launchpad. Understand the product quickly and jump into analysis, strategy, or AI workflow.
 
-```
-├── app.py                    # Main Streamlit application
-├── config.py                 # Configuration and API keys
-├── requirements.txt          # Python dependencies
-├── agents/                   # AI agent implementations
-│   ├── orchestrator.py       # Central coordinator
-│   ├── analyst_agent.py      # Fundamental analysis
-│   ├── ...                   # Other specialized agents
-├── pages/                    # Streamlit page components
-│   ├── 1_📈_Market_Overview.py
-│   ├── 2_🔬_Deep_Dive_Analysis.py
-│   ├── 3_📊_Strategy_Backtester.py
-│   ├── 4_💬_AI_Consultant.py
-│   └── 5_💸_Paper_Trading.py
-├── strategies/               # Trading strategy modules
-│   ├── ema_crossover.py
-│   ├── macd_strategy.py
-│   ├── rsi_strategy.py
-│   └── ...                   # 15+ additional strategies
-├── utils/                    # Utility functions
-│   ├── data_loader.py
-│   ├── risk_metrics.py
-│   ├── visualization.py
-│   └── portfolio_engine.py
-└── data/                     # Market data and universes
-    ├── us_stocks.csv
-    └── nifty500.csv
-```
+### Dashboard
+Daily command center for investors. A quick read of market pulse, macro context, watchlist movement, and account-level signals.
 
-## 🛠️ Setup
+### Markets
+Big-picture page for cross-asset and macro awareness. Use this first when deciding whether market conditions support your idea.
 
-### Prerequisites
-- Python 3.8 or higher
-- Pip package manager
+### Technical
+Chart-focused decision page for timing. Understand structure, momentum, and actionable levels before entering or exiting.
 
-### Installation Steps
+### Backtest
+Your strategy lab. Simulate, compare, and review model behavior so you can choose approaches with higher confidence.
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/Bloomberg.git
-   cd Bloomberg
-   ```
+### Research
+Deep-dive page for company intelligence and sentiment context. Converts scattered information into a coherent investment narrative.
 
-2. **Create a virtual environment:**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+### Sectors
+Theme-first intelligence. Discover which sectors are strengthening or weakening and where opportunity is shifting.
 
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### News
+Live market headlines in a clean stream, designed for quick scanning of what can move price.
 
-4. **Set up API keys in environment variables:**
-   ```bash
-   # Create a .env file in the root directory
-   echo "FINNHUB_API_KEY=your_finnhub_api_key_here" > .env
-   ```
+### Peers
+Relative comparison page. Benchmark a company against similar businesses to find valuation and performance edges.
 
-5. **Run the application:**
-   ```bash
-   streamlit run app.py
-   ```
+### Portfolio
+Capital view. See your holdings, allocation mix, and performance contribution at a glance.
 
-### Required API Keys
-- **Finnhub API Key**: For market data and economic indicators
-- **OpenAI API Key (optional)**: For enhanced AI analysis
-- **Alpaca API Key (optional)**: For paper trading functionality
+### Profile
+Personal account and usage snapshot.
 
-## 🚀 Usage
+### Settings
+Customize market defaults, display behavior, and experience preferences.
 
-### Getting Started
-1. Launch the application with `streamlit run app.py`
-2. Navigate through the sidebar to access different analysis modules
-3. Start with the Market Overview to understand current market conditions
-4. Try the Strategy Backtester with sample tickers like AAPL, MSFT, or TSLA
+### Chat
+Interactive AI workspace for analysis requests, strategy prompts, and decision summaries.
 
-### Strategy Backtesting
-1. Go to **📊 Strategy Backtester** in the sidebar
-2. Select a strategy from the 15+ available options
-3. Enter a ticker symbol and date range
-4. Adjust strategy parameters if needed
-5. Run the backtest and analyze performance metrics
+### Network, Ecosystem, Blog
+Context and narrative pages for platform storytelling, exploration, and updates.
 
-### Deep Dive Analysis
-1. Navigate to **🔬 Deep Dive Analysis**
-2. Enter a stock ticker for comprehensive analysis
-3. Review the multi-agent analysis including:
-   - Fundamentals
-   - Technical indicators
-   - News sentiment
-   - Insider activity
-   - Sector performance
-   - Risk factors
+## Recommended Investor Workflow
 
-### AI Investment Planning
-1. Access **💬 AI Consultant**
-2. Provide your financial profile and investment goals
-3. Receive personalized investment recommendations
-4. Get a comprehensive investment plan
+1. Open Dashboard for market tone.
+2. Check Markets for macro confirmation.
+3. Validate setup on Technical or thesis on Research.
+4. Pressure-test in Backtest.
+5. Benchmark against competitors in Peers.
+6. Confirm exposure in Portfolio.
+7. Use Chat for final summary and action framing.
 
-## 📊 Trading Strategies
+## Who This Is Built For
 
-The platform includes over 15 quantitative trading strategies:
+- Active investors seeking faster, clearer decisions
+- Analysts who need multi-dimensional stock understanding
+- Strategy-driven users who test before deployment
+- Learners who want institutional-style thinking in an accessible format
 
-### 📈 **Trend Following**
-- **EMA Crossover**: Exponential moving average crossover strategy
-- **SMA Crossover**: Simple moving average crossover strategy
-- **MACD Strategy**: Momentum-based trend following
+## Deployment
 
-### 📉 **Mean Reversion**
-- **RSI Strategies**: Overbought/oversold signals using Relative Strength Index
-- **Bollinger Bands**: Volatility-based mean reversion
-- **Support/Resistance**: Trading at key price levels
-
-### ⚡ **Breakout & Momentum**
-- **Breakout Strategy**: Price breakouts above resistance levels
-- **Channel Trading**: Donchian channels for trend identification
-- **Momentum Strategy**: Capturing momentum-driven moves
-
-### 🔄 **Specialized Strategies**
-- **Pairs Trading**: Relative price movements of correlated securities
-- **Fibonacci Pullback**: Using Fibonacci retracement levels
-- **Mean Reversion**: Statistical mean reversion approach
-
-Each strategy includes detailed performance metrics and interactive visualizations.
-
-## 🤖 AI Agents
-
-The platform features a sophisticated multi-agent system:
-
-### **Core Agents:**
-- **Analyst Agent**: Fundamental analysis and financial metrics evaluation
-- **Technical Agent**: Technical analysis with chart patterns and indicators
-- **Sentiment Agent**: News sentiment and social media analysis
-- **Insider Agent**: Insider trading activity monitoring
-- **Sector Agent**: Sector and industry analysis
-- **Macro Agent**: Economic indicators and market sentiment
-- **Risk Agent**: Risk assessment and portfolio optimization
-- **Execution Agent**: Paper trading and execution management
-
-### **Orchestration:**
-The **Orchestrator Agent** coordinates all specialized agents to provide comprehensive, multi-dimensional analysis of any stock or market condition.
-
-## 📈 Dashboard Preview
-
-The platform features several interactive dashboards:
-
-### **Market Overview**
-- Real-time market indices and economic indicators
-- Global market sentiment analysis
-- Economic calendar and events
-
-### **Strategy Backtester**
-- Interactive performance charts with trade signals
-- Multiple performance metrics (Sharpe, Sortino, Calmar ratios)
-- Benchmark comparison capabilities
-- Strategy-specific visualizations
-
-### **Deep Dive Analysis**
-- 8+ dimensional analysis of individual stocks
-- Professional charts with technical indicators
-- Risk-factor analysis and fundamental metrics
-- Historical performance and trend analysis
-
-## 🔧 Configuration
-
-The platform can be configured via `config.py`:
-
-```python
-# Strategy defaults
-DEFAULT_START_DATE = "2020-01-01"
-DEFAULT_INITIAL_CAPITAL = 100000
-
-# Backtesting settings
-COMMISSION_RATE = 0.002
-
-# UI settings
-UI_DECIMAL_PLACES = 2
-
-# Supported currencies
-CURRENCY_SYMBOLS = {
-    "USD": "$",
-    "INR": "₹",
-}
-```
-
-
-**Bloomberg Financial Analysis Platform**
-*Enhancing Investment Decisions with AI and Quantitative Analysis*
-
-⭐ Star this repo if you find it helpful!
-
-</div>
+Production deployment instructions are available in DEPLOY_VERCEL_RENDER.md.
