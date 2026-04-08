@@ -180,6 +180,7 @@ debug_output.txt
 
 # Generated Reports
 backend/reports/
+backend/backtest/reports/
 
 # Data Files
 backend/data/*.parquet
