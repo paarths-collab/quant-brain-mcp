@@ -1,202 +1,27 @@
-# Python
+.env
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-*.manifest
-*.spec
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Virtual Environments
+*.pyc
+.env.local
 .venv/
 venv/
-ENV/
-env/
-.env.local
-.env.*.local
 
-# Environment Variables
-.env
-.env.production
-.env.development
-*.env
+# Node / frontend
+node_modules/
 
-# IDEs
+# Python build / packaging
+build/
+dist/
+*.egg-info/
+
+# Test and coverage
+.pytest_cache/
+.coverage
+coverage.xml
+
+# Tooling / editor
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-.DS_Store
 
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-
-# Build outputs
-dist/
-build/
-*.tsbuildinfo
-.next/
-out/
-
-# Testing
-.coverage
-.pytest_cache/
-.hypothesis/
-htmlcov/
-.tox/
-.nox/
-coverage/
-*.cover
-*.log
-
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Cache directories
-cache/
-.cache/
-__pycache__/
-
-# Python site-packages (if installed locally)
-annotated_types/
-anyio/
-beautifulsoup4*/
-bs4/
-certifi/
-cffi/
-charset_normalizer/
-click/
-colorama/
-curl_cffi/
-dateutil/
-distro/
-dotenv/
-duckduckgo_search/
-frozendict/
-google/
-groq/
-h11/
-httpcore/
-httpx/
-idna/
-lxml/
-multitasking/
-numpy/
-numpy.libs/
-pandas/
-pandas.libs/
-peewee/
-peewee-*/
-platformdirs/
-playhouse/
-primp/
-protobuf*/
-pycparser/
-pydantic/
-pydantic_core/
-pydantic-*/
-python_dateutil*/
-python_dotenv*/
-pytz/
-requests/
-six/
-six-*/
-sniffio/
-soupsieve/
-typing_extensions.py
-typing_extensions-*/
-typing_inspection/
-tzdata/
-urllib3/
-websockets/
-yfinance/
-yfinance-*/
-*.dist-info/
-bin/
-chroma_db/
-
-# OS
+# OS artifacts
 .DS_Store
 Thumbs.db
-*.swp
-*.swo
-
-# Temporary files
-*.tmp
-*.temp
-tmp/
-temp/
-
-# API Keys and Secrets (CRITICAL)
-**/config.yaml
-**/.env
-**/.env.*
-**/secrets.json
-**/credentials.json
-
-# Test outputs
-test_wealth_result.json
-wealth_test_response.json
-test_request.json
-debug_output.txt
-
-# Generated Reports
-backend/reports/
-backend/backtest/reports/
-
-# Data Files
-backend/data/*.parquet
-backend/data/*.csv
-
-# Logs
-*.log
-
-# Package manager lock files (optional - uncomment if needed)
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-
-# Visual Terminal Diagnostic/Temp Files
-*.bak
-original_*.txt
-instruction.md
-inspect_routes.py
-validate_startup.py

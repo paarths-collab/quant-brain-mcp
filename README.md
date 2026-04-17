@@ -1,103 +1,116 @@
-# Bloomberg Agentic Investment Platform
+# 📈 mcp-quant-brain
 
-From market chaos to investment clarity.
+`mcp-quant-brain` is a high-performance Model Context Protocol (MCP) server designed for Quant Analysts and Financial Engineers. It provides a robust suite of tools for financial data ingestion, technical analysis, and advanced portfolio optimization.
 
-Bloomberg Agentic Investment Platform is built for modern investors who want conviction, not noise. It combines real-time market context, deep stock intelligence, strategy simulation, and AI-guided decision support in one experience.
+## 🚀 Features
 
-## Why This Platform
+- **Multi-Market Support**: Seamlessly handle US (e.g., `AAPL`) and Indian (e.g., `RELIANCE.NS`) stock data.
+- **Automated Currency Normalization**: Built-in USD/INR conversion for cross-market portfolio comparisons.
+- **Deep Technical Analysis**: Exposure to over 150+ indicators via `pandas-ta`.
+- **Advanced Portfolio Optimization**:
+  - Mean-Variance Optimization (MVO)
+  - Hierarchical Risk Parity (HRP)
+  - Black-Litterman Model
+- **Integrated Backtesting**: Realistic performance simulation using `vectorbt` with transaction cost considerations.
+- **Dynamic Extensibility**: Automatically registers new tools and indicators placed in the `tools/` directory.
 
-Most investment workflows are fragmented. One app for charts, another for news, another for screening, another for portfolio checks.
+## 📁 Project Structure
 
-This platform brings those decisions into a single loop:
+```text
+mcp-quant-brain/
+├── core/                # Core logic (Data loading, Forex, Mapping)
+├── tools/               # MCP Tool implementations
+│   ├── backtesting/     # Strategy & Portfolio backtesting logic
+│   ├── optimization/    # Mean-Variance and HRP optimizers
+│   ├── indicators/      # Technical analysis wrappers
+│   └── strategies/      # predefined trading logic
+├── knowledge/           # Static data & Risk manifolds
+├── main.py              # Entry point & FastMCP server definition
+└── requirements.txt     # Python dependencies
+```
 
-1. Understand the market regime.
-2. Evaluate a stock from multiple angles.
-3. Test strategy behavior before acting.
-4. Compare peers and sector context.
-5. Validate impact on your portfolio.
-6. Summarize the final call with AI.
+## 🛠️ Getting Started
 
-## What You Get
+### Prerequisites
 
-### Market Awareness
-Read the market faster with live index direction, macro indicators, and broad risk signals. Start each day with context before selecting names.
+- Python 3.10+
+- An internet connection (for fetching market data via `yfinance`)
 
-### Stock Conviction Engine
-Analyze a stock through trend, momentum, valuation, sentiment, and risk layers so your decision is based on evidence, not a single chart or headline.
+### Installation
 
-### Strategy Confidence Before Capital
-Run backtests across multiple approaches to see how ideas might behave under real market conditions. Compare outcomes and reduce guesswork.
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd mcp-quant-brain
+   ```
 
-### Sector and Relative Strength View
-Identify where money is flowing. Spot strong sectors early, then drill into leaders and laggards.
+2. **Create a virtual environment**:
+   ```bash
+   python -m venv .venv
+  source .venv/Scripts/activate
+   ```
 
-### Portfolio Clarity
-Track holdings, allocation, and P&L in one place to avoid hidden concentration and keep risk aligned with your goals.
+3. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### AI-Guided Decision Support
-Use natural language to ask questions, request summaries, and get structured viewpoints before you act.
+## 📖 How to Use
 
-## Page Guide: What Each Page Is For
+The server is built using the official `mcp-python-sdk`. Once running, it exposes several tools that can be called by any MCP-compatible client.
 
-### Home
-Your launchpad. Understand the product quickly and jump into analysis, strategy, or AI workflow.
+### Running the Server
 
-### Dashboard
-Daily command center for investors. A quick read of market pulse, macro context, watchlist movement, and account-level signals.
+To start the server locally:
+```bash
+python main.py
+```
 
-### Markets
-Big-picture page for cross-asset and macro awareness. Use this first when deciding whether market conditions support your idea.
+### Example Usage (with MCP Client)
 
-### Technical
-Chart-focused decision page for timing. Understand structure, momentum, and actionable levels before entering or exiting.
+#### 1. Generate an Optimized Portfolio Verdict
+This is the "Ultimate Tool" that fetches data, optimizes weights between tickers (even across USD/INR markets), backtests the result, and provides a final verdict.
 
-### Backtest
-Your strategy lab. Simulate, compare, and review model behavior so you can choose approaches with higher confidence.
+```json
+// Tool: generate_optimized_verdict
+{
+  "tickers": ["AAPL", "RELIANCE.NS", "TSLA", "TCS.NS"],
+  "amount": 50000
+}
+```
 
-### Research
-Deep-dive page for company intelligence and sentiment context. Converts scattered information into a coherent investment narrative.
+#### 2. Fetch Single Stock Data
+```json
+// Tool: fetch_data
+{
+  "ticker": "RELIANCE.NS"
+}
+```
 
-### Sectors
-Theme-first intelligence. Discover which sectors are strengthening or weakening and where opportunity is shifting.
+#### 3. Compute Technical Indicators
+Indicators are registered as `get_[indicator_name]` tools.
+```json
+// Tool: get_rsi
+{
+  "ticker": "AAPL"
+}
+```
 
-### News
-Live market headlines in a clean stream, designed for quick scanning of what can move price.
+## ⚖️ Verdict Logic
 
-### Peers
-Relative comparison page. Benchmark a company against similar businesses to find valuation and performance edges.
+The server evaluates backtest results against a `VERDICT_LOGIC` manifest:
+- **STRONG BUY**: Sharpe Ratio > 1.5, Win Rate > 60%, Max Drawdown < 15%.
+- **STAY AWAY**: Negative returns or Sharpe Ratio < 0.3.
+- **RISKY MOMENTUM**: High returns (>30%) but erratic drawdown (>25%).
 
-### Portfolio
-Capital view. See your holdings, allocation mix, and performance contribution at a glance.
+## 🧪 Dependencies
 
-### Profile
-Personal account and usage snapshot.
+- **mcp-python-sdk**: The official Model Context Protocol implementation.
+- **yfinance**: Market data source.
+- **PyPortfolioOpt**: Modern Portfolio Theory tools.
+- **vectorbt**: Vectorized backtesting.
+- **pandas-ta**: Technical Analysis library.
 
-### Settings
-Customize market defaults, display behavior, and experience preferences.
-
-### Chat
-Interactive AI workspace for analysis requests, strategy prompts, and decision summaries.
-
-### Network, Ecosystem, Blog
-Context and narrative pages for platform storytelling, exploration, and updates.
-
-## Recommended Investor Workflow
-
-1. Open Dashboard for market tone.
-2. Check Markets for macro confirmation.
-3. Validate setup on Technical or thesis on Research.
-4. Pressure-test in Backtest.
-5. Benchmark against competitors in Peers.
-6. Confirm exposure in Portfolio.
-7. Use Chat for final summary and action framing.
-
-## Who This Is Built For
-
-- Active investors seeking faster, clearer decisions
-- Analysts who need multi-dimensional stock understanding
-- Strategy-driven users who test before deployment
-- Learners who want institutional-style thinking in an accessible format
-
-## Deployment
-
-Production deployment instructions are available in DEPLOY_VERCEL_RENDER.md.
+---
+*Note: This tool is for informational purposes only. Trading involves risk.*
+# quant-brain-mcp-

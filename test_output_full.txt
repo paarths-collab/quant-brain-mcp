@@ -1,3 +1,0 @@
-Initializing Orchestrator...
-Running analysis for: Technology
-Resolving sector: Technology
