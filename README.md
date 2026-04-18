@@ -1,8 +1,8 @@
-# 📈 mcp-quant-brain
+# mcp-quant-brain
 
 `mcp-quant-brain` is a high-performance Model Context Protocol (MCP) server designed for Quant Analysts and Financial Engineers. It provides a robust suite of tools for financial data ingestion, technical analysis, and advanced portfolio optimization.
 
-## 🚀 Features
+## Features
 
 - **Multi-Market Support**: Seamlessly handle US (e.g., `AAPL`) and Indian (e.g., `RELIANCE.NS`) stock data.
 - **Automated Currency Normalization**: Built-in USD/INR conversion for cross-market portfolio comparisons.
@@ -14,7 +14,7 @@
 - **Integrated Backtesting**: Realistic performance simulation using `vectorbt` with transaction cost considerations.
 - **Dynamic Extensibility**: Automatically registers new tools and indicators placed in the `tools/` directory.
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 mcp-quant-brain/
@@ -29,7 +29,7 @@ mcp-quant-brain/
 └── requirements.txt     # Python dependencies
 ```
 
-## 🛠️ Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -96,7 +96,7 @@ Indicators are registered as `get_[indicator_name]` tools.
 }
 ```
 
-## ⚖️ Verdict Logic
+## Verdict Logic
 
 The server evaluates backtest results against a `VERDICT_LOGIC` manifest:
 - **STRONG BUY**: Sharpe Ratio > 1.5, Win Rate > 60%, Max Drawdown < 15%.

@@ -13,7 +13,7 @@ def run_backtest(df, length=20):
 	entries = close > upper_band
 	exits = close < lower_exit
 
-	pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001)
+	pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq="1D")
 	stats = pf.stats()
 
 	return {

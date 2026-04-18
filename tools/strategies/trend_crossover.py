@@ -15,7 +15,7 @@ def run_strategy(df, fast=50, slow=200):
     entries = fast_ma.ma_crossed_above(slow_ma)
     exits = fast_ma.ma_crossed_below(slow_ma)
 
-    pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, init_cash=100000)
+    pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, init_cash=100000, freq="1D")
     stats = pf.stats()
 
     return {

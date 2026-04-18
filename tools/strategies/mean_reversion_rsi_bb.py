@@ -16,7 +16,7 @@ def run_strategy(df, rsi_lower=30, rsi_upper=70):
     entries = (rsi < rsi_lower) & (close < bbands.iloc[:, 0])
     exits = (rsi > rsi_upper) | (close > bbands.iloc[:, 2])
 
-    pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001)
+    pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq="1D")
     stats = pf.stats()
 
     return {

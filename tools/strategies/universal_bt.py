@@ -14,5 +14,5 @@ def run_universal_backtest(df, indicator_name: str, **params):
 	entries = close > ind_data
 	exits = close < ind_data
 
-	pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001)
+	pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq="1D")
 	return pf.stats().to_dict()

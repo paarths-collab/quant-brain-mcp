@@ -24,7 +24,7 @@ def run_backtest(df, length=14, lower=30, upper=70):
     entries = rsi < lower
     exits = rsi > upper
 
-    pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001)
+    pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq="1D")
     stats = pf.stats()
 
     returns = pf.returns().dropna()

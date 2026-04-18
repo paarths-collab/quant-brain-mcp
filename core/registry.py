@@ -1,6 +1,29 @@
 import os
 import importlib.util
-from utils.serializer import serialize_output
+
+
+def _resolve_callable(module, module_name: str):
+    """Resolve a callable tool entrypoint from a module.
+
+    Supported patterns:
+    - compute(df, ...)
+    - get_<name>(df, ...)
+    """
+    if hasattr(module, "compute") and callable(module.compute):
+        return f"get_{module_name}", module.compute
+
+    preferred_name = f"get_{module_name}"
+    if hasattr(module, preferred_name) and callable(getattr(module, preferred_name)):
+        return preferred_name, getattr(module, preferred_name)
+
+    for attr_name in dir(module):
+        if not attr_name.startswith("get_"):
+            continue
+        candidate = getattr(module, attr_name)
+        if callable(candidate):
+            return attr_name, candidate
+
+    return None, None
 
 def register_all_tools():
     """
@@ -23,21 +46,32 @@ def register_all_tools():
                 if spec is None:
                     continue
                 module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
+                try:
+                    spec.loader.exec_module(module)
+                except Exception:
+                    # Skip modules that are not import-safe in registry scan.
+                    continue
 
-                # Identify tools by their 'compute' function (standard for this project)
-                if hasattr(module, "compute"):
-                    description = getattr(module, "__doc__", f"Calculates {module_name} for the provided ticker.")
-                    tools[f"get_{module_name}"] = {
-                        "func": module.compute,
-                        "description": (description or "").strip(),
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "ticker": {"type": "string", "description": "Stock ticker (e.g., AAPL or RELIANCE.NS)"}
-                            },
-                            "required": ["ticker"]
-                        }
+                tool_name, tool_func = _resolve_callable(module, module_name)
+                if tool_func is None:
+                    continue
+
+                description = getattr(module, "__doc__", None)
+                if not description or not str(description).strip():
+                    description = (
+                        f"Technical analysis tool for {module_name.upper()}. "
+                        f"Use this when the user asks for {module_name} on a ticker."
+                    )
+                tools[tool_name] = {
+                    "func": tool_func,
+                    "description": (description or "").strip(),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "ticker": {"type": "string", "description": "Stock ticker (e.g., AAPL or RELIANCE.NS)"}
+                        },
+                        "required": ["ticker"]
                     }
+                }
                 
     return tools

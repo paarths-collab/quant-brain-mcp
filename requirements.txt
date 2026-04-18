@@ -2,6 +2,7 @@ mcp
 yfinance
 pandas-ta==0.4.71b0
 vectorbt
+plotly
 PyPortfolioOpt
 pandas
 numpy

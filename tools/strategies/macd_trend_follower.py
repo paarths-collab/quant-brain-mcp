@@ -1,13 +1,17 @@
 import vectorbt as vbt
+import pandas_ta as ta
 
 
 def run_backtest(df, fast=12, slow=26, signal=9):
     """Vectorized backtest for MACD trend following."""
-    macd = vbt.MACD.run(df["Close"], fast=fast, slow=slow, signal=signal)
-    entries = macd.macd_crossed_above(macd.signal)
-    exits = macd.macd_crossed_below(macd.signal)
+    close = df["Close"].astype(float)
+    macd = ta.macd(close, fast=fast, slow=slow, signal=signal)
+    macd_line = macd.iloc[:, 0]
+    signal_line = macd.iloc[:, 2]
+    entries = macd_line > signal_line
+    exits = macd_line < signal_line
 
-    pf = vbt.Portfolio.from_signals(df["Close"], entries, exits, fees=0.001)
+    pf = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq="1D")
     stats = pf.stats()
 
     return {

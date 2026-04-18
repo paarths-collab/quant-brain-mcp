@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: mcp-quant-brain
+    runtime: python
+    plan: free
+    region: oregon
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python fastmcp_server.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: HOST
+        value: 0.0.0.0

@@ -9,7 +9,7 @@ def run_backtest(df, fast=50, slow=200):
     entries = fast_ma.ma_crossed_above(slow_ma)
     exits = fast_ma.ma_crossed_below(slow_ma)
 
-    pf = vbt.Portfolio.from_signals(df["Close"], entries, exits, fees=0.001)
+    pf = vbt.Portfolio.from_signals(df["Close"], entries, exits, fees=0.001, freq="1D")
     stats = pf.stats()
 
     return {

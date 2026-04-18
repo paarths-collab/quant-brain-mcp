@@ -1,5 +1,14 @@
+import warnings
+
 import yfinance as yf
 import pandas as pd
+
+
+warnings.filterwarnings(
+	"ignore",
+	message=r"YF\.download\(\) has changed argument auto_adjust default to True",
+	category=UserWarning,
+)
 
 
 def fetch_stock_data(ticker: str, period: str = "2y", interval: str = "1d"):
@@ -13,7 +22,13 @@ def fetch_stock_data(ticker: str, period: str = "2y", interval: str = "1d"):
 		# But we will strip whitespace and uppercase it.
 		ticker = ticker.strip().upper()
 
-		data = yf.download(ticker, period=period, interval=interval, progress=False)
+		data = yf.download(
+			ticker,
+			period=period,
+			interval=interval,
+			progress=False,
+			auto_adjust=False,
+		)
 
 		if data.empty:
 			return {
@@ -32,7 +47,7 @@ def fetch_stock_data(ticker: str, period: str = "2y", interval: str = "1d"):
 def fetch_multi_data(tickers: list, period: str = "2y"):
 	"""Fetches multiple tickers for portfolio optimization."""
 	try:
-		data = yf.download(tickers, period=period, progress=False)["Close"]
+		data = yf.download(tickers, period=period, progress=False, auto_adjust=False)["Close"]
 		if data.empty:
 			return {"error": "No data found for the provided list of tickers."}
 		return data

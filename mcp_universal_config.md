@@ -1,8 +1,8 @@
-# 🌐 Universal MCP Configuration Guide
+# Universal MCP Configuration Guide
 
 This guide provides the configuration snippets required to connect the `mcp-quant-brain` server to your favorite AI IDE agents and clients.
 
-## 🛠️ Global Parameters
+## Global Parameters
 
 - **Python Executable**: `c:/Users/PaarthGala/Coding/mcp-quant-brain/.venv/Scripts/python.exe`
 - **Main Script**: `c:/Users/PaarthGala/Coding/mcp-quant-brain/main.py`

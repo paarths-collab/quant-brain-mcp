@@ -5,7 +5,7 @@ import pandas as pd
 def get_conversion_rate():
 	"""Fetches current USD/INR rate to normalize portfolios."""
 	ticker = "USDINR=X"
-	data = yf.download(ticker, period="1d", progress=False)
+	data = yf.download(ticker, period="1d", progress=False, auto_adjust=False)
 	rate = data["Close"].iloc[-1]
 	# Fix if it's a pandas Series
 	if isinstance(rate, pd.Series):
