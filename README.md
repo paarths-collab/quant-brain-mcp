@@ -1,128 +1,114 @@
 # mcp-quant-brain
 
-`mcp-quant-brain` is a high-performance Model Context Protocol (MCP) server designed for Quant Analysts and Financial Engineers. It provides a robust suite of tools for financial data ingestion, technical analysis, and advanced portfolio optimization.
+MCP server for stock analysis, strategy backtesting, portfolio optimization, and chart generation.
 
-## Features
+This product is built for users who want to ask natural-language questions like:
 
-- **Multi-Market Support**: Seamlessly handle US (e.g., `AAPL`) and Indian (e.g., `RELIANCE.NS`) stock data.
-- **Automated Currency Normalization**: Built-in USD/INR conversion for cross-market portfolio comparisons.
-- **Deep Technical Analysis**: Exposure to over 150+ indicators via `pandas-ta`.
-- **Advanced Portfolio Optimization**:
-  - Mean-Variance Optimization (MVO)
-  - Hierarchical Risk Parity (HRP)
-  - Black-Litterman Model
-- **Integrated Backtesting**: Realistic performance simulation using `vectorbt` with transaction cost considerations.
-- **Dynamic Extensibility**: Automatically registers new tools and indicators placed in the `tools/` directory.
+- "Analyze Indian sectors and tell me the best sector by risk-adjusted score."
+- "Backtest MACD on IREDA.NS and show charts."
+- "Optimize a US-India portfolio and explain risk."
 
-## Project Structure
+## Product Use Cases
 
-```text
-mcp-quant-brain/
-├── core/                # Core logic (Data loading, Forex, Mapping)
-├── tools/               # MCP Tool implementations
-│   ├── backtesting/     # Strategy & Portfolio backtesting logic
-│   ├── optimization/    # Mean-Variance and HRP optimizers
-│   ├── indicators/      # Technical analysis wrappers
-│   └── strategies/      # predefined trading logic
-├── knowledge/           # Static data & Risk manifolds
-├── main.py              # Entry point & FastMCP server definition
-└── requirements.txt     # Python dependencies
-```
+- Sector rotation analysis: identify the best-performing sector for a user-defined timeframe (for example `6m` or `1yr`) using return, volatility, drawdown, momentum, and correlation.
+- Portfolio construction: optimize allocations across US and India tickers using methods like MVO, HRP, max Sharpe, min volatility, CVaR, and semivariance.
+- Strategy validation: run rule-based backtests (MACD, RSI mean reversion, SMA crossover, breakout) before making discretionary decisions.
+- Chart-first review: generate chart packs for portfolio diagnostics, strategy behavior, and sector-level risk structure.
+- Company context enrichment: combine technical outputs with company-profile metadata for better explainability.
 
-## Getting Started
+## What You Get
 
-### Prerequisites
+- US and India ticker support (`AAPL`, `RELIANCE.NS`, etc.)
+- 150+ technical indicators
+- Strategy backtests (MACD, RSI mean reversion, SMA crossover, breakout)
+- Portfolio optimization (MVO, HRP, max Sharpe, min volatility, Black-Litterman, CVaR, semivariance)
+- Sector intelligence (returns, volatility, momentum, drawdown, correlation, best-sector selection)
+- Chart pack generation with isolated chart configs and default chart-first layout
 
-- Python 3.10+
-- An internet connection (for fetching market data via `yfinance`)
+## Use the Hosted MCP URL
 
-### Installation
+Use streamable HTTP transport and connect your MCP client to:
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd mcp-quant-brain
-   ```
+- `https://mcp-quant-brain.onrender.com/mcp`
 
-2. **Create a virtual environment**:
-   ```bash
-   python -m venv .venv
-  source .venv/Scripts/activate
-   ```
+Free-tier Render note:
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+- The server may take up to 1-2 minutes to spin up if it was sleeping.
+- If the first request times out, wait and retry.
 
-## 📖 How to Use
+## Connect in Claude (Desktop or Web)
 
-The server is built using the official `mcp-python-sdk`. Once running, it exposes several tools that can be called by any MCP-compatible client.
+Use connectors to add this MCP product in Claude.
 
-### Running the Server
+### Claude Desktop
 
-To start the server locally:
-```bash
-python main.py
-```
+1. Open Claude Desktop settings.
+2. Go to Connectors or MCP integrations.
+3. Add a new connector.
+4. Choose Streamable HTTP transport.
+5. Set the connector URL to `https://mcp-quant-brain.onrender.com/mcp`.
+6. Save and connect.
+7. When Claude asks for tool permissions, click **Accept All** so all analysis and chart tools are available.
 
-## Render Keepalive
+### Claude Web
 
-If you deploy to Render free tier, the service can sleep when idle. This repo includes a GitHub Actions workflow that pings the Render health endpoint every 5 minutes to keep the instance warm.
+1. Open Claude in browser and go to settings.
+2. Open Connectors.
+3. Add a custom connector.
+4. Select Streamable HTTP transport.
+5. Use `https://mcp-quant-brain.onrender.com/mcp` as the connector URL.
+6. Complete connection.
+7. When prompted for tool permissions, click **Accept All**.
 
-Set this repository secret in GitHub:
+If your first connection attempt fails, wait up to 2 minutes and retry once (free-tier cold start).
 
-- `RENDER_HEALTH_URL`: your Render health endpoint, for example `https://mcp-quant-brain.onrender.com/health`
+## Core Tools You’ll Use
 
-The workflow file is [`.github/workflows/render-keepalive.yml`](.github/workflows/render-keepalive.yml).
+- `generate_optimized_verdict`
+- `generate_chart_pack`
+- `generate_charts`
+- `plot_charts`
+- `get_company_profile`
+- `find_sector_stock_pipeline_tool`
+- `analyze_sector_intelligence_tool`
+- Indicator tools like `get_rsi`, `get_macd`, `get_adx`, `get_supertrend`
+- Strategy tools like `backtest_macd_momentum`, `backtest_rsi_mean_reversion`
 
-You can also run it manually from the GitHub Actions tab using `workflow_dispatch`.
+## Example Questions (NLP)
 
-### Example Usage (with MCP Client)
+- "Analyze IREDA.NS over 1 year, run MACD momentum backtest, and show charts."
+- "Compare IT, Bank, Auto, Metal, Pharma, Realty sectors by return, risk, drawdown, and momentum."
+- "Give me the best Indian sector using risk-adjusted ranking and show sector correlation matrix."
+- "Optimize AAPL, MSFT, NVDA, RELIANCE.NS with CVaR and summarize risk flags."
 
-#### 1. Generate an Optimized Portfolio Verdict
-This is the "Ultimate Tool" that fetches data, optimizes weights between tickers (even across USD/INR markets), backtests the result, and provides a final verdict.
+## Render Endpoints
 
-```json
-// Tool: generate_optimized_verdict
-{
-  "tickers": ["AAPL", "RELIANCE.NS", "TSLA", "TCS.NS"],
-  "amount": 50000
-}
-```
+- MCP endpoint: `https://mcp-quant-brain.onrender.com/mcp`
+- Health endpoint: `https://mcp-quant-brain.onrender.com/health`
 
-#### 2. Fetch Single Stock Data
-```json
-// Tool: fetch_data
-{
-  "ticker": "RELIANCE.NS"
-}
-```
+## Troubleshooting
 
-#### 3. Compute Technical Indicators
-Indicators are registered as `get_[indicator_name]` tools.
-```json
-// Tool: get_rsi
-{
-  "ticker": "AAPL"
-}
-```
+### "Missing session ID"
 
-## Verdict Logic
+The server is configured with stateless HTTP mode. If you still see this:
 
-The server evaluates backtest results against a `VERDICT_LOGIC` manifest:
-- **STRONG BUY**: Sharpe Ratio > 1.5, Win Rate > 60%, Max Drawdown < 15%.
-- **STAY AWAY**: Negative returns or Sharpe Ratio < 0.3.
-- **RISKY MOMENTUM**: High returns (>30%) but erratic drawdown (>25%).
+1. Reconnect MCP client.
+2. Ensure URL is exactly `/mcp`.
 
-## 🧪 Dependencies
+### "MCP server connection lost" / 504 / timeout
 
-- **mcp-python-sdk**: The official Model Context Protocol implementation.
-- **yfinance**: Market data source.
-- **PyPortfolioOpt**: Modern Portfolio Theory tools.
-- **vectorbt**: Vectorized backtesting.
-- **pandas-ta**: Technical Analysis library.
+Usually cold-start or proxy timeout on free tier:
 
----
-*Note: This tool is for informational purposes only. Trading involves risk.*
-# quant-brain-mcp-
+1. Wait up to 2 minutes.
+2. Retry once.
+3. Check `/health`.
+
+### Charts not visible
+
+Use `generate_charts` or `plot_charts` for image-friendly responses.
+
+## Notes
+
+- This is not financial advice.
+- Data quality depends on upstream sources (mainly Yahoo Finance via `yfinance`).
+- Use proper ticker suffixes for Indian stocks (for example `.NS`).

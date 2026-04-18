@@ -8,6 +8,8 @@ import base64
 
 import plotly.graph_objects as go
 import mcp.types as types
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.streamable_http import StreamableHTTPServerTransport
@@ -17,7 +19,7 @@ from core.data_loader import fetch_data
 from main import get_dynamic_tools, run_generate_optimized_verdict, serialize_output
 from tools.intelligence.company_profile import get_company_info
 from tools.intelligence.plotly_dashboard import build_chart_pack
-from tools.strategies.sector_pipeline import find_sector_stock_pipeline
+from tools.strategies.sector_pipeline import analyze_sector_intelligence, find_sector_stock_pipeline
 
 
 def _enable_mcpjam_compatibility() -> None:
@@ -31,12 +33,22 @@ def _enable_mcpjam_compatibility() -> None:
     original = StreamableHTTPServerTransport._check_accept_headers
 
     def _patched_check_accept_headers(self, request):  # type: ignore[override]
-        has_json, has_sse = original(self, request)
         accept_header = request.headers.get("accept", "")
 
-        # Browser clients and some MCP UIs may use wildcard Accept values.
+        # Browser clients and some MCP UIs may use wildcard or generic Accept values.
+        # Handle these first so strict upstream checks cannot raise and surface as HTTP 500.
         if not accept_header or "*/*" in accept_header:
             return True, True
+
+        try:
+            has_json, has_sse = original(self, request)
+        except Exception:
+            # Fallback for stricter FastMCP versions that may throw on non-MCP Accept values.
+            lowered = accept_header.lower()
+            has_json = "application/json" in lowered or "application/*" in lowered
+            has_sse = "text/event-stream" in lowered or "text/*" in lowered
+            if not has_json and not has_sse:
+                return True, True
 
         # Treat either media type as acceptable for compatibility.
         if has_json and not has_sse:
@@ -78,6 +90,11 @@ mcp = FastMCP(
 )
 
 
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(_request: Request) -> Response:
+    return JSONResponse({"status": "ok"})
+
+
 @mcp.tool()
 def generate_optimized_verdict(
     tickers: list[str],
@@ -117,6 +134,15 @@ def find_sector_stock_pipeline_tool(
             top_n_stocks=top_n_stocks,
         )
     )
+
+
+@mcp.tool()
+def analyze_sector_intelligence_tool(
+    market: str = "india",
+    timeframe: str = "1y",
+) -> dict:
+    """Analyze sector return, risk, momentum, drawdown and correlation; select best sector."""
+    return serialize_output(analyze_sector_intelligence(market=market, timeframe=timeframe))
 
 
 def _run_optimizer_variant(
