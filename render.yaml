@@ -6,7 +6,8 @@ services:
     region: oregon
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: python fastmcp_server.py
+    startCommand: uvicorn render_app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.10

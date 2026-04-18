@@ -66,6 +66,18 @@ To start the server locally:
 python main.py
 ```
 
+## Render Keepalive
+
+If you deploy to Render free tier, the service can sleep when idle. This repo includes a GitHub Actions workflow that pings the Render health endpoint every 5 minutes to keep the instance warm.
+
+Set this repository secret in GitHub:
+
+- `RENDER_HEALTH_URL`: your Render health endpoint, for example `https://mcp-quant-brain.onrender.com/health`
+
+The workflow file is [`.github/workflows/render-keepalive.yml`](.github/workflows/render-keepalive.yml).
+
+You can also run it manually from the GitHub Actions tab using `workflow_dispatch`.
+
 ### Example Usage (with MCP Client)
 
 #### 1. Generate an Optimized Portfolio Verdict
