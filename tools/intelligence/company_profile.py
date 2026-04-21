@@ -3,13 +3,43 @@ from __future__ import annotations
 from typing import Any
 
 import yfinance as yf
+import pandas as pd
 
 from core.data_loader import fetch_data
 
 
+def _normalize_ticker(ticker: Any) -> str:
+    """Coerce the incoming ticker to a usable symbol string.
+
+    The MCP layer should pass a string, but some client/tooling paths can
+    accidentally hand us a DataFrame or other object. In that case, try to
+    recover a ticker from obvious metadata before failing with a clear error.
+    """
+    if isinstance(ticker, str):
+        normalized = ticker.strip().upper()
+        if normalized:
+            return normalized
+
+    if isinstance(ticker, pd.DataFrame):
+        for key in ("ticker", "symbol", "Ticker", "Symbol"):
+            if key in ticker.attrs and ticker.attrs[key]:
+                return str(ticker.attrs[key]).strip().upper()
+        if len(ticker.columns) == 1:
+            column_name = str(ticker.columns[0]).strip().upper()
+            if column_name:
+                return column_name
+
+    if isinstance(ticker, pd.Series):
+        for key in ("ticker", "symbol", "Ticker", "Symbol"):
+            if key in ticker.index and pd.notna(ticker.get(key)):
+                return str(ticker.get(key)).strip().upper()
+
+    return str(ticker).strip().upper()
+
+
 def get_deep_fundamentals(ticker: str) -> dict[str, Any]:
     """Fetch deep fundamentals from yfinance for a single ticker."""
-    normalized = ticker.strip().upper()
+    normalized = _normalize_ticker(ticker)
     t = yf.Ticker(normalized)
     info = t.info or {}
 
@@ -39,9 +69,12 @@ def get_deep_fundamentals(ticker: str) -> dict[str, Any]:
     }
 
 
-def get_company_info(ticker: str) -> dict[str, Any]:
+def get_company_info(ticker: Any) -> dict[str, Any]:
     """Return a structured company profile with business and market context."""
-    normalized = ticker.strip().upper()
+    normalized = _normalize_ticker(ticker)
+    if not normalized:
+        return {"error": "ticker is required and must be a non-empty string", "ticker": ticker}
+
     base_df, err = fetch_data(normalized)
     if err:
         return {"error": err, "ticker": normalized}
