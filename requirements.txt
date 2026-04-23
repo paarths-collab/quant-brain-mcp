@@ -4,6 +4,7 @@ yfinance
 pandas-ta==0.4.71b0
 vectorbt
 plotly
+kaleido
 PyPortfolioOpt
 pandas
 numpy
