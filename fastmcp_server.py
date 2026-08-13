@@ -15,8 +15,10 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.streamable_http import StreamableHTTPServerTransport
 from mcp.server.transport_security import TransportSecuritySettings
 
+from core import telemetry
 from core.data_loader import fetch_data
-from main import get_dynamic_tools, run_generate_optimized_verdict, serialize_output
+from core.indicator_registry import run_group
+from main import run_generate_optimized_verdict, serialize_output
 from tools.intelligence.company_profile import get_company_info
 from tools.intelligence.plotly_dashboard import build_chart_pack
 from tools.strategies.sector_pipeline import analyze_sector_intelligence, find_sector_stock_pipeline
@@ -90,12 +92,53 @@ mcp = FastMCP(
 )
 
 
+def tracked_tool(category: str):
+    """Register an MCP tool with usage telemetry attached.
+
+    Single entry point for tool registration: every tool call records
+    tool_name, tool_category, session_id, duration_ms, and success.
+    """
+
+    def decorator(fn):
+        return mcp.tool()(telemetry.instrument(fn, category, mcp.get_context))
+
+    return decorator
+
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(_request: Request) -> Response:
     return JSONResponse({"status": "ok"})
 
 
-@mcp.tool()
+@mcp.custom_route("/metrics/summary", methods=["GET"])
+async def metrics_summary(request: Request) -> Response:
+    import asyncio
+    import secrets
+    from datetime import datetime, timezone
+
+    expected_token = os.getenv("METRICS_TOKEN")
+    if not expected_token:
+        return JSONResponse({"error": "metrics endpoint not configured"}, status_code=503)
+
+    auth_header = request.headers.get("authorization", "")
+    provided = auth_header[7:] if auth_header.startswith("Bearer ") else ""
+    if not provided or not secrets.compare_digest(provided, expected_token):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    try:
+        summary = await asyncio.to_thread(telemetry.fetch_summary)
+    except Exception as exc:
+        return JSONResponse({"error": f"metrics query failed: {exc}"}, status_code=500)
+
+    if summary is None:
+        return JSONResponse({"error": "DATABASE_URL not configured"}, status_code=503)
+
+    summary["latency_unit"] = "ms"
+    summary["generated_at"] = datetime.now(timezone.utc).isoformat()
+    return JSONResponse(summary)
+
+
+@tracked_tool("optimization")
 def generate_optimized_verdict(
     tickers: list[str],
     amount: float = 10000,
@@ -114,13 +157,13 @@ def generate_optimized_verdict(
     return serialize_output(result)
 
 
-@mcp.tool()
+@tracked_tool("intelligence")
 def get_company_profile(ticker: str) -> dict:
     """Return a full company snapshot with business, valuation, and market metadata."""
     return serialize_output(get_company_info(ticker))
 
 
-@mcp.tool()
+@tracked_tool("intelligence")
 def find_sector_stock_pipeline_tool(
     market: str = "india",
     top_n_sectors: int = 3,
@@ -136,7 +179,7 @@ def find_sector_stock_pipeline_tool(
     )
 
 
-@mcp.tool()
+@tracked_tool("intelligence")
 def analyze_sector_intelligence_tool(
     market: str = "india",
     timeframe: str = "1y",
@@ -224,55 +267,55 @@ def _image_contents_from_chart_pack(chart_pack: dict[str, Any], limit: int = 8) 
     return contents
 
 
-@mcp.tool()
+@tracked_tool("optimization")
 def optimize_mvo(tickers: list[str], amount: float = 10000) -> dict:
     """Optimize portfolio using MVO and return full verdict payload."""
     return _run_optimizer_variant(tickers, amount, "mvo")
 
 
-@mcp.tool()
+@tracked_tool("optimization")
 def optimize_hrp(tickers: list[str], amount: float = 10000) -> dict:
     """Optimize portfolio using HRP and return full verdict payload."""
     return _run_optimizer_variant(tickers, amount, "hrp")
 
 
-@mcp.tool()
+@tracked_tool("optimization")
 def optimize_max_sharpe(tickers: list[str], amount: float = 10000) -> dict:
     """Optimize portfolio for max Sharpe and return full verdict payload."""
     return _run_optimizer_variant(tickers, amount, "max_sharpe")
 
 
-@mcp.tool()
+@tracked_tool("optimization")
 def optimize_min_volatility(tickers: list[str], amount: float = 10000) -> dict:
     """Optimize portfolio for minimum volatility and return full verdict payload."""
     return _run_optimizer_variant(tickers, amount, "min_volatility")
 
 
-@mcp.tool()
+@tracked_tool("optimization")
 def optimize_black_litterman(tickers: list[str], amount: float = 10000) -> dict:
     """Optimize portfolio using Black-Litterman and return full verdict payload."""
     return _run_optimizer_variant(tickers, amount, "black_litterman")
 
 
-@mcp.tool()
+@tracked_tool("optimization")
 def optimize_cvar(tickers: list[str], amount: float = 10000) -> dict:
     """Optimize portfolio using CVaR and return full verdict payload."""
     return _run_optimizer_variant(tickers, amount, "cvar")
 
 
-@mcp.tool()
+@tracked_tool("optimization")
 def optimize_semivariance(tickers: list[str], amount: float = 10000) -> dict:
     """Optimize portfolio using semivariance and return full verdict payload."""
     return _run_optimizer_variant(tickers, amount, "semivariance")
 
 
-@mcp.tool()
+@tracked_tool("backtest")
 def backtest_macd_momentum(ticker: str) -> dict:
     """Run MACD momentum strategy backtest for one ticker."""
     return _run_strategy_module(ticker, "tools.strategies.macd_momentum", "run_strategy")
 
 
-@mcp.tool()
+@tracked_tool("backtest")
 def backtest_macd_trend_follower(
     ticker: str,
     fast: int = 12,
@@ -290,7 +333,7 @@ def backtest_macd_trend_follower(
     )
 
 
-@mcp.tool()
+@tracked_tool("backtest")
 def backtest_mean_reversion_rsi_bb(
     ticker: str,
     rsi_lower: int = 30,
@@ -306,7 +349,7 @@ def backtest_mean_reversion_rsi_bb(
     )
 
 
-@mcp.tool()
+@tracked_tool("backtest")
 def backtest_rsi_mean_reversion(
     ticker: str,
     length: int = 14,
@@ -324,7 +367,7 @@ def backtest_rsi_mean_reversion(
     )
 
 
-@mcp.tool()
+@tracked_tool("backtest")
 def backtest_sma_crossover(ticker: str, fast: int = 50, slow: int = 200) -> dict:
     """Run SMA crossover strategy backtest."""
     return _run_strategy_module(
@@ -336,7 +379,7 @@ def backtest_sma_crossover(ticker: str, fast: int = 50, slow: int = 200) -> dict
     )
 
 
-@mcp.tool()
+@tracked_tool("backtest")
 def backtest_trend_crossover(ticker: str, fast: int = 50, slow: int = 200) -> dict:
     """Run trend crossover strategy backtest."""
     return _run_strategy_module(
@@ -348,7 +391,7 @@ def backtest_trend_crossover(ticker: str, fast: int = 50, slow: int = 200) -> di
     )
 
 
-@mcp.tool()
+@tracked_tool("backtest")
 def backtest_volatility_breakout(ticker: str, length: int = 20) -> dict:
     """Run volatility breakout strategy backtest."""
     return _run_strategy_module(
@@ -359,7 +402,7 @@ def backtest_volatility_breakout(ticker: str, length: int = 20) -> dict:
     )
 
 
-@mcp.tool()
+@tracked_tool("backtest")
 def backtest_universal_indicator(
     ticker: str,
     indicator_name: str,
@@ -373,7 +416,7 @@ def backtest_universal_indicator(
     )
 
 
-@mcp.tool()
+@tracked_tool("chart")
 def generate_chart_pack(
     tickers: list[str],
     amount: float = 10000,
@@ -394,7 +437,7 @@ def generate_chart_pack(
     )
 
 
-@mcp.tool()
+@tracked_tool("chart")
 def generate_charts(
     tickers: list[str],
     amount: float = 10000,
@@ -420,7 +463,7 @@ def generate_charts(
     return [types.TextContent(type="text", text=json.dumps(summary, indent=2))] + _image_contents_from_chart_pack(chart_pack)
 
 
-@mcp.tool()
+@tracked_tool("chart")
 def plot_charts(
     tickers: list[str],
     amount: float = 10000,
@@ -446,29 +489,59 @@ def plot_charts(
     return [types.TextContent(type="text", text=json.dumps(summary, indent=2))] + _image_contents_from_chart_pack(chart_pack)
 
 
-def _register_dynamic_tools() -> None:
-    dynamic_tools = get_dynamic_tools()
+@tracked_tool("indicator")
+def analyze_momentum(ticker: str, indicators: list[str] | None = None) -> dict:
+    """Momentum indicators: rsi, macd, roc, cci, stoch, stochrsi, tsi, willr.
 
-    for tool_name, info in dynamic_tools.items():
-        indicator_func = info["func"]
-        tool_description = info.get("description") or f"Run {tool_name} for a ticker"
-
-        def _make_tool(func, name: str, description: str):
-            def _tool(ticker: str) -> dict:
-                """Dynamically generated indicator tool."""
-                df, err = fetch_data(ticker)
-                if err:
-                    return {"error": err}
-                return serialize_output(func(df))
-
-            _tool.__name__ = name
-            _tool.__doc__ = description
-            return _tool
-
-        mcp.tool()(_make_tool(indicator_func, tool_name, tool_description))
+    Runs all momentum indicators for the ticker, or only the subset named in
+    `indicators` (e.g. ["rsi", "macd"]).
+    """
+    return run_group("momentum", ticker, indicators)
 
 
-_register_dynamic_tools()
+@tracked_tool("indicator")
+def analyze_technical_levels(ticker: str, indicators: list[str] | None = None) -> dict:
+    """Moving averages and price levels: sma, ema, hma, kama, ichimoku, supertrend, vwap, vwma.
+
+    Runs all level indicators for the ticker, or only the subset named in `indicators`.
+    """
+    return run_group("technical_levels", ticker, indicators)
+
+
+@tracked_tool("indicator")
+def analyze_trend(ticker: str, indicators: list[str] | None = None) -> dict:
+    """Trend strength and direction: adx, aroon, chop, psar, vortex, zigzag.
+
+    Runs all trend indicators for the ticker, or only the subset named in `indicators`.
+    """
+    return run_group("trend", ticker, indicators)
+
+
+@tracked_tool("indicator")
+def analyze_volatility(ticker: str, indicators: list[str] | None = None) -> dict:
+    """Volatility and bands: atr, bbands, donchian, kc, stdev, ui.
+
+    Runs all volatility indicators for the ticker, or only the subset named in `indicators`.
+    """
+    return run_group("volatility", ticker, indicators)
+
+
+@tracked_tool("indicator")
+def analyze_volume(ticker: str, indicators: list[str] | None = None) -> dict:
+    """Volume confirmation: obv, cmf, mfi, ad, pvt.
+
+    Runs all volume indicators for the ticker, or only the subset named in `indicators`.
+    """
+    return run_group("volume", ticker, indicators)
+
+
+@tracked_tool("indicator")
+def analyze_statistics(ticker: str, indicators: list[str] | None = None) -> dict:
+    """Statistical behavior: log_return, zscore, skew, kurtosis, entropy.
+
+    Runs all statistical indicators for the ticker, or only the subset named in `indicators`.
+    """
+    return run_group("statistics", ticker, indicators)
 
 
 if __name__ == "__main__":
