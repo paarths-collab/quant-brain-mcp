@@ -2,6 +2,8 @@
 
 MCP server for stock analysis, strategy backtesting, portfolio optimization, and chart generation.
 
+**38 curated quantitative indicators • 7 portfolio optimizers • 8 backtesting workflows • U.S. + Indian equities • production usage telemetry**
+
 This product is built for users who want to ask natural-language questions like:
 
 - "Analyze Indian sectors and tell me the best sector by risk-adjusted score."
@@ -19,7 +21,7 @@ This product is built for users who want to ask natural-language questions like:
 ## What You Get
 
 - US and India ticker support (`AAPL`, `RELIANCE.NS`, etc.)
-- 150+ technical indicators
+- 38 curated quantitative indicators exposed through 6 grouped analysis tools
 - Strategy backtests (MACD, RSI mean reversion, SMA crossover, breakout)
 - Portfolio optimization (MVO, HRP, max Sharpe, min volatility, Black-Litterman, CVaR, semivariance)
 - Sector intelligence (returns, volatility, momentum, drawdown, correlation, best-sector selection)
@@ -64,6 +66,22 @@ If your first connection attempt fails, wait up to 2 minutes and retry once (fre
 
 ## Core Tools You’ll Use
 
+### Indicator analysis (6 grouped tools, 38 indicators)
+
+Each tool runs its whole group by default, or a subset via the optional
+`indicators` argument (for example `analyze_momentum(ticker="AAPL", indicators=["rsi", "macd"])`).
+
+| Tool | Indicators |
+| --- | --- |
+| `analyze_momentum` | rsi, macd, roc, cci, stoch, stochrsi, tsi, willr |
+| `analyze_technical_levels` | sma, ema, hma, kama, ichimoku, supertrend, vwap, vwma |
+| `analyze_trend` | adx, aroon, chop, psar, vortex, zigzag |
+| `analyze_volatility` | atr, bbands, donchian, kc, stdev, ui |
+| `analyze_volume` | obv, cmf, mfi, ad, pvt |
+| `analyze_statistics` | log_return, zscore, skew, kurtosis, entropy |
+
+### Portfolio, backtesting, and reporting
+
 - `generate_optimized_verdict`
 - `generate_chart_pack`
 - `generate_charts`
@@ -71,7 +89,6 @@ If your first connection attempt fails, wait up to 2 minutes and retry once (fre
 - `get_company_profile`
 - `find_sector_stock_pipeline_tool`
 - `analyze_sector_intelligence_tool`
-- Indicator tools like `get_rsi`, `get_macd`, `get_adx`, `get_supertrend`
 - Strategy tools like `backtest_macd_momentum`, `backtest_rsi_mean_reversion`
 
 ## Example Questions (NLP)
@@ -85,6 +102,35 @@ If your first connection attempt fails, wait up to 2 minutes and retry once (fre
 
 - MCP endpoint: `https://mcp-quant-brain.onrender.com/mcp`
 - Health endpoint: `https://mcp-quant-brain.onrender.com/health`
+- Metrics endpoint: `https://mcp-quant-brain.onrender.com/metrics/summary` (bearer token required)
+
+## Usage Telemetry
+
+Every MCP tool call records `tool_name`, `tool_category`, `session_id`,
+`duration_ms`, and `success` to Postgres. Writes are fire-and-forget on a
+background thread, so telemetry never blocks or fails a tool call. With no
+`DATABASE_URL` configured, telemetry is a silent no-op and the server runs
+normally.
+
+### Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Postgres/Supabase connection URI (use the Supabase **session pooler** URI). Unset disables telemetry. |
+| `METRICS_TOKEN` | Bearer token protecting `/metrics/summary`. Unset returns 503. |
+
+The `mcp_tool_events` table and its indexes are created automatically on first
+connection — no manual migration needed.
+
+### Reading your metrics
+
+```bash
+curl -H "Authorization: Bearer $METRICS_TOKEN" \
+  https://mcp-quant-brain.onrender.com/metrics/summary
+```
+
+Returns `total_requests`, `unique_sessions`, `backtests`, `optimizations`,
+`success_rate`, `p50_latency`, and `p95_latency`.
 
 ## Troubleshooting
 

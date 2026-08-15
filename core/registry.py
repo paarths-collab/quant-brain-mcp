@@ -1,77 +1,46 @@
-import os
-import importlib.util
+"""Legacy flat tool registry, now backed by the explicit allowlist.
 
+Previously this walked the entire tools/ tree and auto-registered every
+compatible get_*/compute function (~133 tools). It now reads the curated
+38-indicator allowlist in core.indicator_registry so the stdio server
+(main.py) exposes the same curated surface as the FastMCP server.
+"""
 
-def _resolve_callable(module, module_name: str):
-    """Resolve a callable tool entrypoint from a module.
+import importlib
 
-    Supported patterns:
-    - compute(df, ...)
-    - get_<name>(df, ...)
-    """
-    if hasattr(module, "compute") and callable(module.compute):
-        return f"get_{module_name}", module.compute
+from core.indicator_registry import _resolve, iter_all_indicators
 
-    preferred_name = f"get_{module_name}"
-    if hasattr(module, preferred_name) and callable(getattr(module, preferred_name)):
-        return preferred_name, getattr(module, preferred_name)
-
-    for attr_name in dir(module):
-        if not attr_name.startswith("get_"):
-            continue
-        candidate = getattr(module, attr_name)
-        if callable(candidate):
-            return attr_name, candidate
-
-    return None, None
 
 def register_all_tools():
-    """
-    Dynamically discovers all indicators and strategies.
-    Returns a dictionary mapping tool names to their metadata and functions.
-    """
+    """Return {tool_name: {func, description, parameters}} for the 38 core indicators."""
     tools = {}
-    base_path = os.path.join(os.path.dirname(__file__), "..", "tools")
+    for key, module_path, func_name, group in iter_all_indicators():
+        try:
+            func = _resolve(module_path, func_name)
+        except Exception:
+            # Skip indicators whose module cannot import in this environment.
+            continue
 
-    if not os.path.exists(base_path):
-        return tools
+        module_doc = (importlib.import_module(module_path).__doc__ or "").strip()
+        func_doc = (func.__doc__ or "").strip()
+        description = module_doc or func_doc or (
+            f"Technical analysis tool for {key.upper()} ({group}). "
+            f"Use this when the user asks for {key} on a ticker."
+        )
 
-    for root, _, files in os.walk(base_path):
-        for file in files:
-            if file.endswith(".py") and not file.startswith("__"):
-                module_name = file[:-3]
-                file_path = os.path.join(root, file)
-
-                spec = importlib.util.spec_from_file_location(module_name, file_path)
-                if spec is None:
-                    continue
-                module = importlib.util.module_from_spec(spec)
-                try:
-                    spec.loader.exec_module(module)
-                except Exception:
-                    # Skip modules that are not import-safe in registry scan.
-                    continue
-
-                tool_name, tool_func = _resolve_callable(module, module_name)
-                if tool_func is None:
-                    continue
-
-                description = getattr(module, "__doc__", None)
-                if not description or not str(description).strip():
-                    description = (
-                        f"Technical analysis tool for {module_name.upper()}. "
-                        f"Use this when the user asks for {module_name} on a ticker."
-                    )
-                tools[tool_name] = {
-                    "func": tool_func,
-                    "description": (description or "").strip(),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "ticker": {"type": "string", "description": "Stock ticker (e.g., AAPL or RELIANCE.NS)"}
-                        },
-                        "required": ["ticker"]
+        tools[func_name] = {
+            "func": func,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker (e.g., AAPL or RELIANCE.NS)",
                     }
-                }
-                
+                },
+                "required": ["ticker"],
+            },
+        }
+
     return tools
