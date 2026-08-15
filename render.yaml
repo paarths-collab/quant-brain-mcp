@@ -15,3 +15,7 @@ services:
         value: "1"
       - key: HOST
         value: 0.0.0.0
+      - key: DATABASE_URL
+        sync: false
+      - key: METRICS_TOKEN
+        sync: false
