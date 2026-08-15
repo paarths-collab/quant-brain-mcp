@@ -17,6 +17,7 @@ import queue
 import threading
 import time
 from dataclasses import dataclass
+from urllib.parse import quote, unquote
 
 logger = logging.getLogger("mcp-quant-brain.telemetry")
 
@@ -53,6 +54,34 @@ SELECT
   percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)   AS p95_latency
 FROM mcp_tool_events
 """
+
+
+def _normalize_dsn(dsn):
+    """Percent-encode special characters in a Postgres URL password.
+
+    Passwords containing '@', '#', etc. break URL parsing because '@' also
+    separates credentials from the host. Encoding is idempotent: an
+    already-encoded password is unquoted then requoted to the same value.
+    Non-URL (keyword-style) DSNs are returned untouched.
+    """
+    if not dsn or "://" not in dsn:
+        return dsn
+
+    try:
+        scheme, rest = dsn.split("://", 1)
+        if "@" not in rest:
+            return dsn
+
+        # The host section is everything after the LAST '@'; credentials precede it.
+        userinfo, host_part = rest.rsplit("@", 1)
+        if ":" not in userinfo:
+            return dsn  # user only, no password
+
+        user, password = userinfo.split(":", 1)
+        safe_password = quote(unquote(password), safe="")
+        return f"{scheme}://{user}:{safe_password}@{host_part}"
+    except Exception:
+        return dsn
 
 
 @dataclass
@@ -93,7 +122,7 @@ class TelemetryWriter:
     def _connect(self):
         import psycopg2
 
-        conn = psycopg2.connect(self.dsn)
+        conn = psycopg2.connect(_normalize_dsn(self.dsn))
         conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute(_SCHEMA_SQL)
@@ -236,7 +265,7 @@ def fetch_summary() -> dict | None:
 
     import psycopg2
 
-    conn = psycopg2.connect(dsn)
+    conn = psycopg2.connect(_normalize_dsn(dsn))
     try:
         with conn.cursor() as cur:
             cur.execute(_SCHEMA_SQL)
