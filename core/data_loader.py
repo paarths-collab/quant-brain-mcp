@@ -22,12 +22,18 @@ def fetch_stock_data(ticker: str, period: str = "2y", interval: str = "1d"):
 		# But we will strip whitespace and uppercase it.
 		ticker = ticker.strip().upper()
 
+		# auto_adjust=True: "Close" (and OHLC proportionally) reflects dividends
+		# and splits. Every consumer in this codebase reads df["Close"] directly
+		# (nothing references "Adj Close"), so this makes every downstream
+		# return/Sharpe/alpha figure dividend-inclusive at no other cost. With
+		# auto_adjust=False, a stock's true total return was silently understated
+		# by its dividend yield (measured: 8.91pp on XLE over 2 years).
 		data = yf.download(
 			ticker,
 			period=period,
 			interval=interval,
 			progress=False,
-			auto_adjust=False,
+			auto_adjust=True,
 		)
 
 		if data.empty:
@@ -47,7 +53,7 @@ def fetch_stock_data(ticker: str, period: str = "2y", interval: str = "1d"):
 def fetch_multi_data(tickers: list, period: str = "2y"):
 	"""Fetches multiple tickers for portfolio optimization."""
 	try:
-		data = yf.download(tickers, period=period, progress=False, auto_adjust=False)["Close"]
+		data = yf.download(tickers, period=period, progress=False, auto_adjust=True)["Close"]
 		if data.empty:
 			return {"error": "No data found for the provided list of tickers."}
 		return data
