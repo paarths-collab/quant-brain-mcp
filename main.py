@@ -1,5 +1,6 @@
 import asyncio
 import json
+import math
 
 from core import quant_settings  # noqa: F401  (252-day annualization, applied on import)
 
@@ -120,27 +121,105 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
         log(traceback.format_exc())
         return [types.TextContent(type="text", text=f"Tool Error: {str(e)}")]
 
+def _infer_benchmark_ticker(symbol: str) -> str:
+    """Pick the appropriate index for a single ticker's alpha/beta regression."""
+    sym = str(symbol).upper()
+    if sym.endswith((".NS", ".BO")):
+        return "^NSEI"
+    return "^GSPC"
+
+
+def _to_float_pct(value, default: float = 0.0) -> float:
+    """Parse a value like '-2.50%' into -2.50. Returns `default` on failure."""
+    try:
+        return float(str(value).replace("%", "").strip())
+    except Exception:
+        return default
+
+
+def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benchmark):
+    """Run quant/alpha analysis per HELD ticker and blend by portfolio weight.
+
+    Previously only ONE ticker (whichever resolved first) drove every risk
+    field -- VaR, beta, alpha, factor_exposure, risk_flags -- regardless of
+    portfolio weights. Two users with the identical portfolio in a different
+    list order could get different, sometimes contradictory, verdicts.
+
+    Returns (per_ticker: list[dict], blended: dict | None). Tickers whose
+    analysis fails (insufficient history, benchmark fetch error, etc.) are
+    still reported in per_ticker with their error, but excluded from the
+    blend; blend weights are renormalized over the tickers that succeeded.
+    blended is None only when every held ticker's analysis failed.
+    """
+    from core.data_loader import fetch_data
+    from tools.intelligence.alpha_engine import calculate_alpha_metrics
+    from tools.intelligence.engine import get_quant_analysis
+
+    per_ticker = []
+    for ticker, raw_weight in weights.items():
+        try:
+            weight = float(raw_weight)
+        except (TypeError, ValueError):
+            continue
+        if weight <= 0 or ticker not in ohlc_frames:
+            continue
+
+        benchmark = infer_benchmark(ticker)
+        entry = {"ticker": ticker, "weight": round(weight, 4), "benchmark": benchmark}
+
+        try:
+            entry["quant_analysis"] = get_quant_analysis(ohlc_frames[ticker], benchmark_ticker=benchmark)
+        except Exception as exc:
+            entry["quant_analysis"] = {"error": str(exc)}
+
+        try:
+            entry["alpha_analysis"] = calculate_alpha_metrics(ohlc_frames[ticker], benchmark_ticker=benchmark)
+        except Exception as exc:
+            entry["alpha_analysis"] = {"error": str(exc)}
+
+        per_ticker.append(entry)
+
+    usable = [
+        e
+        for e in per_ticker
+        if "error" not in e["quant_analysis"] and "error" not in e["alpha_analysis"]
+    ]
+    total_weight = sum(e["weight"] for e in usable)
+    if not usable or total_weight <= 0:
+        return per_ticker, None
+
+    def _weighted_avg(values):
+        return sum(e["weight"] * v for e, v in zip(usable, values)) / total_weight
+
+    var_pcts = [_to_float_pct(e["quant_analysis"].get("one_day_var_95")) for e in usable]
+    betas = [float(e["alpha_analysis"].get("beta", 0.0)) for e in usable]
+    alphas = [float(e["alpha_analysis"].get("alpha_annualized", 0.0)) for e in usable]
+    r_squareds = [float(e["alpha_analysis"].get("r_squared", 0.0)) for e in usable]
+
+    from collections import Counter
+
+    regimes = [e["quant_analysis"].get("regime") for e in usable if e["quant_analysis"].get("regime")]
+    dominant_regime = Counter(regimes).most_common(1)[0][0] if regimes else None
+
+    blended = {
+        "one_day_var_95_pct": round(_weighted_avg(var_pcts), 2),
+        "beta": round(_weighted_avg(betas), 3),
+        "alpha_annualized": round(_weighted_avg(alphas), 4),
+        "r_squared": round(_weighted_avg(r_squareds), 3),
+        "dominant_regime": dominant_regime,
+        "coverage_weight": round(total_weight, 4),
+        "tickers_used": [e["ticker"] for e in usable],
+    }
+    return per_ticker, blended
+
+
 def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: str = "mvo"):
     """Internal logic for the optimized verdict tool."""
     import pandas as pd
     from core.data_loader import resolve_ticker
-    from tools.intelligence.alpha_engine import calculate_alpha_metrics
-    from tools.intelligence.engine import get_quant_analysis
     from tools.optimization.mean_variance import run_mvo_basic
     from tools.optimization.hierarchical_risk_parity import optimize as run_hrp_optimize
     from tools.backtesting.portfolio_bt import backtest_optimized_portfolio
-
-    def _infer_benchmark_ticker(symbol: str) -> str:
-        sym = str(symbol).upper()
-        if sym.endswith((".NS", ".BO")):
-            return "^NSEI"
-        return "^GSPC"
-
-    def _to_float_pct(value, default: float = 0.0) -> float:
-        try:
-            return float(str(value).replace("%", "").strip())
-        except Exception:
-            return default
 
     requested_tickers = list(tickers)
     data_dict = {}
@@ -222,61 +301,62 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
         bt_results = backtest_optimized_portfolio(price_df, weights)
         actual_sharpe = float(bt_results['portfolio_sharpe'])
         
-        # Step 3: Institutional intelligence on a representative market series
+        # Step 3: Institutional intelligence, blended across the WHOLE portfolio.
+        # Previously only ONE ticker (whichever resolved first) drove every risk
+        # field regardless of weights, so two users with the identical portfolio
+        # in a different list order could get different, sometimes
+        # contradictory, verdicts. Each held ticker is now analyzed on its own
+        # and blended by portfolio weight (renormalized over tickers whose
+        # analysis succeeded).
+        per_ticker_intel, blended_intel = _compute_portfolio_intelligence(
+            weights, ohlc_frames, _infer_benchmark_ticker
+        )
+
+        # A single representative ticker (highest-weighted with usable data) is
+        # still surfaced for readability in `reasoning` and in the legacy
+        # quant_analysis/alpha_analysis fields; all VERDICT MATH below uses the
+        # portfolio-wide blend, not this one ticker.
+        intel_ticker = None
+        benchmark_ticker = None
         quant_analysis = None
         alpha_analysis = None
-        # ohlc_frames is keyed by the RESOLVED symbol (e.g. "RELIANCE.NS"), not
-        # the raw requested string ("RELIANCE") -- iterate its own keys rather
-        # than re-checking membership against the raw `tickers` list, which
-        # would never match for an unsuffixed Indian ticker.
-        intel_ticker = next(iter(ohlc_frames), None)
-        benchmark_ticker = None
+        if blended_intel:
+            usable_entries = [e for e in per_ticker_intel if e["ticker"] in blended_intel["tickers_used"]]
+            representative = max(usable_entries, key=lambda e: e["weight"])
+            intel_ticker = representative["ticker"]
+            benchmark_ticker = representative["benchmark"]
+            quant_analysis = representative["quant_analysis"]
+            alpha_analysis = representative["alpha_analysis"]
 
-        if intel_ticker:
-            benchmark_ticker = _infer_benchmark_ticker(intel_ticker)
-            try:
-                quant_analysis = get_quant_analysis(
-                    ohlc_frames[intel_ticker],
-                    benchmark_ticker=benchmark_ticker,
-                )
-            except Exception as quant_err:
-                quant_analysis = {"error": f"Quant engine failed: {quant_err}"}
-
-            try:
-                alpha_analysis = calculate_alpha_metrics(
-                    ohlc_frames[intel_ticker],
-                    benchmark_ticker=benchmark_ticker,
-                )
-            except Exception as alpha_err:
-                alpha_analysis = {"error": f"Alpha engine failed: {alpha_err}"}
-
-        # Step 4: Risk-adjusted verdicts
+        # Step 4: Risk-adjusted verdicts, computed from the portfolio-wide blend.
         backtest_verdict = "STAY AWAY"
         if actual_sharpe > 1.2:
             backtest_verdict = "STRONG BUY"
         elif actual_sharpe > 0.7:
             backtest_verdict = "PROPER"
 
-        alpha_value = None
-        beta_value = None
-        r_squared = None
-        if isinstance(alpha_analysis, dict) and "error" not in alpha_analysis:
-            alpha_value = alpha_analysis.get("alpha_annualized")
-            beta_value = alpha_analysis.get("beta")
-            r_squared = alpha_analysis.get("r_squared")
+        alpha_value = blended_intel["alpha_annualized"] if blended_intel else None
+        beta_value = blended_intel["beta"] if blended_intel else None
+        r_squared = blended_intel["r_squared"] if blended_intel else None
+        one_day_var_pct = blended_intel["one_day_var_95_pct"] if blended_intel else 0.0
 
-        strategic_verdict = backtest_verdict
-        if isinstance(alpha_value, (int, float)):
+        # A clearly bad backtest (non-finite or non-positive Sharpe) must be
+        # able to surface as STAY AWAY. Previously this branch unconditionally
+        # overwrote strategic_verdict with REDUCE/ACCUMULATE/NEUTRAL whenever
+        # alpha was numeric -- true almost every call -- which made STAY AWAY
+        # structurally unreachable even for a portfolio that lost money with a
+        # deeply negative Sharpe (it would still show e.g. "NEUTRAL").
+        if not math.isfinite(actual_sharpe) or actual_sharpe <= 0:
+            strategic_verdict = "STAY AWAY"
+        elif isinstance(alpha_value, (int, float)):
             if alpha_value < 0:
                 strategic_verdict = "REDUCE"
             elif actual_sharpe >= 0.9 and alpha_value > 0.02:
                 strategic_verdict = "ACCUMULATE"
             else:
                 strategic_verdict = "NEUTRAL"
-
-        one_day_var_pct = 0.0
-        if isinstance(quant_analysis, dict) and "error" not in quant_analysis:
-            one_day_var_pct = _to_float_pct(quant_analysis.get("one_day_var_95"), 0.0)
+        else:
+            strategic_verdict = backtest_verdict
 
         capital_at_risk = abs(one_day_var_pct) / 100 * float(amount)
         capital_plan = "LUMP_SUM_ACCEPTABLE"
@@ -300,18 +380,18 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
             f"total return {bt_results['portfolio_total_return']}, and max drawdown {bt_results['portfolio_drawdown']}."
         )
 
-        if isinstance(quant_analysis, dict) and "error" not in quant_analysis:
+        if blended_intel:
             reasoning += (
-                f" Regime check on {intel_ticker} versus {benchmark_ticker}: {quant_analysis.get('regime')}; "
-                f"Hurst={quant_analysis.get('hurst_exponent')}, Beta={quant_analysis.get('beta')}, "
-                f"VaR95={quant_analysis.get('one_day_var_95')}."
+                f" Portfolio-weighted risk (blended across {blended_intel['tickers_used']}, "
+                f"coverage {blended_intel['coverage_weight']*100:.0f}% of allocation): "
+                f"Beta={blended_intel['beta']}, Alpha={blended_intel['alpha_annualized']*100:.2f}%, "
+                f"R-squared={blended_intel['r_squared']}, VaR95={blended_intel['one_day_var_95_pct']:.2f}%, "
+                f"dominant regime={blended_intel['dominant_regime']}."
             )
-
-        if isinstance(alpha_analysis, dict) and "error" not in alpha_analysis:
-            reasoning += (
-                f" Alpha/Beta regression: alpha={alpha_analysis.get('alpha_annualized_pct')}, "
-                f"beta={alpha_analysis.get('beta')}, R-squared={alpha_analysis.get('r_squared')}."
-            )
+            if intel_ticker:
+                reasoning += f" Representative single-name detail: {intel_ticker} vs {benchmark_ticker}."
+        elif per_ticker_intel:
+            reasoning += " Institutional intelligence unavailable: analysis failed for every held ticker."
 
         reasoning += (
             f" Estimated 95% one-day capital-at-risk on notional {amount} is {capital_at_risk:.2f}. "
@@ -321,7 +401,7 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
         if risk_flags:
             reasoning += " Risk flags: " + "; ".join(risk_flags) + "."
 
-        if isinstance(quant_analysis, dict) and quant_analysis.get("regime") == "MEAN_REVERTING":
+        if blended_intel and blended_intel.get("dominant_regime") == "MEAN_REVERTING":
             reasoning += " Regime filter: avoid pure trend-following entries while mean reversion dominates."
 
         res = {
@@ -333,6 +413,10 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
                 "INR for .NS/.BO tickers); FX risk between markets is not modeled."
             ),
             "recommended_weights": weights,
+            "portfolio_intelligence": {
+                "per_ticker": per_ticker_intel,
+                "blended": blended_intel,
+            },
             "intelligence": quant_analysis,
             "quant_analysis": quant_analysis,
             "alpha_analysis": alpha_analysis,
