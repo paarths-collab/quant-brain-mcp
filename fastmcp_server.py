@@ -22,6 +22,7 @@ from core.indicator_registry import run_group
 from main import run_generate_optimized_verdict, serialize_output
 from tools.intelligence.company_profile import get_company_info
 from tools.intelligence.plotly_dashboard import build_chart_pack
+from tools.trading.alerts import manage_alert
 from tools.trading.news import get_ticker_news
 from tools.trading.quotes import get_quotes as run_get_quotes
 from tools.trading.trade_plan import compute_trade_plan
@@ -232,6 +233,36 @@ def scan_watchlist(tickers: list[str], period: Period = "1y") -> dict:
     then feed interesting names into build_trade_plan.
     """
     return serialize_output(run_scan_watchlist(tickers, period=period))
+
+
+@tracked_tool("trade")
+def price_alert(
+    action: Literal["set", "list", "delete", "check"],
+    ticker: str | None = None,
+    level: float | None = None,
+    direction: Literal["above", "below"] | None = None,
+    alert_id: int | None = None,
+    note: str | None = None,
+) -> dict:
+    """Persistent price alerts stored server-side (survive restarts, one-shot).
+
+    Actions:
+      set    -- watch a level: price_alert("set", ticker="RELIANCE.NS",
+                level=1270, direction="below", note="stop level")
+      list   -- show all active alerts
+      delete -- remove an alert by alert_id
+      check  -- fetch current prices for every active alert and return which
+                fired; fired alerts deactivate so they never spam.
+
+    A server cannot push messages into Claude, so pair this with a scheduled
+    task that calls action='check' on a cadence (e.g. every 30 minutes during
+    market hours) and notifies the user only when 'triggered' is non-empty.
+    """
+    return serialize_output(
+        manage_alert(
+            action, ticker=ticker, level=level, direction=direction, alert_id=alert_id, note=note
+        )
+    )
 
 
 @tracked_tool("quote")

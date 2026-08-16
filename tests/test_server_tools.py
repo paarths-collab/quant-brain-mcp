@@ -34,6 +34,7 @@ EXPECTED_TOOLS = {
     "get_news",
     "build_trade_plan",
     "scan_watchlist",
+    "price_alert",
     # intelligence
     "get_company_profile",
     "find_sector_stock_pipeline_tool",
@@ -53,7 +54,7 @@ def _list_tools(server):
 def test_tool_surface_is_exactly_the_curated_set(server):
     names = {tool.name for tool in _list_tools(server)}
     assert names == EXPECTED_TOOLS
-    assert len(names) == 24
+    assert len(names) == 25
 
 
 def test_no_individual_indicator_tools_exposed(server):
