@@ -403,20 +403,6 @@ def backtest_volatility_breakout(ticker: str, length: int = 20) -> dict:
     )
 
 
-@tracked_tool("backtest")
-def backtest_universal_indicator(
-    ticker: str,
-    indicator_name: str,
-) -> dict:
-    """Run universal indicator backtest for a given indicator on one ticker."""
-    return _run_strategy_module(
-        ticker,
-        "tools.strategies.universal_bt",
-        "run_universal_backtest",
-        indicator_name=indicator_name,
-    )
-
-
 @tracked_tool("chart")
 def generate_chart_pack(
     tickers: list[str],

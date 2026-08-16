@@ -9,6 +9,5 @@ __all__ = [
 	"sma_crossover_bt",
 	"trend_crossover",
 	"trend_following",
-	"universal_bt",
 	"volatility_breakout",
 ]

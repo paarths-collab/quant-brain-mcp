@@ -30,7 +30,6 @@ EXPECTED_TOOLS = {
     "backtest_sma_crossover",
     "backtest_trend_crossover",
     "backtest_volatility_breakout",
-    "backtest_universal_indicator",
     # charts
     "generate_chart_pack",
     "generate_charts",
@@ -54,7 +53,7 @@ def _list_tools(server):
 def test_tool_surface_is_exactly_the_curated_set(server):
     names = {tool.name for tool in _list_tools(server)}
     assert names == EXPECTED_TOOLS
-    assert len(names) == 28
+    assert len(names) == 27
 
 
 def test_no_individual_indicator_tools_exposed(server):
