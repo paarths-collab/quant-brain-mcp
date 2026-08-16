@@ -1,160 +1,109 @@
-# mcp-quant-brain
+<div align="center">
 
-MCP server for stock analysis, strategy backtesting, portfolio optimization, and chart generation.
+# 🧠 Quant Brain MCP
 
-**38 curated quantitative indicators • 7 portfolio optimizers • 8 backtesting workflows • U.S. + Indian equities • production usage telemetry**
+**Turn Claude into a quantitative analyst for US and Indian equities.**
 
-This product is built for users who want to ask natural-language questions like:
+Ask in plain English. Get sized trade plans, portfolio optimization, backtests, and price alerts — grounded in real market data, not vibes.
 
-- "Analyze Indian sectors and tell me the best sector by risk-adjusted score."
-- "Backtest MACD on IREDA.NS and show charts."
-- "Optimize a US-India portfolio and explain risk."
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-listed-0e6e5c)](https://registry.modelcontextprotocol.io/v0.1/servers?search=quant-brain-mcp)
+[![Tests](https://img.shields.io/badge/tests-161%20passing-0e6e5c)](tests/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](requirements.txt)
 
-## Product Use Cases
+</div>
 
-- Sector rotation analysis: identify the best-performing sector for a user-defined timeframe (for example `6m` or `1yr`) using return, volatility, drawdown, momentum, and correlation.
-- Portfolio construction: optimize allocations across US and India tickers using methods like MVO, HRP, max Sharpe, min volatility, CVaR, and semivariance.
-- Strategy validation: run rule-based backtests (MACD, RSI mean reversion, SMA crossover, breakout) before making discretionary decisions.
-- Chart-first review: generate chart packs for portfolio diagnostics, strategy behavior, and sector-level risk structure.
-- Company context enrichment: combine technical outputs with company-profile metadata for better explainability.
+---
 
-## What You Get
+```text
+You:    "Scan my watchlist and build a trade plan for whatever looks most actionable.
+         ₹2,00,000 equity, 1% risk."
 
-- US and India ticker support (`AAPL`, `RELIANCE.NS`, etc.)
-- 38 curated quantitative indicators exposed through 6 grouped analysis tools
-- Strategy backtests (MACD, RSI mean reversion, SMA crossover, breakout)
-- Portfolio optimization (MVO, HRP, max Sharpe, min volatility, Black-Litterman, CVaR, semivariance)
-- Sector intelligence (returns, volatility, momentum, drawdown, correlation, best-sector selection)
-- Chart pack generation with isolated chart configs and default chart-first layout
+Claude: RELIANCE.NS flagged (at 20-DMA, volume 1.8x average).
 
-## Use the Hosted MCP URL
-
-Use streamable HTTP transport and connect your MCP client to:
-
-- `https://mcp-quant-brain.onrender.com/mcp`
-
-Free-tier Render note:
-
-- The server may take up to 1-2 minutes to spin up if it was sleeping.
-- If the first request times out, wait and retry.
-
-## Connect in Claude (Desktop or Web)
-
-Use connectors to add this MCP product in Claude.
-
-### Claude Desktop
-
-1. Open Claude Desktop settings.
-2. Go to Connectors or MCP integrations.
-3. Add a new connector.
-4. Choose Streamable HTTP transport.
-5. Set the connector URL to `https://mcp-quant-brain.onrender.com/mcp`.
-6. Save and connect.
-7. When Claude asks for tool permissions, click **Accept All** so all analysis and chart tools are available.
-
-### Claude Web
-
-1. Open Claude in browser and go to settings.
-2. Open Connectors.
-3. Add a custom connector.
-4. Select Streamable HTTP transport.
-5. Use `https://mcp-quant-brain.onrender.com/mcp` as the connector URL.
-6. Complete connection.
-7. When prompted for tool permissions, click **Accept All**.
-
-If your first connection attempt fails, wait up to 2 minutes and retry once (free-tier cold start).
-
-## Core Tools You’ll Use
-
-### Indicator analysis (6 grouped tools, 38 indicators)
-
-Each tool runs its whole group by default, or a subset via the optional
-`indicators` argument (for example `analyze_momentum(ticker="AAPL", indicators=["rsi", "macd"])`).
-
-| Tool | Indicators |
-| --- | --- |
-| `analyze_momentum` | rsi, macd, roc, cci, stoch, stochrsi, tsi, willr |
-| `analyze_technical_levels` | sma, ema, hma, kama, ichimoku, supertrend, vwap, vwma |
-| `analyze_trend` | adx, aroon, chop, psar, vortex, zigzag |
-| `analyze_volatility` | atr, bbands, donchian, kc, stdev, ui |
-| `analyze_volume` | obv, cmf, mfi, ad, pvt |
-| `analyze_statistics` | log_return, zscore, skew, kurtosis, entropy |
-
-### Portfolio, backtesting, and reporting
-
-- `generate_optimized_verdict`
-- `generate_chart_pack`
-- `generate_charts`
-- `plot_charts`
-- `get_company_profile`
-- `find_sector_stock_pipeline_tool`
-- `analyze_sector_intelligence_tool`
-- Strategy tools like `backtest_macd_momentum`, `backtest_rsi_mean_reversion`
-
-## Example Questions (NLP)
-
-- "Analyze IREDA.NS over 1 year, run MACD momentum backtest, and show charts."
-- "Compare IT, Bank, Auto, Metal, Pharma, Realty sectors by return, risk, drawdown, and momentum."
-- "Give me the best Indian sector using risk-adjusted ranking and show sector correlation matrix."
-- "Optimize AAPL, MSFT, NVDA, RELIANCE.NS with CVaR and summarize risk flags."
-
-## Render Endpoints
-
-- MCP endpoint: `https://mcp-quant-brain.onrender.com/mcp`
-- Health endpoint: `https://mcp-quant-brain.onrender.com/health`
-- Metrics endpoint: `https://mcp-quant-brain.onrender.com/metrics/summary` (bearer token required)
-
-## Usage Telemetry
-
-Every MCP tool call records `tool_name`, `tool_category`, `session_id`,
-`duration_ms`, and `success` to Postgres. Writes are fire-and-forget on a
-background thread, so telemetry never blocks or fails a tool call. With no
-`DATABASE_URL` configured, telemetry is a silent no-op and the server runs
-normally.
-
-### Environment variables
-
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | Postgres/Supabase connection URI (use the Supabase **session pooler** URI). Unset disables telemetry. |
-| `METRICS_TOKEN` | Bearer token protecting `/metrics/summary`. Unset returns 503. |
-
-The `mcp_tool_events` table and its indexes are created automatically on first
-connection — no manual migration needed.
-
-### Reading your metrics
-
-```bash
-curl -H "Authorization: Bearer $METRICS_TOKEN" \
-  https://mcp-quant-brain.onrender.com/metrics/summary
+        TRADE PLAN — RELIANCE.NS (long)
+        Entry           ₹1,310.00
+        Stop            ₹1,270.10   (swing low, 2.1 ATR)
+        Size            50 shares   (₹65,500 — 32.8% of equity)
+        Max loss        ₹1,995      (1.0% of equity)
+        Targets         1R ₹1,349.90 · 2R ₹1,389.80 · 3R ₹1,429.70
+        Invalidation    Thesis invalid below ₹1,270.10 — exit without debate.
 ```
 
-Returns `total_requests`, `unique_sessions`, `backtests`, `optimizations`,
-`success_rate`, `p50_latency`, and `p95_latency`.
+No API keys. No accounts. Connect one URL and start asking.
 
-## Troubleshooting
+## ⚡ Quickstart
 
-### "Missing session ID"
+**Claude Desktop / Claude Web** → Settings → Connectors → Add custom connector → **Streamable HTTP**:
 
-The server is configured with stateless HTTP mode. If you still see this:
+```text
+https://mcp-quant-brain.onrender.com/mcp
+```
 
-1. Reconnect MCP client.
-2. Ensure URL is exactly `/mcp`.
+That's the whole setup. Try: *"What's RELIANCE trading at, and is it overbought?"*
 
-### "MCP server connection lost" / 504 / timeout
+> Free-tier note: the server sleeps when idle and takes ~50 s to wake. If the first request times out, retry once. Details in [Getting Started](docs/getting-started.md).
 
-Usually cold-start or proxy timeout on free tier:
+## 🛠 What you get — 25 tools
 
-1. Wait up to 2 minutes.
-2. Retry once.
-3. Check `/health`.
+| | Tools | What they answer |
+|---|---|---|
+| 📋 **Trader workflow** | `get_quote` · `get_news` · `build_trade_plan` · `scan_watchlist` · `price_alert` | *What's it at? What happened? **What do I do?** What moved this week? Tell me when it hits my level.* |
+| 📊 **Indicators** | 6 grouped `analyze_*` tools — 38 curated indicators | *Is it overbought? Trending or chopping? How volatile?* |
+| 💼 **Portfolio** | `generate_optimized_verdict` — 7 optimization methods | *How do I split my money? What's my risk?* |
+| 🧪 **Backtests** | 7 rule-based strategies | *Does this strategy actually work, or does it just feel like it?* |
+| 🔭 **Intelligence** | Sector ranking · sector→stock pipeline · company profiles | *Which sector is leading? Which stocks inside it?* |
+| 📈 **Charts** | Institutional chart pack, rendered as images | *Show me.* |
 
-### Charts not visible
+Full reference with every parameter: **[docs/tools.md](docs/tools.md)**
 
-Use `generate_charts` or `plot_charts` for image-friendly responses.
+## 🔄 The workflow it's built around
 
-## Notes
+```mermaid
+flowchart LR
+    S["🔍 <b>scan_watchlist</b><br/>what moved this week?"] --> N["📰 <b>get_news</b><br/>why did it move?"]
+    N --> P["📐 <b>build_trade_plan</b><br/>entry · stop · size · targets"]
+    P --> A["🔔 <b>price_alert</b><br/>watch my levels"]
+    A -.->|level breaks → notified| P
+    subgraph deeper["go deeper anytime"]
+        I["📊 indicators"] ~~~ B["🧪 backtests"] ~~~ O["💼 optimizer"]
+    end
+    S -.-> deeper
+```
 
-- This is not financial advice.
-- Data quality depends on upstream sources (mainly Yahoo Finance via `yfinance`).
-- Use proper ticker suffixes for Indian stocks (for example `.NS`).
+## 🔔 Price alerts that survive restarts
+
+```text
+You:  "Alert me if RELIANCE drops below ₹1,270"        → stored server-side (Postgres)
+      ...
+Bot:  "PRICE ALERT FIRED — RELIANCE.NS moved below 1270.00, now at 1268.20"
+```
+
+Alerts are one-shot, persist across server restarts, and pair with a scheduled Claude task that checks hourly during market hours and pushes to your phone. Setup in **[docs/price-alerts.md](docs/price-alerts.md)**.
+
+## 🎯 Why this instead of a stock screener?
+
+1. **It answers the trading question, not just the data question.** Indicators tell you RSI is 43. `build_trade_plan` tells you *entry, stop, how many shares, and where your thesis dies* — sized to your account.
+2. **India is a first-class citizen.** NSE tickers, NIFTY benchmarking, 8 Indian sector indices, ₹ formatting. Not a US tool with `.NS` bolted on.
+3. **The numbers are audited.** Every calculation was adversarially tested against textbook references and live data — 161 automated tests pin the math, including regression tests for 11 real bugs found and fixed along the way. See [docs/architecture.md](docs/architecture.md).
+4. **Honest about its data.** Delayed quotes are labeled with timestamps. Stale feeds are flagged, not hidden. FX limitations are disclosed, not papered over.
+
+## 📚 Documentation
+
+| Page | What's in it |
+|---|---|
+| [Getting Started](docs/getting-started.md) | Connecting from Claude Desktop, Web, and Code; cold starts; troubleshooting |
+| [Tool Reference](docs/tools.md) | All 25 tools, every parameter, response shapes |
+| [Example Prompts](docs/examples.md) | The prompt cookbook — from one-liners to full workflows |
+| [Price Alerts](docs/price-alerts.md) | Persistent alerts + the scheduled watcher pattern |
+| [Architecture & Methodology](docs/architecture.md) | How it works, data conventions, the bug audit, telemetry |
+
+## ⚠️ Honest limits
+
+- **Data**: Yahoo Finance. US quotes near-real-time; NSE/BSE ~15 min delayed. Daily bars for analysis.
+- **No** options chains, futures, intraday candles, or tick data.
+- **Not investment advice.** Educational analysis tooling. Every trade plan says so and means it.
+
+## License
+
+[MIT](LICENSE) — use it, fork it, ship it.
