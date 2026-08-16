@@ -72,6 +72,56 @@ def _moving_average_signal(close: pd.Series, short_window: int = 50, long_window
     return "GOLDEN_CROSS_BULLISH" if float(sma_short) > float(sma_long) else "BEARISH"
 
 
+SCORE_WEIGHTS = {"risk_adjusted": 0.50, "momentum": 0.35, "drawdown": 0.15}
+
+
+def _zscores(values: list[float]) -> list[float]:
+    """Standardize to mean 0 / std 1. Returns zeros when there is no spread."""
+    if not values:
+        return []
+    arr = np.asarray(values, dtype=float)
+    arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+    std = float(arr.std())
+    if std < 1e-12:
+        return [0.0] * len(values)
+    return ((arr - float(arr.mean())) / std).tolist()
+
+
+def _apply_composite_scores(analytics: list[dict[str, Any]]) -> None:
+    """Compute each sector's composite score from z-scored components, in place.
+
+    Every term is standardized across the sector cross-section before weighting.
+    Without this, raw units dominate: momentum runs on the order of +/-40 (percent)
+    while risk_adjusted is roughly +/-2, so the 0.50 weight on risk_adjusted was
+    swamped regardless of intent.
+
+    Momentum is the period return. It was previously `-dist_from_high`, which is
+    non-negative by construction and therefore *rewarded* sectors for trading
+    further below their 52-week high -- inverting the intended signal.
+    """
+    if not analytics:
+        return
+
+    z_risk = _zscores([item["_risk_adjusted_raw"] for item in analytics])
+    z_momentum = _zscores([item["_momentum_raw"] for item in analytics])
+    z_drawdown = _zscores([item["_drawdown_raw"] for item in analytics])
+
+    for item, zr, zm, zd in zip(analytics, z_risk, z_momentum, z_drawdown):
+        score = (
+            SCORE_WEIGHTS["risk_adjusted"] * zr
+            + SCORE_WEIGHTS["momentum"] * zm
+            - SCORE_WEIGHTS["drawdown"] * zd
+        )
+        item["composite_score"] = round(score, 3)
+        item["score_components"] = {
+            "risk_adjusted_z": round(zr, 3),
+            "momentum_z": round(zm, 3),
+            "drawdown_z": round(zd, 3),
+        }
+        for key in ("_risk_adjusted_raw", "_momentum_raw", "_drawdown_raw"):
+            item.pop(key, None)
+
+
 def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") -> dict[str, Any]:
     """Compute sector return, risk, momentum, drawdown and correlation, then select best sector."""
     universe = _pick_universe(market)
@@ -119,11 +169,10 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
         max_drawdown = _max_drawdown_pct(close)
         ma_signal = _moving_average_signal(close)
 
-        # Composite score: reward return/risk and momentum, penalize deep drawdowns.
+        # Raw score components. The composite is computed after the loop, once
+        # every sector is known, so each term can be z-scored onto a common scale.
         risk_adjusted = pct_return / max(annualized_vol, 1e-6)
-        momentum_component = -dist_from_high
         drawdown_penalty = abs(max_drawdown)
-        composite_score = (0.50 * risk_adjusted) + (0.35 * momentum_component) - (0.15 * drawdown_penalty)
 
         analytics.append(
             {
@@ -135,7 +184,9 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
                 "max_drawdown_pct": round(max_drawdown, 2),
                 "moving_average_signal": ma_signal,
                 "risk_adjusted_return": round(risk_adjusted, 3),
-                "composite_score": round(composite_score, 3),
+                "_risk_adjusted_raw": risk_adjusted,
+                "_momentum_raw": pct_return,
+                "_drawdown_raw": drawdown_penalty,
             }
         )
         prices[sector_name] = close
@@ -149,6 +200,7 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
             }
         )
 
+    _apply_composite_scores(analytics)
     analytics.sort(key=lambda item: item["composite_score"], reverse=True)
     best_sector = analytics[0] if analytics else None
 
