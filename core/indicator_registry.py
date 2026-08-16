@@ -95,11 +95,14 @@ def iter_all_indicators() -> Iterator[tuple[str, str, str, str]]:
             yield key, module_path, func_name, group
 
 
-def run_group(group: str, ticker: str, indicators: list[str] | None = None) -> dict:
+def run_group(
+    group: str, ticker: str, indicators: list[str] | None = None, period: str = "2y"
+) -> dict:
     """Run all (or a subset of) indicators in a group against one ticker.
 
     Data is fetched once; each indicator runs isolated so a single failure
-    cannot take down the whole group.
+    cannot take down the whole group. `period` selects the history window
+    (e.g. "6mo", "1y", "5y", "10y") -- see core.data_loader.VALID_PERIODS.
     """
     from core import data_loader
     from utils.serializer import serialize_output
@@ -114,7 +117,7 @@ def run_group(group: str, ticker: str, indicators: list[str] | None = None) -> d
     unknown = [k for k in requested if k not in available]
     selected = [k for k in requested if k in available]
 
-    df, err = data_loader.fetch_data(ticker)
+    df, err = data_loader.fetch_data(ticker, period=period)
     if err:
         return {
             "ticker": ticker,

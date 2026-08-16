@@ -13,15 +13,10 @@ EXPECTED_TOOLS = {
     "analyze_volatility",
     "analyze_volume",
     "analyze_statistics",
-    # optimization
+    # optimization (7 optimize_* variants removed: each was byte-for-byte
+    # identical to generate_optimized_verdict(optimize_type=...), which
+    # already documents and accepts all 7 methods via one parameter)
     "generate_optimized_verdict",
-    "optimize_mvo",
-    "optimize_hrp",
-    "optimize_max_sharpe",
-    "optimize_min_volatility",
-    "optimize_black_litterman",
-    "optimize_cvar",
-    "optimize_semivariance",
     # backtests
     "backtest_macd_momentum",
     "backtest_macd_trend_follower",
@@ -53,7 +48,7 @@ def _list_tools(server):
 def test_tool_surface_is_exactly_the_curated_set(server):
     names = {tool.name for tool in _list_tools(server)}
     assert names == EXPECTED_TOOLS
-    assert len(names) == 27
+    assert len(names) == 20
 
 
 def test_no_individual_indicator_tools_exposed(server):
@@ -66,8 +61,35 @@ def test_analyze_momentum_schema(server):
     props = tool.inputSchema["properties"]
     assert "ticker" in props
     assert "indicators" in props
+    assert "period" in props
     assert tool.inputSchema["required"] == ["ticker"]
-    assert "rsi" in (tool.description or "")
+
+
+def test_period_parameter_exposed_on_indicator_and_backtest_tools(server):
+    tools_by_name = {t.name: t for t in _list_tools(server)}
+    for name in (
+        "analyze_momentum",
+        "analyze_technical_levels",
+        "analyze_trend",
+        "analyze_volatility",
+        "analyze_volume",
+        "analyze_statistics",
+        "backtest_macd_momentum",
+        "backtest_sma_crossover",
+        "generate_optimized_verdict",
+    ):
+        assert "period" in tools_by_name[name].inputSchema["properties"], name
+
+
+def test_generate_optimized_verdict_documents_all_seven_methods(server):
+    """The 7 optimize_* tools were removed because generate_optimized_verdict
+    already covers every method via optimize_type -- verify that's still true."""
+    tool = next(t for t in _list_tools(server) if t.name == "generate_optimized_verdict")
+    enum = tool.inputSchema["properties"]["optimize_type"]["enum"]
+    assert set(enum) == {
+        "mvo", "hrp", "max_sharpe", "min_volatility",
+        "black_litterman", "cvar", "semivariance",
+    }
 
 
 async def _get(server, path, headers=None):

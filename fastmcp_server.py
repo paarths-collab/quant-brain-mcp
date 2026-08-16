@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 import base64
 
 import plotly.graph_objects as go
@@ -23,6 +23,13 @@ from main import run_generate_optimized_verdict, serialize_output
 from tools.intelligence.company_profile import get_company_info
 from tools.intelligence.plotly_dashboard import build_chart_pack
 from tools.strategies.sector_pipeline import analyze_sector_intelligence, find_sector_stock_pipeline
+
+# Shared type aliases so tool schemas expose a real enum (visible to MCP
+# clients) instead of a bare string documented only in prose.
+Period = Literal["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"]
+OptimizeType = Literal[
+    "mvo", "hrp", "max_sharpe", "min_volatility", "black_litterman", "cvar", "semivariance"
+]
 
 
 def _enable_mcpjam_compatibility() -> None:
@@ -143,7 +150,8 @@ async def metrics_summary(request: Request) -> Response:
 def generate_optimized_verdict(
     tickers: list[str],
     amount: float = 10000,
-    optimize_type: str = "mvo",
+    optimize_type: OptimizeType = "mvo",
+    period: Period = "2y",
 ) -> dict:
     """Optimize a portfolio and return backtest metrics plus a final verdict.
 
@@ -153,8 +161,11 @@ def generate_optimized_verdict(
         optimize_type: Optimization mode. Supported values are:
             "mvo", "hrp", "max_sharpe", "min_volatility",
             "black_litterman", "cvar", "semivariance".
+        period: History window for price data, e.g. "1y", "2y", "5y", "10y"
+            (default "2y"). Longer windows give the optimizer and backtest
+            more data at the cost of a slower fetch.
     """
-    result = run_generate_optimized_verdict(tickers, amount, optimize_type)
+    result = run_generate_optimized_verdict(tickers, amount, optimize_type, period=period)
     return serialize_output(result)
 
 
@@ -189,26 +200,17 @@ def analyze_sector_intelligence_tool(
     return serialize_output(analyze_sector_intelligence(market=market, timeframe=timeframe))
 
 
-def _run_optimizer_variant(
-    tickers: list[str],
-    amount: float,
-    optimize_type: str,
-) -> dict:
-    """Expose each optimizer mode as a first-class MCP tool."""
-    result = run_generate_optimized_verdict(tickers, amount, optimize_type)
-    return serialize_output(result)
-
-
 def _run_strategy_module(
     ticker: str,
     module_path: str,
     runner_name: str,
+    period: Period = "2y",
     **kwargs: Any,
 ) -> dict:
     """Load strategy module lazily and run the requested entrypoint."""
     import importlib
 
-    df, err = fetch_data(ticker)
+    df, err = fetch_data(ticker, period=period)
     if err:
         return {"error": err}
 
@@ -268,52 +270,13 @@ def _image_contents_from_chart_pack(chart_pack: dict[str, Any], limit: int = 8) 
     return contents
 
 
-@tracked_tool("optimization")
-def optimize_mvo(tickers: list[str], amount: float = 10000) -> dict:
-    """Optimize portfolio using MVO and return full verdict payload."""
-    return _run_optimizer_variant(tickers, amount, "mvo")
-
-
-@tracked_tool("optimization")
-def optimize_hrp(tickers: list[str], amount: float = 10000) -> dict:
-    """Optimize portfolio using HRP and return full verdict payload."""
-    return _run_optimizer_variant(tickers, amount, "hrp")
-
-
-@tracked_tool("optimization")
-def optimize_max_sharpe(tickers: list[str], amount: float = 10000) -> dict:
-    """Optimize portfolio for max Sharpe and return full verdict payload."""
-    return _run_optimizer_variant(tickers, amount, "max_sharpe")
-
-
-@tracked_tool("optimization")
-def optimize_min_volatility(tickers: list[str], amount: float = 10000) -> dict:
-    """Optimize portfolio for minimum volatility and return full verdict payload."""
-    return _run_optimizer_variant(tickers, amount, "min_volatility")
-
-
-@tracked_tool("optimization")
-def optimize_black_litterman(tickers: list[str], amount: float = 10000) -> dict:
-    """Optimize portfolio using Black-Litterman and return full verdict payload."""
-    return _run_optimizer_variant(tickers, amount, "black_litterman")
-
-
-@tracked_tool("optimization")
-def optimize_cvar(tickers: list[str], amount: float = 10000) -> dict:
-    """Optimize portfolio using CVaR and return full verdict payload."""
-    return _run_optimizer_variant(tickers, amount, "cvar")
-
-
-@tracked_tool("optimization")
-def optimize_semivariance(tickers: list[str], amount: float = 10000) -> dict:
-    """Optimize portfolio using semivariance and return full verdict payload."""
-    return _run_optimizer_variant(tickers, amount, "semivariance")
-
-
 @tracked_tool("backtest")
-def backtest_macd_momentum(ticker: str) -> dict:
-    """Run MACD momentum strategy backtest for one ticker."""
-    return _run_strategy_module(ticker, "tools.strategies.macd_momentum", "run_strategy")
+def backtest_macd_momentum(ticker: str, period: Period = "2y") -> dict:
+    """Run MACD momentum strategy backtest for one ticker.
+
+    `period`: history window, e.g. "1y","2y","5y","10y" (default "2y").
+    """
+    return _run_strategy_module(ticker, "tools.strategies.macd_momentum", "run_strategy", period=period)
 
 
 @tracked_tool("backtest")
@@ -322,12 +285,17 @@ def backtest_macd_trend_follower(
     fast: int = 12,
     slow: int = 26,
     signal: int = 9,
+    period: Period = "2y",
 ) -> dict:
-    """Run MACD trend follower strategy backtest for one ticker."""
+    """Run MACD trend follower strategy backtest for one ticker.
+
+    `period`: history window, e.g. "1y","2y","5y","10y" (default "2y").
+    """
     return _run_strategy_module(
         ticker,
         "tools.strategies.macd_trend_follower",
         "run_backtest",
+        period=period,
         fast=fast,
         slow=slow,
         signal=signal,
@@ -339,12 +307,17 @@ def backtest_mean_reversion_rsi_bb(
     ticker: str,
     rsi_lower: int = 30,
     rsi_upper: int = 70,
+    period: Period = "2y",
 ) -> dict:
-    """Run RSI + Bollinger Band mean-reversion strategy backtest."""
+    """Run RSI + Bollinger Band mean-reversion strategy backtest.
+
+    `period`: history window, e.g. "1y","2y","5y","10y" (default "2y").
+    """
     return _run_strategy_module(
         ticker,
         "tools.strategies.mean_reversion_rsi_bb",
         "run_strategy",
+        period=period,
         rsi_lower=rsi_lower,
         rsi_upper=rsi_upper,
     )
@@ -356,12 +329,17 @@ def backtest_rsi_mean_reversion(
     length: int = 14,
     lower: int = 30,
     upper: int = 70,
+    period: Period = "2y",
 ) -> dict:
-    """Run RSI mean-reversion strategy backtest."""
+    """Run RSI mean-reversion strategy backtest.
+
+    `period`: history window, e.g. "1y","2y","5y","10y" (default "2y").
+    """
     return _run_strategy_module(
         ticker,
         "tools.strategies.rsi_mean_reversion",
         "run_backtest",
+        period=period,
         length=length,
         lower=lower,
         upper=upper,
@@ -369,36 +347,48 @@ def backtest_rsi_mean_reversion(
 
 
 @tracked_tool("backtest")
-def backtest_sma_crossover(ticker: str, fast: int = 50, slow: int = 200) -> dict:
-    """Run SMA crossover strategy backtest."""
+def backtest_sma_crossover(ticker: str, fast: int = 50, slow: int = 200, period: Period = "2y") -> dict:
+    """Run SMA crossover strategy backtest.
+
+    `period`: history window, e.g. "1y","2y","5y","10y" (default "2y").
+    """
     return _run_strategy_module(
         ticker,
         "tools.strategies.sma_crossover_bt",
         "run_backtest",
+        period=period,
         fast=fast,
         slow=slow,
     )
 
 
 @tracked_tool("backtest")
-def backtest_trend_crossover(ticker: str, fast: int = 50, slow: int = 200) -> dict:
-    """Run trend crossover strategy backtest."""
+def backtest_trend_crossover(ticker: str, fast: int = 50, slow: int = 200, period: Period = "2y") -> dict:
+    """Run trend crossover strategy backtest.
+
+    `period`: history window, e.g. "1y","2y","5y","10y" (default "2y").
+    """
     return _run_strategy_module(
         ticker,
         "tools.strategies.trend_crossover",
         "run_strategy",
+        period=period,
         fast=fast,
         slow=slow,
     )
 
 
 @tracked_tool("backtest")
-def backtest_volatility_breakout(ticker: str, length: int = 20) -> dict:
-    """Run volatility breakout strategy backtest."""
+def backtest_volatility_breakout(ticker: str, length: int = 20, period: Period = "2y") -> dict:
+    """Run volatility breakout strategy backtest.
+
+    `period`: history window, e.g. "1y","2y","5y","10y" (default "2y").
+    """
     return _run_strategy_module(
         ticker,
         "tools.strategies.volatility_breakout",
         "run_backtest",
+        period=period,
         length=length,
     )
 
@@ -477,58 +467,71 @@ def plot_charts(
 
 
 @tracked_tool("indicator")
-def analyze_momentum(ticker: str, indicators: list[str] | None = None) -> dict:
+def analyze_momentum(ticker: str, indicators: list[str] | None = None, period: Period = "2y") -> dict:
     """Momentum indicators: rsi, macd, roc, cci, stoch, stochrsi, tsi, willr.
 
     Runs all momentum indicators for the ticker, or only the subset named in
-    `indicators` (e.g. ["rsi", "macd"]).
+    `indicators` (e.g. ["rsi", "macd"]). `period` sets the history window:
+    "1d","5d","1mo","3mo","6mo","1y","2y","5y","10y","ytd","max" (default "2y").
     """
-    return run_group("momentum", ticker, indicators)
+    return run_group("momentum", ticker, indicators, period=period)
 
 
 @tracked_tool("indicator")
-def analyze_technical_levels(ticker: str, indicators: list[str] | None = None) -> dict:
+def analyze_technical_levels(
+    ticker: str, indicators: list[str] | None = None, period: Period = "2y"
+) -> dict:
     """Moving averages and price levels: sma, ema, hma, kama, ichimoku, supertrend, vwap, vwma.
 
-    Runs all level indicators for the ticker, or only the subset named in `indicators`.
+    Runs all level indicators for the ticker, or only the subset named in
+    `indicators`. `period` sets the history window: "1d","5d","1mo","3mo",
+    "6mo","1y","2y","5y","10y","ytd","max" (default "2y").
     """
-    return run_group("technical_levels", ticker, indicators)
+    return run_group("technical_levels", ticker, indicators, period=period)
 
 
 @tracked_tool("indicator")
-def analyze_trend(ticker: str, indicators: list[str] | None = None) -> dict:
+def analyze_trend(ticker: str, indicators: list[str] | None = None, period: Period = "2y") -> dict:
     """Trend strength and direction: adx, aroon, chop, psar, vortex, zigzag.
 
-    Runs all trend indicators for the ticker, or only the subset named in `indicators`.
+    Runs all trend indicators for the ticker, or only the subset named in
+    `indicators`. `period` sets the history window: "1d","5d","1mo","3mo",
+    "6mo","1y","2y","5y","10y","ytd","max" (default "2y").
     """
-    return run_group("trend", ticker, indicators)
+    return run_group("trend", ticker, indicators, period=period)
 
 
 @tracked_tool("indicator")
-def analyze_volatility(ticker: str, indicators: list[str] | None = None) -> dict:
+def analyze_volatility(ticker: str, indicators: list[str] | None = None, period: Period = "2y") -> dict:
     """Volatility and bands: atr, bbands, donchian, kc, stdev, ui.
 
-    Runs all volatility indicators for the ticker, or only the subset named in `indicators`.
+    Runs all volatility indicators for the ticker, or only the subset named in
+    `indicators`. `period` sets the history window: "1d","5d","1mo","3mo",
+    "6mo","1y","2y","5y","10y","ytd","max" (default "2y").
     """
-    return run_group("volatility", ticker, indicators)
+    return run_group("volatility", ticker, indicators, period=period)
 
 
 @tracked_tool("indicator")
-def analyze_volume(ticker: str, indicators: list[str] | None = None) -> dict:
+def analyze_volume(ticker: str, indicators: list[str] | None = None, period: Period = "2y") -> dict:
     """Volume confirmation: obv, cmf, mfi, ad, pvt.
 
-    Runs all volume indicators for the ticker, or only the subset named in `indicators`.
+    Runs all volume indicators for the ticker, or only the subset named in
+    `indicators`. `period` sets the history window: "1d","5d","1mo","3mo",
+    "6mo","1y","2y","5y","10y","ytd","max" (default "2y").
     """
-    return run_group("volume", ticker, indicators)
+    return run_group("volume", ticker, indicators, period=period)
 
 
 @tracked_tool("indicator")
-def analyze_statistics(ticker: str, indicators: list[str] | None = None) -> dict:
+def analyze_statistics(ticker: str, indicators: list[str] | None = None, period: Period = "2y") -> dict:
     """Statistical behavior: log_return, zscore, skew, kurtosis, entropy.
 
-    Runs all statistical indicators for the ticker, or only the subset named in `indicators`.
+    Runs all statistical indicators for the ticker, or only the subset named in
+    `indicators`. `period` sets the history window: "1d","5d","1mo","3mo",
+    "6mo","1y","2y","5y","10y","ytd","max" (default "2y").
     """
-    return run_group("statistics", ticker, indicators)
+    return run_group("statistics", ticker, indicators, period=period)
 
 
 if __name__ == "__main__":

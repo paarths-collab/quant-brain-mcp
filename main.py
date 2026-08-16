@@ -59,6 +59,12 @@ async def handle_list_tools() -> list[types.Tool]:
                         "enum": ["mvo", "hrp", "max_sharpe", "min_volatility", "black_litterman", "cvar", "semivariance"],
                         "default": "mvo",
                         "description": "Portfolio optimization strategy. Supported: mvo, hrp, max_sharpe, min_volatility, black_litterman, cvar, semivariance."
+                    },
+                    "period": {
+                        "type": "string",
+                        "enum": ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"],
+                        "default": "2y",
+                        "description": "History window for price data."
                     }
                 },
                 "required": ["tickers"]
@@ -89,7 +95,8 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
             tickers = arguments.get("tickers", [])
             amount = arguments.get("amount", 10000)
             optimize_type = arguments.get("optimize_type", "mvo")
-            result = run_generate_optimized_verdict(tickers, amount, optimize_type)
+            period = arguments.get("period", "2y")
+            result = run_generate_optimized_verdict(tickers, amount, optimize_type, period=period)
             # Serialize the result before dumping to JSON
             safe_result = serialize_output(result)
             return [types.TextContent(type="text", text=json.dumps(safe_result, indent=2))]
@@ -213,8 +220,14 @@ def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benc
     return per_ticker, blended
 
 
-def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: str = "mvo"):
-    """Internal logic for the optimized verdict tool."""
+def run_generate_optimized_verdict(
+    tickers: list, amount: float, optimize_type: str = "mvo", period: str = "2y"
+):
+    """Internal logic for the optimized verdict tool.
+
+    `period` selects the price-history window for every held ticker (e.g.
+    "1y", "5y", "10y"); see core.data_loader.VALID_PERIODS.
+    """
     import pandas as pd
     from core.data_loader import resolve_ticker
     from tools.optimization.mean_variance import run_mvo_basic
@@ -232,7 +245,7 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
         # unsuffixed Indian tickers against the S&P 500 (no ".NS" to detect)
         # and let case variants ("aapl" vs "AAPL") become two "different"
         # portfolio assets instead of one.
-        df, err, resolved = resolve_ticker(t)
+        df, err, resolved = resolve_ticker(t, period=period)
         if not err and df is not None and not df.empty:
             df.index = df.index.tz_localize(None).normalize()
             ohlc_frames[resolved] = df

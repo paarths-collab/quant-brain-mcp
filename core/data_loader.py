@@ -10,12 +10,27 @@ warnings.filterwarnings(
 	category=UserWarning,
 )
 
+# Every period string yfinance's download() accepts. Everything in this
+# codebase was previously hardcoded to "2y" with no way for a caller to ask
+# for a longer or shorter window; validating here gives every entry point
+# (indicators, backtests, portfolio optimization) a consistent, clear error
+# instead of a confusing empty-data failure from yfinance.
+VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"}
+
 
 def fetch_stock_data(ticker: str, period: str = "2y", interval: str = "1d"):
 	"""
 	Fetches data from yfinance.
 	Handles US stocks (AAPL) and Indian stocks (RELIANCE.NS).
 	"""
+	if period not in VALID_PERIODS:
+		return {
+			"error": (
+				f"Invalid period '{period}'. Must be one of: "
+				f"{', '.join(sorted(VALID_PERIODS))}."
+			)
+		}
+
 	try:
 		# Standardize ticker: if it's a common Indian name without suffix,
 		# we can't guess .NS or .BO, so we rely on the Agent/User to provide it.
