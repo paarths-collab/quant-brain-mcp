@@ -15,7 +15,11 @@ INDIAN_SECTORS = {
     },
     "Automobiles": {
         "index": "^CNXAUTO",
-        "tickers": ["TATAMOTORS.NS", "M&M.NS", "BAJAJ-AUTO.NS", "EICHERMOT.NS"],
+        # Tata Motors demerged in 2024 into a commercial-vehicle entity and a
+        # passenger-vehicle entity; the old "TATAMOTORS.NS" symbol no longer
+        # resolves on Yahoo Finance (404). TMPV.NS is the passenger-vehicle
+        # listing and is the closest live successor for this index.
+        "tickers": ["TMPV.NS", "M&M.NS", "BAJAJ-AUTO.NS", "EICHERMOT.NS"],
     },
     "FMCG": {
         "index": "^CNXFMCG",

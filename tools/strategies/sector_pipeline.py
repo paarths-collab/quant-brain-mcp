@@ -122,6 +122,14 @@ def _apply_composite_scores(analytics: list[dict[str, Any]]) -> None:
             item.pop(key, None)
 
 
+# A sector index feed more than this many calendar days behind the freshest
+# fetched index is flagged stale rather than silently stamped "ok". Live audit
+# found 5 of 8 Indian sector indices stuck 28 days behind the other 3, with
+# every row stamped "status": "ok" and no way to tell them apart -- rankings
+# silently compared mismatched windows.
+STALE_AFTER_DAYS = 5
+
+
 def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") -> dict[str, Any]:
     """Compute sector return, risk, momentum, drawdown and correlation, then select best sector."""
     universe = _pick_universe(market)
@@ -130,6 +138,7 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
     analytics: list[dict[str, Any]] = []
     prices: dict[str, pd.Series] = {}
     data_trace: list[dict[str, Any]] = []
+    trace_by_sector: dict[str, dict[str, Any]] = {}
 
     for sector_name, info in universe.items():
         index_ticker = info["index"]
@@ -187,18 +196,36 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
                 "_risk_adjusted_raw": risk_adjusted,
                 "_momentum_raw": pct_return,
                 "_drawdown_raw": drawdown_penalty,
+                "_last_date": close.index[-1],
             }
         )
         prices[sector_name] = close
-        data_trace.append(
-            {
-                "stage": "sector_index",
-                "sector": sector_name,
-                "ticker": index_ticker,
-                "status": "ok",
-                "window": selected_timeframe,
-            }
-        )
+        trace_entry = {
+            "stage": "sector_index",
+            "sector": sector_name,
+            "ticker": index_ticker,
+            "status": "ok",
+            "window": selected_timeframe,
+        }
+        data_trace.append(trace_entry)
+        trace_by_sector[sector_name] = trace_entry
+
+    stale_sectors: list[str] = []
+    if analytics:
+        freshest_date = max(item["_last_date"] for item in analytics)
+        for item in analytics:
+            last_date = item.pop("_last_date")
+            days_behind = (freshest_date - last_date).days
+            is_stale = days_behind > STALE_AFTER_DAYS
+            item["last_observed_date"] = last_date.strftime("%Y-%m-%d")
+            item["days_behind_freshest"] = days_behind
+            item["is_stale"] = is_stale
+            if is_stale:
+                stale_sectors.append(item["sector"])
+                trace = trace_by_sector.get(item["sector"])
+                if trace is not None:
+                    trace["status"] = "stale"
+                    trace["days_behind_freshest"] = days_behind
 
     _apply_composite_scores(analytics)
     analytics.sort(key=lambda item: item["composite_score"], reverse=True)
@@ -218,6 +245,15 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
         "correlation_matrix": corr_matrix,
         "data_trace": data_trace,
         "confidence": round(confidence, 2),
+        "stale_sectors": stale_sectors,
+        "data_freshness_note": (
+            f"{len(stale_sectors)} of {len(analytics)} sector indices are more than "
+            f"{STALE_AFTER_DAYS} days behind the freshest fetched index "
+            f"({', '.join(stale_sectors)}); rankings may compare mismatched windows "
+            "for those sectors."
+        )
+        if stale_sectors
+        else None,
     }
 
 
