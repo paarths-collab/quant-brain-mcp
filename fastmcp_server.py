@@ -22,6 +22,8 @@ from core.indicator_registry import run_group
 from main import run_generate_optimized_verdict, serialize_output
 from tools.intelligence.company_profile import get_company_info
 from tools.intelligence.plotly_dashboard import build_chart_pack
+from tools.trading.news import get_ticker_news
+from tools.trading.quotes import get_quotes as run_get_quotes
 from tools.strategies.sector_pipeline import analyze_sector_intelligence, find_sector_stock_pipeline
 
 # Shared type aliases so tool schemas expose a real enum (visible to MCP
@@ -173,6 +175,31 @@ def generate_optimized_verdict(
 def get_company_profile(ticker: str) -> dict:
     """Return a full company snapshot with business, valuation, and market metadata."""
     return serialize_output(get_company_info(ticker))
+
+
+@tracked_tool("quote")
+def get_quote(tickers: list[str]) -> dict:
+    """Current price snapshot for one or more tickers (US and Indian).
+
+    Returns last price, day change %, day and 52-week ranges, position within
+    the 52-week range, and volume vs 3-month average, with an `as_of`
+    timestamp. US quotes are near-real-time; NSE/BSE quotes are ~15 minutes
+    delayed (disclosed in the response). For to-the-second Indian prices
+    during market hours, supplement with a live web search.
+    """
+    return serialize_output(run_get_quotes(tickers))
+
+
+@tracked_tool("quote")
+def get_news(ticker: str, limit: int = 8) -> dict:
+    """Recent news headlines for a ticker via Yahoo Finance's news feed.
+
+    Returns structured articles (title, publisher, url, published_at,
+    summary) for you to read and synthesize. Not a scraper -- uses Yahoo's
+    aggregated feed, so coverage is strongest for large-cap US and Indian
+    names.
+    """
+    return serialize_output(get_ticker_news(ticker, limit=limit))
 
 
 @tracked_tool("intelligence")

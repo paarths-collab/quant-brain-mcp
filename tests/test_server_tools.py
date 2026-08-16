@@ -29,6 +29,9 @@ EXPECTED_TOOLS = {
     "generate_chart_pack",
     "generate_charts",
     "plot_charts",
+    # quotes and news
+    "get_quote",
+    "get_news",
     # intelligence
     "get_company_profile",
     "find_sector_stock_pipeline_tool",
@@ -48,12 +51,15 @@ def _list_tools(server):
 def test_tool_surface_is_exactly_the_curated_set(server):
     names = {tool.name for tool in _list_tools(server)}
     assert names == EXPECTED_TOOLS
-    assert len(names) == 20
+    assert len(names) == 22
 
 
 def test_no_individual_indicator_tools_exposed(server):
+    """get_* names are reserved for non-indicator tools; the 38 indicators
+    must only surface through the 6 grouped analyze_* tools."""
+    allowed_get_tools = {"get_company_profile", "get_quote", "get_news"}
     names = {tool.name for tool in _list_tools(server)}
-    assert not any(name.startswith("get_") and name != "get_company_profile" for name in names)
+    assert not any(name.startswith("get_") and name not in allowed_get_tools for name in names)
 
 
 def test_analyze_momentum_schema(server):
