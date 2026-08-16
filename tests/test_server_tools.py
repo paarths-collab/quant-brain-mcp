@@ -29,9 +29,11 @@ EXPECTED_TOOLS = {
     "generate_chart_pack",
     "generate_charts",
     "plot_charts",
-    # quotes and news
+    # trader tools
     "get_quote",
     "get_news",
+    "build_trade_plan",
+    "scan_watchlist",
     # intelligence
     "get_company_profile",
     "find_sector_stock_pipeline_tool",
@@ -51,7 +53,7 @@ def _list_tools(server):
 def test_tool_surface_is_exactly_the_curated_set(server):
     names = {tool.name for tool in _list_tools(server)}
     assert names == EXPECTED_TOOLS
-    assert len(names) == 22
+    assert len(names) == 24
 
 
 def test_no_individual_indicator_tools_exposed(server):

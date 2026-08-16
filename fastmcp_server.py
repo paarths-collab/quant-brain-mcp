@@ -24,6 +24,8 @@ from tools.intelligence.company_profile import get_company_info
 from tools.intelligence.plotly_dashboard import build_chart_pack
 from tools.trading.news import get_ticker_news
 from tools.trading.quotes import get_quotes as run_get_quotes
+from tools.trading.trade_plan import compute_trade_plan
+from tools.trading.watchlist import scan_watchlist as run_scan_watchlist
 from tools.strategies.sector_pipeline import analyze_sector_intelligence, find_sector_stock_pipeline
 
 # Shared type aliases so tool schemas expose a real enum (visible to MCP
@@ -188,6 +190,48 @@ def get_quote(tickers: list[str]) -> dict:
     during market hours, supplement with a live web search.
     """
     return serialize_output(run_get_quotes(tickers))
+
+
+@tracked_tool("trade")
+def build_trade_plan(
+    ticker: str,
+    equity: float,
+    risk_pct: float = 1.0,
+    direction: Literal["long", "short"] = "long",
+    period: Period = "1y",
+) -> dict:
+    """Build a sized trade plan: entry, stop, share count, R targets, invalidation.
+
+    The answer to "what do I do?": given account equity and the percent of it
+    you are willing to risk, returns an entry reference (last close), a
+    structural stop (tighter of recent swing level or 2x ATR, never inside
+    daily noise), the exact number of shares so a stop-out loses only the
+    risk budget, 1R/2R/3R targets, a liquidity check (order as % of 20-day
+    turnover), and a one-line invalidation. Educational analysis, not
+    investment advice.
+    """
+    from core.data_loader import resolve_ticker
+
+    df, err, resolved = resolve_ticker(ticker, period=period)
+    if err:
+        return {"error": err}
+    return serialize_output(
+        compute_trade_plan(df, resolved, equity=equity, risk_pct=risk_pct, direction=direction)
+    )
+
+
+@tracked_tool("trade")
+def scan_watchlist(tickers: list[str], period: Period = "1y") -> dict:
+    """Scan a watchlist and report which names did something actionable.
+
+    For each ticker: last close, day change, gap, distance from the
+    20/50/200-day averages and the 52-week high, ATR%, and volume vs its
+    20-day average -- plus which rules fired (near_52w_high, volume_spike,
+    crossed_above/below_200dma, at_20dma, gapped_over_1atr). Sorted
+    most-actionable first. The Sunday-evening tool: run it over your list,
+    then feed interesting names into build_trade_plan.
+    """
+    return serialize_output(run_scan_watchlist(tickers, period=period))
 
 
 @tracked_tool("quote")
