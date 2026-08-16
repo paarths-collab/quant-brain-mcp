@@ -1,5 +1,8 @@
 import asyncio
 import json
+
+from core import quant_settings  # noqa: F401  (252-day annualization, applied on import)
+
 import mcp.types as types
 from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions

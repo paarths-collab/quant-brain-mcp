@@ -15,6 +15,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.streamable_http import StreamableHTTPServerTransport
 from mcp.server.transport_security import TransportSecuritySettings
 
+from core import quant_settings  # noqa: F401  (252-day annualization, applied on import)
 from core import telemetry
 from core.data_loader import fetch_data
 from core.indicator_registry import run_group
