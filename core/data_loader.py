@@ -55,10 +55,12 @@ def fetch_multi_data(tickers: list, period: str = "2y"):
 		return {"error": str(e)}
 
 
-def fetch_data(ticker: str, period: str = "2y", interval: str = "1d"):
-	"""Fetches data and auto-tries .NS for unsuffixed Indian tickers.
+def _fetch_with_resolution(ticker: str, period: str = "2y", interval: str = "1d"):
+	"""Try `ticker` as-is, then `<ticker>.NS` for unsuffixed Indian tickers.
 
-	Returns tuple: (dataframe_or_none, error_or_none)
+	Returns (dataframe_or_none, error_or_none, resolved_ticker). resolved_ticker
+	is the symbol that actually returned data (e.g. "RELIANCE" -> "RELIANCE.NS"),
+	or the normalized input symbol if nothing resolved.
 	"""
 	ticker = ticker.strip().upper()
 	df = fetch_stock_data(ticker, period=period, interval=interval)
@@ -67,6 +69,30 @@ def fetch_data(ticker: str, period: str = "2y", interval: str = "1d"):
 			indian_ticker = f"{ticker}.NS"
 			df2 = fetch_stock_data(indian_ticker, period=period, interval=interval)
 			if not isinstance(df2, dict):
-				return df2, None
-		return None, df["error"]
-	return df, None
+				return df2, None, indian_ticker
+		return None, df["error"], ticker
+	return df, None, ticker
+
+
+def fetch_data(ticker: str, period: str = "2y", interval: str = "1d"):
+	"""Fetches data and auto-tries .NS for unsuffixed Indian tickers.
+
+	Returns tuple: (dataframe_or_none, error_or_none)
+	"""
+	df, err, _resolved = _fetch_with_resolution(ticker, period=period, interval=interval)
+	return df, err
+
+
+def resolve_ticker(ticker: str, period: str = "2y", interval: str = "1d"):
+	"""Like fetch_data, but also returns which symbol actually resolved.
+
+	Use this instead of fetch_data whenever the resolved ticker is used as a
+	dict key or fed into logic that depends on the symbol (e.g. inferring a
+	benchmark index from a ".NS"/".BO" suffix). Using fetch_data's raw input
+	ticker for that purpose silently mis-keys unsuffixed Indian tickers
+	("RELIANCE" stays "RELIANCE" even though "RELIANCE.NS" is what resolved)
+	and leaves case variants ("aapl" vs "AAPL") as distinct keys.
+
+	Returns tuple: (dataframe_or_none, error_or_none, resolved_ticker)
+	"""
+	return _fetch_with_resolution(ticker, period=period, interval=interval)

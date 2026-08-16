@@ -64,7 +64,10 @@ def get_deep_fundamentals(ticker: str) -> dict[str, Any]:
         "Debt_to_Equity": round(_num("debtToEquity"), 2),
         "ROE": f"{_num('returnOnEquity') * 100:.2f}%",
         "Market_Cap": market_cap_fmt,
-        "Dividend_Yield": f"{_num('dividendYield') * 100:.2f}%",
+        # yfinance's dividendYield already returns a percent value (2.42 == 2.42%),
+        # not a fraction -- do not multiply by 100 again (bug: previously showed
+        # "242.00%" for a stock yielding 2.42%).
+        "Dividend_Yield": f"{_num('dividendYield'):.2f}%",
         "Short_Ratio": info.get("shortRatio"),
     }
 
@@ -97,7 +100,9 @@ def get_company_info(ticker: Any) -> dict[str, Any]:
         "PE_Ratio": _pick("trailingPE"),
         "Forward_PE": _pick("forwardPE"),
         "Market_Cap": f"₹{(_pick('marketCap', default=0) or 0) / 1e7:.2f} Cr" if normalized.endswith((".NS", ".BO")) else _pick("marketCap"),
-        "Dividend_Yield": f"{((_pick('dividendYield', default=0) or 0) * 100):.2f}%",
+        # See get_deep_fundamentals: dividendYield from yfinance is already a
+        # percent value, so it must not be multiplied by 100 again.
+        "Dividend_Yield": f"{(_pick('dividendYield', default=0) or 0):.2f}%",
         "ROE": f"{((_pick('returnOnEquity', default=0) or 0) * 100):.2f}%",
         "Debt_To_Equity": _pick("debtToEquity"),
     }

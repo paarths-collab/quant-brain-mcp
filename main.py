@@ -123,8 +123,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
 def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: str = "mvo"):
     """Internal logic for the optimized verdict tool."""
     import pandas as pd
-    from core.data_loader import fetch_data
-    from core.forex import normalize_prices
+    from core.data_loader import resolve_ticker
     from tools.intelligence.alpha_engine import calculate_alpha_metrics
     from tools.intelligence.engine import get_quant_analysis
     from tools.optimization.mean_variance import run_mvo_basic
@@ -143,25 +142,40 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
         except Exception:
             return default
 
+    requested_tickers = list(tickers)
     data_dict = {}
     ohlc_frames = {}
+    excluded_tickers = []
     for t in tickers:
-        df, err = fetch_data(t)
-        if not err and not df.empty:
+        # resolve_ticker (not fetch_data) so the dict key is the symbol that
+        # ACTUALLY resolved -- e.g. "RELIANCE" -> "RELIANCE.NS" -- rather than
+        # the raw input. Using the raw string here silently mis-benchmarked
+        # unsuffixed Indian tickers against the S&P 500 (no ".NS" to detect)
+        # and let case variants ("aapl" vs "AAPL") become two "different"
+        # portfolio assets instead of one.
+        df, err, resolved = resolve_ticker(t)
+        if not err and df is not None and not df.empty:
             df.index = df.index.tz_localize(None).normalize()
-            ohlc_frames[t] = df
-            data_dict[t] = df[~df.index.duplicated(keep='last')]['Close']
-    
+            ohlc_frames[resolved] = df
+            data_dict[resolved] = df[~df.index.duplicated(keep='last')]['Close']
+        else:
+            excluded_tickers.append({"ticker": t, "error": err or "No data returned."})
+
     if not data_dict:
-        return {"error": "Could not fetch data for provided tickers."}
+        return {"error": "Could not fetch data for provided tickers.", "excluded_tickers": excluded_tickers}
 
     price_df = pd.DataFrame(data_dict).ffill().dropna()
     
     try:
         # Step 1: Optimize
+        # NOTE: prices are each ticker's own LOCAL currency (USD for US
+        # tickers, INR for .NS/.BO). A previous "USD normalization" step
+        # divided Indian prices by a single spot FX rate, which cancels out
+        # exactly in percentage-return terms (mu/S/backtests are unaffected
+        # either way) -- it gave the appearance of modeling FX risk while
+        # doing nothing. It has been removed; see `fx_note` in the result.
         opt_key = str(optimize_type or "mvo").strip().lower()
-        normalized_df = normalize_prices(price_df.copy())
-        returns = normalized_df.pct_change(fill_method=None).dropna()
+        returns = price_df.pct_change(fill_method=None).dropna()
         mu = returns.mean() * 252
         S = returns.cov() * 252
 
@@ -174,7 +188,7 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
         elif opt_key == "max_sharpe":
             from tools.optimization.markowitz_mvo import optimize as run_markowitz_optimize
 
-            opt_results = run_markowitz_optimize(normalized_df)
+            opt_results = run_markowitz_optimize(price_df)
             weights = opt_results["optimized_weights"]
         elif opt_key == "black_litterman":
             from pypfopt import EfficientFrontier
@@ -185,7 +199,7 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
                 best_asset = str(mu.idxmax())
                 implied_views = {best_asset: float(mu.loc[best_asset])}
 
-            bl_res = run_black_litterman_optimize(normalized_df, views=implied_views)
+            bl_res = run_black_litterman_optimize(price_df, views=implied_views)
             posterior_returns = pd.Series(bl_res["posterior_returns"])
             posterior_cov = pd.DataFrame(bl_res["posterior_covariance"])
             ef = EfficientFrontier(posterior_returns, posterior_cov)
@@ -211,12 +225,12 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
         # Step 3: Institutional intelligence on a representative market series
         quant_analysis = None
         alpha_analysis = None
-        intel_ticker = None
+        # ohlc_frames is keyed by the RESOLVED symbol (e.g. "RELIANCE.NS"), not
+        # the raw requested string ("RELIANCE") -- iterate its own keys rather
+        # than re-checking membership against the raw `tickers` list, which
+        # would never match for an unsuffixed Indian ticker.
+        intel_ticker = next(iter(ohlc_frames), None)
         benchmark_ticker = None
-        for ticker in tickers:
-            if ticker in ohlc_frames:
-                intel_ticker = ticker
-                break
 
         if intel_ticker:
             benchmark_ticker = _infer_benchmark_ticker(intel_ticker)
@@ -311,6 +325,13 @@ def run_generate_optimized_verdict(tickers: list, amount: float, optimize_type: 
             reasoning += " Regime filter: avoid pure trend-following entries while mean reversion dominates."
 
         res = {
+            "requested_tickers": requested_tickers,
+            "included_tickers": list(data_dict.keys()),
+            "excluded_tickers": excluded_tickers,
+            "fx_note": (
+                "Prices are each ticker's own local currency (USD for US tickers, "
+                "INR for .NS/.BO tickers); FX risk between markets is not modeled."
+            ),
             "recommended_weights": weights,
             "intelligence": quant_analysis,
             "quant_analysis": quant_analysis,
