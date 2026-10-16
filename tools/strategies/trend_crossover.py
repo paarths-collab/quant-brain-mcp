@@ -1,5 +1,7 @@
 import vectorbt as vbt
 
+from tools.strategies._common import history_error, pct, positive_int, ratio
+
 
 def run_strategy(df, fast=50, slow=200):
     """
@@ -8,7 +10,13 @@ def run_strategy(df, fast=50, slow=200):
     MARKET CONDITION: Best for Bull Runs. Avoid in Sideways/Choppy markets.
     RISK: High lag from slow moving averages.
     """
+    fast, slow = positive_int("fast", fast), positive_int("slow", slow)
+    if fast >= slow:
+        return {"error": f"fast ({fast}) must be shorter than slow ({slow})."}
     close = df["Close"]
+    error = history_error(close, slow + 1, "Trend Crossover")
+    if error:
+        return error
     fast_ma = vbt.MA.run(close, fast)
     slow_ma = vbt.MA.run(close, slow)
 
@@ -19,11 +27,11 @@ def run_strategy(df, fast=50, slow=200):
     stats = pf.stats()
 
     return {
-        "strategy_name": "SMA Crossover",
-        "win_rate": f"{stats['Win Rate [%]']:.2f}%",
-        "sharpe_ratio": round(stats['Sharpe Ratio'], 2),
-        "max_drawdown": f"{stats['Max Drawdown [%]']:.2f}%",
-        "profit_factor": round(stats['Profit Factor'], 2),
+        "strategy_name": "Trend Crossover",
+        "win_rate": pct(stats['Win Rate [%]']),
+        "sharpe_ratio": ratio(stats['Sharpe Ratio']),
+        "max_drawdown": pct(stats['Max Drawdown [%]']),
+        "profit_factor": ratio(stats['Profit Factor']),
         "total_trades": stats['Total Trades'],
-        "total_return": f"{stats['Total Return [%]']:.2f}%",
+        "total_return": pct(stats['Total Return [%]']),
     }

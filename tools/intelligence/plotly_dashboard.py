@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import vectorbt as vbt
 import yfinance as yf
 
-from core.data_loader import fetch_data
+from core.data_loader import VALID_PERIODS, fetch_data, period_covering, resolve_ticker
 from core.sector_data import INDIAN_SECTORS, US_SECTORS
 from main import run_generate_optimized_verdict
 from tools.intelligence.alpha_engine import calculate_alpha_metrics
@@ -91,15 +91,31 @@ _CHART_CATEGORIES = {
 }
 
 
-def _prepare_price_frame(tickers: list[str], period: str = "2y") -> tuple[pd.DataFrame, dict[str, pd.DataFrame], list[str]]:
+def _prepare_price_frame(
+    tickers: list[str], period: str = "2y"
+) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], list[str], dict[str, tuple]]:
+    """Fetch each ticker once, keyed by the symbol that actually resolved.
+
+    Keys must match the optimizer's weight keys ("aapl" -> "AAPL",
+    "RELIANCE" -> "RELIANCE.NS"); keying by raw input made every weight
+    reindex to 0 for lowercase or unsuffixed tickers. The raw fetch results
+    are also returned so each optimizer run reuses them instead of
+    downloading every ticker again.
+    """
     close_map: dict[str, pd.Series] = {}
     ohlc_map: dict[str, pd.DataFrame] = {}
     warnings: list[str] = []
+    fetched: dict[str, tuple] = {}
 
     for ticker in tickers:
-        df, err = fetch_data(ticker, period=period)
+        if ticker in fetched:
+            continue
+        df, err, resolved = resolve_ticker(ticker, period=period)
+        fetched[ticker] = (df, err, resolved)
         if err or df is None or df.empty:
             warnings.append(f"Failed to fetch data for {ticker}: {err}")
+            continue
+        if resolved in ohlc_map:
             continue
 
         clean_df = df.copy()
@@ -108,14 +124,14 @@ def _prepare_price_frame(tickers: list[str], period: str = "2y") -> tuple[pd.Dat
             warnings.append(f"Ticker {ticker} missing Close column")
             continue
 
-        ohlc_map[ticker] = clean_df
-        close_map[ticker] = clean_df["Close"].astype(float)
+        ohlc_map[resolved] = clean_df
+        close_map[resolved] = clean_df["Close"].astype(float)
 
     if not close_map:
-        return pd.DataFrame(), {}, warnings
+        return pd.DataFrame(), {}, warnings, fetched
 
     price_df = pd.DataFrame(close_map).ffill().dropna()
-    return price_df, ohlc_map, warnings
+    return price_df, ohlc_map, warnings, fetched
 
 
 def _build_portfolio(price_df: pd.DataFrame, weights: dict[str, float]) -> vbt.Portfolio:
@@ -263,9 +279,18 @@ def _build_fundamental_series(ticker: str) -> dict[str, Any]:
                     interest_cov.append(abs(float(ebit) / float(interest)))
     data["interest_coverage"] = interest_cov if interest_cov else [None for _ in years]
 
-    roe_value = info.get("returnOnEquity")
-    if years:
-        data["roe"] = [None if roe_value is None else float(roe_value) * 100 for _ in years]
+    # Per-year ROE from that year's statements. The provider's returnOnEquity
+    # is a single current value; repeating it across years drew a fake trend.
+    if years and not balance.empty and "Net Income" in income.index:
+        equity_row = next((r for r in ("Stockholders Equity", "Common Stock Equity") if r in balance.index), None)
+        roe = []
+        for c in list(income.columns[: len(years)])[::-1]:
+            net = income.loc["Net Income", c]
+            equity = balance.loc[equity_row, c] if equity_row and c in balance.columns else np.nan
+            roe.append(None if pd.isna(net) or pd.isna(equity) or float(equity) == 0 else float(net) / float(equity) * 100)
+        data["roe"] = roe
+    else:
+        data["roe"] = [None for _ in years]
 
     data["multiples"] = {
         "PE": info.get("trailingPE"),
@@ -325,8 +350,10 @@ def build_chart_pack(
     ]
 
     selected_timeframe = (timeframe or "2y").strip()
+    if selected_timeframe not in VALID_PERIODS:
+        return {"error": f"Invalid timeframe '{selected_timeframe}'. Use one of: {', '.join(sorted(VALID_PERIODS))}."}
 
-    price_df, ohlc_map, prep_warnings = _prepare_price_frame(tickers, period=selected_timeframe)
+    price_df, ohlc_map, prep_warnings, fetched = _prepare_price_frame(tickers, period=selected_timeframe)
     warnings.extend(prep_warnings)
     if price_df.empty:
         return {"error": "Unable to build chart pack: no valid price data", "warnings": warnings}
@@ -337,9 +364,19 @@ def build_chart_pack(
     asset_returns = price_df.pct_change(fill_method=None).dropna()
     cov_ann = asset_returns.cov() * 252 if not asset_returns.empty else pd.DataFrame()
 
+    # Shared across all seven optimizer runs: prices were fetched above, and
+    # each benchmark is downloaded once for the whole chart pack.
+    benchmark_cache: dict = {}
     for method in methods:
         try:
-            result = run_generate_optimized_verdict(tickers=tickers, amount=amount, optimize_type=method)
+            result = run_generate_optimized_verdict(
+                tickers=tickers,
+                amount=amount,
+                optimize_type=method,
+                period=selected_timeframe,
+                prefetched=fetched,
+                benchmark_cache=benchmark_cache,
+            )
             if "error" in result:
                 warnings.append(f"Optimization {method} failed: {result['error']}")
                 continue
@@ -386,13 +423,14 @@ def build_chart_pack(
         fig_compare.update_layout(title="Optimization Method Comparison", barmode="group")
         charts["optimization_comparison_bars"] = _to_plotly_json(fig_compare)
 
+        # Sharpe goes in the hover data, not marker size: Plotly rejects
+        # negative sizes, and a negative holdout Sharpe is routine.
         fig_scatter = px.scatter(
             compare_df,
             x="volatility_pct",
             y="total_return_pct",
             color="method",
-            size="sharpe",
-            hover_data=["max_drawdown_pct", "var_95_pct"],
+            hover_data=["sharpe", "max_drawdown_pct", "var_95_pct"],
             title="Risk-Return Scatter by Optimization Method",
         )
         charts["risk_return_scatter"] = _to_plotly_json(fig_scatter)
@@ -483,7 +521,7 @@ def build_chart_pack(
         )
         charts["asset_correlation_heatmap"] = _to_plotly_json(fig_corr)
 
-    stock_ticker = tickers[0]
+    stock_ticker = next(iter(ohlc_map))
     stock_df = ohlc_map.get(stock_ticker)
     if stock_df is not None and not stock_df.empty:
         strategy_metrics = _safe_strategy_metrics(stock_df)
@@ -536,8 +574,13 @@ def build_chart_pack(
         charts["trade_overlay"] = _to_plotly_json(fig_trades)
 
         benchmark = "^NSEI" if stock_ticker.endswith((".NS", ".BO")) else "^GSPC"
-        bdf, berr = fetch_data(benchmark, period=selected_timeframe)
-        if not berr and bdf is not None and not bdf.empty:
+        bench_key = (benchmark, period_covering(stock_df.index))
+        if bench_key not in benchmark_cache:
+            benchmark_cache[bench_key] = fetch_data(benchmark, period=bench_key[1])
+        bdf, berr = benchmark_cache[bench_key]
+        if berr or bdf is None or bdf.empty:
+            warnings.append(f"Quant charts skipped: benchmark data unavailable for {benchmark}: {berr}")
+        else:
             combo = pd.DataFrame({"asset": close, "bench": bdf["Close"]}).ffill().pct_change(fill_method=None).dropna()
             if not combo.empty:
                 win = 63
@@ -547,24 +590,31 @@ def build_chart_pack(
                 fig_beta.update_layout(title=f"Rolling Beta vs {benchmark}")
                 charts["rolling_beta"] = _to_plotly_json(fig_beta)
 
-                quant = get_quant_analysis(stock_df, benchmark_ticker=benchmark)
-                alpha = calculate_alpha_metrics(stock_df, benchmark_ticker=benchmark)
+                try:
+                    quant = get_quant_analysis(stock_df, benchmark_ticker=benchmark, benchmark_df=bdf)
+                except Exception as exc:
+                    quant = {}
+                    warnings.append(f"Quant analysis failed for {stock_ticker}: {exc}")
+                alpha = calculate_alpha_metrics(stock_df, benchmark_ticker=benchmark, bench_df=bdf)
 
-                bench_ann = float(combo["bench"].mean() * 252)
-                beta_val = float(alpha.get("beta", 0.0)) if isinstance(alpha, dict) else 0.0
-                alpha_val = float(alpha.get("alpha_annualized", 0.0)) if isinstance(alpha, dict) else 0.0
-                contrib = [bench_ann, beta_val * bench_ann, alpha_val]
-                fig_wf = go.Figure(
-                    go.Waterfall(
-                        name="Alpha Decomposition",
-                        orientation="v",
-                        measure=["relative", "relative", "total"],
-                        x=["Benchmark Return", "Beta Contribution", "Alpha"],
-                        y=contrib,
+                if "error" in alpha:
+                    warnings.append(f"Alpha decomposition skipped for {stock_ticker}: {alpha['error']}")
+                else:
+                    # Annualized stock return = beta * benchmark return + alpha.
+                    bench_ann = float(combo["bench"].mean() * 252)
+                    beta_contribution = float(alpha["beta"]) * bench_ann
+                    alpha_val = float(alpha["alpha_annualized"])
+                    fig_wf = go.Figure(
+                        go.Waterfall(
+                            name="Alpha Decomposition",
+                            orientation="v",
+                            measure=["relative", "relative", "total"],
+                            x=["Beta Contribution", "Alpha", "Stock Return"],
+                            y=[beta_contribution, alpha_val, 0],
+                        )
                     )
-                )
-                fig_wf.update_layout(title="Alpha Decomposition Waterfall")
-                charts["alpha_decomposition_waterfall"] = _to_plotly_json(fig_wf)
+                    fig_wf.update_layout(title=f"Alpha Decomposition Waterfall (benchmark {bench_ann:.1%} annualized)")
+                    charts["alpha_decomposition_waterfall"] = _to_plotly_json(fig_wf)
 
                 hurst = _rolling_hurst(close)
                 if not hurst.empty:
@@ -584,8 +634,11 @@ def build_chart_pack(
                     )
                     charts["regime_timeline"] = _to_plotly_json(fig_reg)
 
-    target_company = company_ticker or tickers[0]
+    target_company = company_ticker or stock_ticker
     try:
+        if company_ticker:
+            _df, company_err, resolved_company = resolve_ticker(company_ticker, period="5d")
+            target_company = resolved_company if not company_err else company_ticker.strip().upper()
         fdata = _build_fundamental_series(target_company)
         years = fdata.get("years", [])
         if years:
@@ -632,29 +685,30 @@ def build_chart_pack(
             fig_sector = px.bar(
                 sector_rankings,
                 x="sector",
-                y="performance_3m_pct",
-                title=f"Sector Relative Strength ({market.upper()})",
+                y="return_pct",
+                title=f"Sector Relative Strength, 1y return % ({market.upper()})",
             )
             charts["sector_relative_strength"] = _to_plotly_json(fig_sector)
 
         stocks = pipeline.get("selected_stocks", [])
-        top_sector = float(sector_rankings["performance_3m_pct"].iloc[0]) if not sector_rankings.empty else 0.0
-        top_stock = float(stocks[0]["score"]) if stocks else 0.0
-        conf = float(pipeline.get("confidence", 0.0)) * 100
-
-        fig_funnel = go.Figure(go.Funnel(y=["Top Sector Score", "Top Stock Score", "Pipeline Confidence"], x=[top_sector, top_stock, conf]))
+        fig_funnel = go.Figure(go.Funnel(
+            y=["Sectors Ranked", "Sectors Selected", "Stocks Selected", "Stocks Confirmed"],
+            x=[len(sector_rankings), len(pipeline.get("selected_sectors", [])), len(stocks), len(pipeline.get("confirmed_stocks", []))],
+        ))
         fig_funnel.update_layout(title="Sector-to-Stock Funnel")
         charts["sector_stock_funnel"] = _to_plotly_json(fig_funnel)
 
         ok_count = sum(1 for row in pipeline.get("data_trace", []) if row.get("status") == "ok")
         fail_count = sum(1 for row in pipeline.get("data_trace", []) if row.get("status") != "ok")
+        # No calibrated confidence exists; show input coverage instead.
+        coverage = ok_count / (ok_count + fail_count) * 100 if ok_count + fail_count else 0.0
 
         fig_conf = go.Figure()
         fig_conf.add_trace(
             go.Indicator(
                 mode="gauge+number",
-                value=conf,
-                title={"text": "Pipeline Confidence"},
+                value=coverage,
+                title={"text": "Data Coverage %"},
                 gauge={"axis": {"range": [0, 100]}},
                 domain={"x": [0, 0.55], "y": [0, 1]},
             )
@@ -669,7 +723,7 @@ def build_chart_pack(
             )
         )
         fig_conf.update_layout(
-            title="Confidence and Data Trace",
+            title="Data Coverage and Trace",
             xaxis2={"domain": [0.62, 1.0], "anchor": "y2"},
             yaxis2={"domain": [0.0, 1.0], "anchor": "x2"},
             showlegend=False,

@@ -82,7 +82,7 @@ def test_quote_discloses_delay_and_as_of():
 
 def test_one_bad_ticker_does_not_break_the_batch():
     def ticker_side_effect(symbol):
-        if symbol == "BADTICKER":
+        if symbol.startswith("BADTICKER"):  # including the .NS retry
             return _fake_ticker(_ExplodingFastInfo())
         return _fake_ticker(_FakeFastInfo())
 
@@ -91,6 +91,24 @@ def test_one_bad_ticker_does_not_break_the_batch():
 
     assert result["quotes"]["RELIANCE.NS"]["last_price"] == 1310.0
     assert "error" in result["quotes"]["BADTICKER"]
+
+
+def test_unsuffixed_symbol_falls_back_to_nse_keyed_by_request():
+    def ticker_side_effect(symbol):
+        return _fake_ticker(_FakeFastInfo() if symbol == "RELIANCE.NS" else _ExplodingFastInfo())
+
+    with patch("yfinance.Ticker", side_effect=ticker_side_effect):
+        quote = get_quotes(["reliance"])["quotes"]["RELIANCE"]
+    assert quote["last_price"] == 1310.0
+    assert quote["resolved_ticker"] == "RELIANCE.NS"
+
+
+@pytest.mark.parametrize("symbol", ["^NSEI", "USDINR=X", "TCS.BO"])
+def test_indices_fx_and_suffixed_symbols_are_not_rewritten(symbol):
+    with patch("yfinance.Ticker", return_value=_fake_ticker(_ExplodingFastInfo())) as mock_t:
+        result = get_quotes([symbol])
+    assert "error" in result["quotes"][symbol]
+    assert mock_t.call_count == 1
 
 
 def test_tickers_normalized_and_deduped():

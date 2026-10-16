@@ -37,6 +37,10 @@ CREATE INDEX IF NOT EXISTS idx_mcp_tool_events_category ON mcp_tool_events (tool
 CREATE INDEX IF NOT EXISTS idx_mcp_tool_events_session  ON mcp_tool_events (session_id);
 """
 
+# Bound connection attempts so an unreachable database cannot pin the writer
+# thread or a /metrics/summary worker thread indefinitely.
+_CONNECT_TIMEOUT_SECONDS = 10
+
 _INSERT_SQL = (
     "INSERT INTO mcp_tool_events "
     "(tool_name, tool_category, session_id, duration_ms, success, error) "
@@ -122,7 +126,7 @@ class TelemetryWriter:
     def _connect(self):
         import psycopg2
 
-        conn = psycopg2.connect(_normalize_dsn(self.dsn))
+        conn = psycopg2.connect(_normalize_dsn(self.dsn), connect_timeout=_CONNECT_TIMEOUT_SECONDS)
         conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute(_SCHEMA_SQL)
@@ -265,7 +269,7 @@ def fetch_summary() -> dict | None:
 
     import psycopg2
 
-    conn = psycopg2.connect(_normalize_dsn(dsn))
+    conn = psycopg2.connect(_normalize_dsn(dsn), connect_timeout=_CONNECT_TIMEOUT_SECONDS)
     try:
         with conn.cursor() as cur:
             cur.execute(_SCHEMA_SQL)

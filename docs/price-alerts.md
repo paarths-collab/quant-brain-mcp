@@ -34,6 +34,10 @@ Alerts require a verified bearer token configured by the server's `MCP_API_KEYS`
 
 Existing tables are migrated with a nullable `owner_id` column. Historical ownerless alerts remain inaccessible; an administrator must assign them to a verified owner or remove them. Never automatically assign all historical alerts to the first caller.
 
+To assign them, an administrator sets `PRICE_ALERTS_LEGACY_OWNER` to the verified owner ID (a key from `MCP_API_KEYS`) and restarts the server; ownerless rows are assigned to that owner once, when the schema is initialized. Leave it unset otherwise.
+
+`check` also returns `unpriced`: alerts whose symbol returned no valid quote on this poll. They stay active, but a symbol that never prices (for example an NSE name without `.NS` that Yahoo cannot resolve) should be corrected rather than left silently watching.
+
 Concurrent polls use an atomic conditional update: only the poll that deactivates an active alert reports it as triggered. This prevents duplicate reports, but notification delivery is not guaranteed if the connection is lost after the database update. Alerts are informational polling reminders, not execution guarantees or broker stop orders.
 
 ## Setting alerts

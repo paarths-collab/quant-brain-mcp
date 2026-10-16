@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import math
 import logging
+import threading
 from datetime import datetime, timezone
 
 from core.telemetry import _normalize_dsn
@@ -38,18 +39,47 @@ CREATE INDEX IF NOT EXISTS idx_price_alerts_owner_active ON price_alerts (owner_
 """
 
 
+# Rows created before alerts were owner-scoped have owner_id NULL and are
+# invisible to every owner. Setting this env var assigns them to that owner
+# once at schema initialization; unset, they are left untouched.
+_LEGACY_OWNER_ENV = "PRICE_ALERTS_LEGACY_OWNER"
+
+# DSNs whose schema has been initialized by this process.
+_schema_ready: set[str] = set()
+_schema_lock = threading.Lock()
+
+
 def _db_available() -> bool:
     return bool(os.getenv("DATABASE_URL"))
+
+
+def _ensure_schema(conn, dsn: str) -> None:
+    """Run DDL once per process and database.
+
+    ALTER TABLE takes an ACCESS EXCLUSIVE lock even when the column already
+    exists, so running it on every set/list/check serialized all alert traffic.
+    """
+    if dsn in _schema_ready:
+        return
+    with _schema_lock:
+        if dsn in _schema_ready:
+            return
+        with conn.cursor() as cur:
+            cur.execute(_SCHEMA_SQL)
+            legacy_owner = (os.getenv(_LEGACY_OWNER_ENV) or "").strip()
+            if legacy_owner:
+                cur.execute("UPDATE price_alerts SET owner_id = %s WHERE owner_id IS NULL", (legacy_owner,))
+        _schema_ready.add(dsn)
 
 
 def _connect():
     import psycopg2
 
-    conn = psycopg2.connect(_normalize_dsn(os.getenv("DATABASE_URL")), connect_timeout=10)
+    dsn = _normalize_dsn(os.getenv("DATABASE_URL"))
+    conn = psycopg2.connect(dsn, connect_timeout=10)
     conn.autocommit = True
     try:
-        with conn.cursor() as cur:
-            cur.execute(_SCHEMA_SQL)
+        _ensure_schema(conn, dsn)
     except Exception:
         conn.close()
         raise
@@ -211,6 +241,7 @@ def _do_check(owner_id) -> dict:
     quotes = quote_result.get("quotes", {})
 
     triggered = []
+    unpriced = []
     still_watching = 0
     for alert in active:
         quote = quotes.get(alert["ticker"], {})
@@ -221,6 +252,11 @@ def _do_check(owner_id) -> dict:
             price = float("nan")
         if not math.isfinite(price) or price <= 0:
             still_watching += 1  # unfetchable now; keep watching, never drop silently
+            unpriced.append({
+                "alert_id": alert["id"],
+                "ticker": alert["ticker"],
+                "reason": quote.get("error") or "No valid price returned",
+            })
             continue
 
         fired = (alert["direction"] == "below" and price <= alert["level"]) or (
@@ -242,8 +278,15 @@ def _do_check(owner_id) -> dict:
         else:
             still_watching += 1
 
-    return {
+    result = {
         "triggered": triggered,
         "still_watching": still_watching,
+        "unpriced": unpriced,
         "as_of": quote_result.get("as_of"),
     }
+    if unpriced:
+        result["warning"] = (
+            f"{len(unpriced)} alert(s) could not be priced and were not evaluated; "
+            "check the symbols (e.g. add .NS for NSE) or retry later."
+        )
+    return result

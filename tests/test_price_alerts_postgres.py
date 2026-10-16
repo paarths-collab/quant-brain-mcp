@@ -64,3 +64,19 @@ def test_real_sql_concurrent_trigger_claim_has_one_winner(database):
     rows = alerts._fetch_alerts("alice", active_only=False)
     assert rows[0]["triggered_price"] == 110
     assert rows[0]["triggered_at"]
+
+
+def test_real_sql_legacy_alerts_assigned_only_when_configured(database, monkeypatch):
+    import psycopg2
+
+    conn = psycopg2.connect(database)
+    conn.autocommit = True
+    old_schema = alerts._SCHEMA_SQL.split("ALTER TABLE")[0].replace("    owner_id        TEXT,\n", "")
+    with conn.cursor() as cur:
+        cur.execute(old_schema)
+        cur.execute("INSERT INTO price_alerts(ticker,direction,level) VALUES ('LEGACY','above',10)")
+    conn.close()
+    monkeypatch.setenv("PRICE_ALERTS_LEGACY_OWNER", "alice")
+    rows = alerts._fetch_alerts("alice")
+    assert [row["ticker"] for row in rows] == ["LEGACY"]
+    assert alerts._fetch_alerts("bob") == []

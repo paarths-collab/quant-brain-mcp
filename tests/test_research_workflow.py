@@ -58,15 +58,24 @@ def test_corrections_bounded(depth, calls):
     asyncio.run(run())
 
 
-def test_unknown_citation_rejected():
+def _assert_withheld(report, fragment, claims_withheld=True):
+    if claims_withheld:
+        assert report.claims == []
+    assert report.verified_claim_ids == []
+    assert report.outcome == "insufficient_evidence"
+    assert report.confidence == "low"
+    assert any(warning.startswith("Integrity") and fragment in warning for warning in report.warnings)
+
+
+def test_unknown_citation_withheld_not_reported():
     class Invalid(FakeRuntime):
         async def run(self, role, prompt):
             result = await super().run(role, prompt)
             if role == "synthesizer":
                 result["claims"] = [{**CLAIM, "id": "new_claim", "evidence_ids": ["made_up"]}]
             return result
-    with pytest.raises(ValueError, match="Unknown evidence"):
-        asyncio.run(run_research("Investigate", runtime=Invalid()))
+    report = asyncio.run(run_research("Investigate", runtime=Invalid()))
+    _assert_withheld(report, "unknown or quarantined evidence made_up")
 
 
 def test_synthesis_cannot_add_unaudited_claim():
@@ -76,8 +85,21 @@ def test_synthesis_cannot_add_unaudited_claim():
             if role == "synthesizer":
                 result["claims"] = [{**CLAIM, "id": "new_claim"}]
             return result
-    with pytest.raises(ValueError, match="unaudited"):
-        asyncio.run(run_research("Investigate", runtime=Invalid()))
+    report = asyncio.run(run_research("Investigate", runtime=Invalid()))
+    _assert_withheld(report, "not an unchanged audited claim")
+
+
+def test_synthesis_cannot_rewrite_audited_claim():
+    class Invalid(FakeRuntime):
+        async def run(self, role, prompt):
+            result = await super().run(role, prompt)
+            if role == "synthesizer":
+                result["claims"] = [{**CLAIM, "text": "Revenue doubled"}]
+            return result
+    report = asyncio.run(run_research("Investigate", runtime=Invalid()))
+    _assert_withheld(report, "not an unchanged audited claim")
+    # The audited original is still on record; only the rewrite was withheld.
+    assert report.agent_findings["company"].claims[0].text == "Revenue increased"
 
 
 def test_runtime_failure_cancels_parallel_worker():
@@ -109,8 +131,9 @@ def test_auditor_cannot_verify_unknown_claim():
             if role == "auditor":
                 result["verified_claim_ids"] = ["nonexistent"]
             return result
-    with pytest.raises(ValueError, match="unknown prior"):
-        asyncio.run(run_research("Investigate", runtime=Invalid()))
+    report = asyncio.run(run_research("Investigate", runtime=Invalid()))
+    # The real claim remains visible but unverified, so nothing is supported.
+    _assert_withheld(report, "unknown or quarantined claim nonexistent", claims_withheld=False)
 
 
 def test_auditor_cannot_upgrade_insufficient_synthesis():
@@ -153,8 +176,21 @@ def test_conflicting_parallel_claim_ids_fail_closed():
             if role == "quant":
                 result.update(evidence=[EVIDENCE], claims=[{**CLAIM, "text": "Revenue declined"}])
             return result
-    with pytest.raises(ValueError, match="Conflicting claim ID"):
-        asyncio.run(run_research("Investigate", runtime=Collision()))
+    # Neither version can be verified or reported, and the job still completes.
+    report = asyncio.run(run_research("Investigate", runtime=Collision()))
+    _assert_withheld(report, "conflicting reuse of claim ID company_c1")
+
+
+def test_conflicting_evidence_quarantines_dependent_claims():
+    class Collision(FakeRuntime):
+        async def run(self, role, prompt):
+            result = await super().run(role, prompt)
+            if role == "quant":
+                result.update(evidence=[{**EVIDENCE, "excerpt": "Revenue fell"}])
+            return result
+    report = asyncio.run(run_research("Investigate", runtime=Collision()))
+    _assert_withheld(report, "conflicting reuse of evidence ID company_e1")
+    assert all(item.id != "company_e1" for item in report.evidence)
 
 
 def test_analyst_self_checks_do_not_replace_auditor():

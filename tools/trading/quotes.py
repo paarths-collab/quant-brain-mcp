@@ -84,8 +84,35 @@ def _one_quote(symbol: str) -> dict:
     }
 
 
+def _needs_nse_fallback(symbol: str) -> bool:
+    # Plain equity symbols only: indices (^), FX/futures (=) and already
+    # exchange-suffixed symbols are never rewritten.
+    return not any(marker in symbol for marker in (".", "^", "="))
+
+
+def _quote_with_resolution(symbol: str) -> dict:
+    """Quote `symbol`, retrying `<symbol>.NS` like the other data tools do.
+
+    Without this, an unsuffixed Indian symbol ("RELIANCE") never priced, so
+    price alerts on it could never fire.
+    """
+    quote = _one_quote(symbol)
+    if "error" in quote and _needs_nse_fallback(symbol):
+        try:
+            fallback = _one_quote(f"{symbol}.NS")
+        except Exception:
+            fallback = {"error": "fallback failed"}
+        if "error" not in fallback:
+            return {**fallback, "resolved_ticker": f"{symbol}.NS"}
+    return quote
+
+
 def get_quotes(tickers: list[str]) -> dict:
-    """Batched quote snapshot for one or more tickers (US and Indian)."""
+    """Batched quote snapshot for one or more tickers (US and Indian).
+
+    Results are keyed by the requested symbol; when an unsuffixed symbol only
+    resolved on NSE, the quote carries `resolved_ticker`.
+    """
     if not tickers:
         return {"error": "Provide at least one ticker symbol."}
 
@@ -98,7 +125,7 @@ def get_quotes(tickers: list[str]) -> dict:
     quotes: dict[str, dict] = {}
     for symbol in normalized:
         try:
-            quotes[symbol] = _one_quote(symbol)
+            quotes[symbol] = _quote_with_resolution(symbol)
         except Exception as exc:
             quotes[symbol] = {"error": f"Quote fetch failed for '{symbol}': {exc}"}
 

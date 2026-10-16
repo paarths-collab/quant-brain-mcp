@@ -1,9 +1,15 @@
 import vectorbt as vbt
 
+from tools.strategies._common import history_error, pct, positive_int, ratio
+
 
 def run_backtest(df, length=20):
 	"""Vectorized backtest for a Donchian-style volatility breakout."""
+	length = positive_int("length", length)
 	close = df["Close"]
+	error = history_error(close, max(length, 10) + 1, "Volatility Breakout")
+	if error:
+		return error
 	high = df["High"]
 	low = df["Low"]
 
@@ -18,9 +24,9 @@ def run_backtest(df, length=20):
 
 	return {
 		"strategy_name": "Volatility Breakout",
-		"total_return": f"{stats['Total Return [%]']:.2f}%",
-		"sharpe_ratio": round(stats['Sharpe Ratio'], 2),
-		"win_rate": f"{stats['Win Rate [%]']:.2f}%",
-		"max_drawdown": f"{stats['Max Drawdown [%]']:.2f}%",
-		"profit_factor": round(stats['Profit Factor'], 2),
+		"total_return": pct(stats['Total Return [%]']),
+		"sharpe_ratio": ratio(stats['Sharpe Ratio']),
+		"win_rate": pct(stats['Win Rate [%]']),
+		"max_drawdown": pct(stats['Max Drawdown [%]']),
+		"profit_factor": ratio(stats['Profit Factor']),
 	}
