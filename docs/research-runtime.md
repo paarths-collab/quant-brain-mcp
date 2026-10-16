@@ -57,30 +57,107 @@ private filesystem data to research agents.
 
 A fresh isolated SDK startup and effective configuration were verified without
 model access. Adapter tests cover lifecycle, cancellation, timeouts, secret-safe
-errors and strict structured outputs. An authenticated quick research job has also completed through both HTTP MCP servers, with SDK-observed web search and successful private quote calls. This is an integration smoke test, not a research-quality benchmark. Standard/deep live runs and broader accuracy evaluation remain outstanding.
+errors and strict structured outputs. Authenticated quick and deep research jobs have completed through both HTTP MCP servers, with SDK-observed web search and successful private quote calls. The deep run exercised all six roles and both correction rounds; its final result remained mixed with moderate confidence and excluded unaudited quote timestamps. These are integration checks, not an investment-accuracy benchmark. See [testing results](testing-results.md) for scope and remaining limitations.
 
 ## Start both servers
 
-Set these variables in both server terminals (use the same internal secret):
+Create a local configuration file **outside the repository** once. This generates
+separate client/internal secrets and stores only the client token's digest in the
+server's authentication map. It reuses the Codex profile you already signed into.
+The command refuses to overwrite an existing configuration:
 
 ```sh
-export QUANT_INTERNAL_TOKEN='<random secret of at least 32 characters>'
-export QUANT_RESEARCH_ENABLED=true
+python - <<'PYCONFIG'
+import hashlib, json, os, secrets, shlex
+from pathlib import Path
+
+config = Path.home() / ".config" / "quant-brain" / "runtime.env"
+config.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+client_token = secrets.token_urlsafe(32)
+values = {
+    "QUANT_CLIENT_TOKEN": client_token,
+    "QUANT_INTERNAL_TOKEN": secrets.token_urlsafe(32),
+    "QUANT_RESEARCH_ENABLED": "true",
+    "QUANT_CODEX_HOME": os.environ.get("CODEX_HOME", str(Path.home() / ".codex")),
+    "MCP_API_KEYS": json.dumps({"personal-research": hashlib.sha256(client_token.encode()).hexdigest()}),
+}
+fd = os.open(config, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "w") as out:
+    for key, value in values.items():
+        out.write(f"export {key}={shlex.quote(value)}\n")
+print("Local configuration created; no secrets printed.")
+PYCONFIG
 ```
 
-Configure the outer server's `MCP_API_KEYS` as documented in [deployment](deployment.md). It maps an owner ID to the SHA-256 digest of their bearer token. Keep the raw outer token in your Claude MCP client configuration.
+Do not commit this file or paste its contents into chat. For an existing deployment,
+use its operator-issued client token and matching server digest instead; see
+[deployment](deployment.md). Do not use a Codex sign-in token as an MCP bearer token.
 
-Run each command in its own terminal, using the installed Python environment:
+Open two terminals in the repository, activate the Python environment where you
+installed `requirements_research.txt`, and run:
+
+**Terminal 1 — private calculation server**
 
 ```sh
+source "$HOME/.config/quant-brain/runtime.env"
 python -m uvicorn internal_app:app --host 127.0.0.1 --port 8001 --workers 1
 ```
 
+**Terminal 2 — Claude-facing research server**
+
 ```sh
+source "$HOME/.config/quant-brain/runtime.env"
+python research_cli.py check
 python -m uvicorn render_app:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Connect Claude to `http://127.0.0.1:8000/mcp` using an HTTP MCP client that supports bearer authentication. A remote Claude client cannot reach your computer's loopback address; use a supported local bridge or an authenticated HTTPS deployment in that case. The internal server must remain private. Use one outer server worker because it owns the local research queue.
+Keep both running. Use one outer server worker because it owns the local research
+queue. The account check confirms sign-in, not a completed research run.
+
+## Connect Claude Code locally
+
+In a third terminal, with [Claude Code installed](https://code.claude.com/docs/en/setup),
+load the local configuration and register the outer endpoint:
+
+```sh
+source "$HOME/.config/quant-brain/runtime.env"
+claude mcp add-json --scope user quant-brain '{"type":"http","url":"http://127.0.0.1:8000/mcp","headers":{"Authorization":"Bearer ${QUANT_CLIENT_TOKEN}"}}'
+claude mcp list
+claude
+```
+
+Keep the JSON single-quoted: Claude stores the literal environment-variable
+reference, not the bearer token. Start Claude from a terminal where
+`QUANT_CLIENT_TOKEN` is set each time. In Claude, run `/mcp` and confirm
+`quant-brain` is connected. If the name is already registered, inspect/update that
+entry rather than creating duplicates. [Official Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
+
+Try this prompt:
+
+> Use Quant Brain to run quick research on TCS.NS. Check the latest available
+> quote and company news, show source timestamps, and distinguish facts from
+> assumptions. Poll the research job until it finishes, retrieve the report,
+> then give your judgment with uncertainties and unresolved disagreements.
+
+## Claude Desktop or claude.ai
+
+The **remote connector** in Claude Desktop/web connects from Anthropic's cloud,
+so it cannot reach `127.0.0.1` on your computer. For this personal local setup,
+Claude Code above is the direct route. Desktop local stdio integrations are a
+separate mechanism; this repository currently supplies authenticated HTTP
+servers, not a configured Desktop stdio bridge.
+
+For a remotely hosted instance, expose **only the outer server** over authenticated
+HTTPS, then use **Customize → Connectors → Add → Add custom connector**. Enter the
+outer `/mcp` URL. This server uses a fixed bearer credential, so choose **No sign in**
+for OAuth and add a **Request headers** entry named `Authorization` with value
+`Bearer <operator-issued outer token>`. That UI choice does not disable server
+authentication. Enable the connector in your conversation. Do not assume the
+existing hosted URL has the optional research runtime or Codex sign-in configured.
+Keep the internal endpoint private and credentials on the server.
+[Official custom connector documentation](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+
+## Research jobs
 
 Ask Claude to call `start_research` with `question`, one to five `tickers` (for example `["TCS.NS"]`), and `depth` (`quick`, `standard`, or `deep`). It returns a job ID immediately. Poll `get_research_status`, then fetch `get_research_report` when completed. `cancel_research` stops an unwanted job. Jobs and reports are isolated by authenticated owner and persisted in SQLite. Set `QUANT_RESEARCH_DB` to choose the database location.
 

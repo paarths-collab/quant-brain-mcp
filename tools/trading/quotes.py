@@ -9,6 +9,7 @@ staleness.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import math
 
 import yfinance as yf
 
@@ -36,9 +37,19 @@ def _one_quote(symbol: str) -> dict:
         except Exception:
             raw[field] = None
 
+    # Provider fields may be NaN, infinity, or malformed even on a successful fetch.
+    for field in _FIELDS:
+        if field in {"currency", "timezone", "exchange"}:
+            continue
+        try:
+            value = float(raw[field])
+            raw[field] = value if math.isfinite(value) and value >= 0 else None
+        except (TypeError, ValueError, OverflowError):
+            raw[field] = None
+
     last = raw["lastPrice"]
     prev = raw["previousClose"]
-    if last is None:
+    if last is None or last <= 0:
         return {"error": f"No quote data available for '{symbol}'."}
 
     day_change_pct = None
@@ -97,9 +108,14 @@ def get_quotes(tickers: list[str]) -> dict:
         except Exception as exc:
             quotes[symbol] = {"error": f"Quote fetch failed for '{symbol}': {exc}"}
 
+    fetched_at = datetime.now(timezone.utc).isoformat()
     return {
         "quotes": quotes,
-        "as_of": datetime.now(timezone.utc).isoformat(),
+        "as_of": fetched_at,
+        "fetched_at": fetched_at,
+        "market_timestamp": None,
+        "freshness_status": "unknown",
+        "timestamp_note": "as_of/fetched_at records retrieval time, not the quote observation time. fast_info does not provide a verified market timestamp; freshness is unknown.",
         "data_delay_note": (
             "Prices via Yahoo Finance: US exchanges are near-real-time; "
             "NSE/BSE quotes are delayed roughly 15 minutes. For to-the-second "

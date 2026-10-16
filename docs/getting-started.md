@@ -10,24 +10,41 @@ https://mcp-quant-brain.onrender.com/mcp
 
 Transport: **Streamable HTTP**.
 
-## Claude Desktop
+## Personal Codex research setup
 
-1. Open **Settings → Connectors** (or MCP integrations).
-2. **Add custom connector**.
-3. Transport: **Streamable HTTP**, URL as above.
-4. Supply the operator-issued bearer token if your client supports custom headers. Otherwise use a compatible authenticated gateway; the URL alone is insufficient.
+For Claude → Quant Brain → Codex research agents on your computer, follow the
+[research runtime guide](research-runtime.md#start-both-servers). It includes local
+secret generation, two-server startup, and a Claude Code connection that stores an
+environment-variable reference instead of your raw token. A deployed URL alone
+does not enable the optional research workers or authenticate Codex.
 
-## Claude Web (claude.ai)
+## Claude Desktop / Claude Web
 
-1. **Settings → Connectors → Add custom connector**.
-2. Streamable HTTP, same URL.
-3. Configure bearer authentication through a supported client or gateway before connecting.
+1. Open **Customize → Connectors → Add → Add custom connector**.
+2. Enter the outer server's public HTTPS `/mcp` URL.
+3. Choose **No sign in** for OAuth, since this server uses a fixed bearer token.
+4. Under **Request headers**, set `Authorization` to `Bearer <operator-issued token>`.
+5. Add the connector and enable it for the conversation.
+
+The request originates from Anthropic's cloud, including in Desktop; `localhost`
+URLs do not work as remote connectors. Local Desktop stdio servers are a separate
+mechanism. [Official connector instructions](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
 
 ## Claude Code (CLI)
 
-```bash
-claude mcp add quant-brain --transport http https://mcp-quant-brain.onrender.com/mcp
+Load your operator-issued token into `QUANT_CLIENT_TOKEN` from a local secret
+store, then use a literal variable reference:
+
+```sh
+claude mcp add-json --scope user quant-brain '{"type":"http","url":"https://mcp-quant-brain.onrender.com/mcp","headers":{"Authorization":"Bearer ${QUANT_CLIENT_TOKEN}"}}'
+claude mcp list
+claude
 ```
+
+Keep the JSON single-quoted, and launch Claude with that environment variable set.
+For the local research setup, use `http://127.0.0.1:8000/mcp` instead of the hosted
+URL. Check `/mcp` inside Claude to confirm connection.
+[Official Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
 
 ## Other MCP clients
 

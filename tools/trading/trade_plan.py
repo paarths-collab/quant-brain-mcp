@@ -58,8 +58,8 @@ def compute_trade_plan(
         risk_pct = float(risk_pct)
     except (TypeError, ValueError):
         return {"error": "equity and risk_pct must be numbers."}
-    if equity <= 0:
-        return {"error": "equity must be positive."}
+    if not math.isfinite(equity) or equity <= 0:
+        return {"error": "equity must be finite and positive."}
     if not (0 < risk_pct <= MAX_RISK_PCT):
         return {"error": f"risk_pct must be between 0 and {MAX_RISK_PCT} (percent of equity risked)."}
 
@@ -70,6 +70,21 @@ def compute_trade_plan(
                 f"daily bars, got {0 if df is None else len(df)}."
             )
         }
+
+    required = ["Open", "High", "Low", "Close", "Volume"]
+    if any(column not in df.columns for column in required):
+        return {"error": "History must include Open, High, Low, Close and Volume."}
+    try:
+        values = df[required].to_numpy(dtype=float)
+    except (TypeError, ValueError):
+        return {"error": "History must contain numeric OHLCV values."}
+    if not np.isfinite(values).all() or (values[:, :4] <= 0).any() or (values[:, 4] < 0).any():
+        return {"error": "History must contain finite, positive prices and nonnegative volume."}
+    df = pd.DataFrame(values, index=df.index, columns=required)
+    if (df["High"] < df["Low"]).any():
+        return {"error": "History contains inconsistent OHLC price ranges."}
+    if not df.index.is_monotonic_increasing or not df.index.is_unique:
+        return {"error": "History must have unique chronological observations."}
 
     close = float(df["Close"].iloc[-1])
     atr_series = _atr(df)
@@ -96,12 +111,23 @@ def compute_trade_plan(
     if stop_distance <= 0 or not math.isfinite(stop_distance):
         return {"error": "Could not derive a valid stop distance from this history."}
 
-    risk_amount = equity * risk_pct / 100.0
-    shares = int(risk_amount // stop_distance)
+    stop_basis = "swing" if stop == swing_stop else "atr"
+    # Size using the exact prices shown to the user, so rounding cannot increase
+    # the displayed maximum loss past the requested risk budget.
+    entry, stop = round(entry, 2), round(stop, 2)
+    stop_distance = round(abs(entry - stop), 2)
+    if entry <= 0 or stop <= 0 or stop_distance <= 0:
+        return {"error": "Entry and stop must remain positive and distinct at price precision."}
+    risk_amount = equity * (risk_pct / 100.0)
+    risk_shares = risk_amount / stop_distance
+    affordable_shares = equity / entry
+    if not math.isfinite(risk_shares) or not math.isfinite(affordable_shares):
+        return {"error": "Position sizing exceeds supported numeric precision."}
+    shares = math.floor(risk_shares)
 
     note = None
     size_capped_by_equity = False
-    max_affordable = int(equity // entry)
+    max_affordable = math.floor(affordable_shares)
     if shares > max_affordable:
         shares = max_affordable
         size_capped_by_equity = True
@@ -127,10 +153,6 @@ def compute_trade_plan(
             "risk_budget": round(risk_amount, 2),
         }
 
-    # Round once, then derive every dependent number from the ROUNDED values so
-    # the plan is internally consistent when a user re-checks the arithmetic.
-    stop_distance = round(stop_distance, 2)
-
     sign = 1 if direction == "long" else -1
     targets = {
         f"{k}R": round(entry + sign * k * stop_distance, 2) for k in (1, 2, 3)
@@ -148,7 +170,7 @@ def compute_trade_plan(
         "currency": currency,
         "entry": round(entry, 2),
         "stop": round(stop, 2),
-        "stop_basis": "swing" if (direction == "long" and stop == swing_stop) or (direction == "short" and stop == swing_stop) else "atr",
+        "stop_basis": stop_basis,
         "stop_distance": stop_distance,
         "stop_distance_atr": round(stop_distance / atr, 2),
         "atr_14": round(atr, 2),
