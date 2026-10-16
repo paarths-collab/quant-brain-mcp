@@ -4,6 +4,12 @@ Claude calls the outer research MCP. Its background worker starts bounded Codex
 specialist turns. Those turns use live web search and a separate internal MCP
 allowlist; they cannot recursively start research jobs.
 
+This guide covers the current six-role NSE workflow. See the [agent and tool map](agents-and-tools.md)
+for exact tools and permissions. To run it continuously on a remote host, follow
+the [VPS deployment design](vps-deployment.md), including on-host login and persistent
+services. The [global research roadmap](global-research-roadmap.md) describes future
+browser access, additional specialists, and broader market research.
+
 Install the optional runtime using Python 3.12:
 
 ```sh

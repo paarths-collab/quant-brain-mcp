@@ -1,8 +1,13 @@
-# Architecture and methodology
+# Current and target architecture
 
 Quant Brain is a Python MCP server for market data, calculations and personal Indian-equity research. A client such as Claude can call individual tools or request a background investigation. The research service runs bounded Codex specialist turns, stores a report, and returns it to the client for interpretation. It does not place orders.
 
-For installation, authentication and Claude connection commands, see the [research runtime guide](research-runtime.md). For hosted HTTP configuration, see [deployment](deployment.md).
+For installation, authentication and Claude connection commands, see the [research runtime guide](research-runtime.md). For hosted HTTP configuration, see [deployment](deployment.md) and the [VPS deployment design](vps-deployment.md).
+
+Sections through the repository map describe the implementation today. The
+[target global research architecture](#target-global-research-architecture) at the
+end describes proposed extensions. It does not change the current tool schemas,
+supported research markets, or runtime permissions.
 
 ## System architecture
 
@@ -14,7 +19,7 @@ flowchart TB
         Public["29 public MCP tools<br/>25 analysis/alert tools + 4 research tools"]
         Jobs["Research service<br/>one job worker and bounded queue"]
     end
-    subgraph Local["Local research runtime"]
+    subgraph Local["Same-host research runtime: workstation or VPS"]
         Codex["Codex SDK specialist turns<br/>selected local sign-in profile"]
         Internal["Internal MCP: internal_app:app<br/>loopback port 8001 · separate bearer token<br/>21 allowed analysis tools"]
         SQLite[("SQLite<br/>jobs, progress events, reports")]
@@ -42,6 +47,9 @@ The two MCP surfaces use the same calculation implementations. The internal surf
 The outer server uses FastMCP's stateless HTTP transport. Research jobs are independent of individual HTTP requests: reconnecting or polling does not end a job. SQLite retains completed reports, but an interrupted job is marked failed on recovery; it is not resumed from its last agent turn.
 
 ## Research agents and bounded workflow
+
+The [agent and tool map](agents-and-tools.md) lists exact role IDs, tool names,
+inputs/outputs, and the distinction between intended use and enforced access.
 
 The agents are roles implemented by separate Codex turns, not six permanently running services. Python controls their ordering and budgets. Each turn uses a temporary working directory and an ephemeral Codex thread. Model selection is configurable with `QUANT_CODEX_MODEL`; an unset value uses the runtime default.
 
@@ -214,3 +222,131 @@ docs/                      Setup, API, architecture and operational guidance
 ```
 
 The implementation is a single-host research system. Distributed job scheduling, automatic crash resumption, independently attested claim provenance, guaranteed real-time exchange data and order execution are outside its current scope. Test outcomes document tested behavior; they do not remove these limitations.
+
+## Target global research architecture
+
+Status: proposed design. Keep the Python calculation engines and MCP interface,
+then add provider contracts, isolated research workers, and evidence storage in
+stages. The current single-host system remains the starting point; no new
+orchestration framework or distributed queue has been selected or implemented.
+
+```mermaid
+flowchart TB
+    Client["Claude / other MCP clients / optional dashboard"] --> Gateway["Authenticated MCP and job API"]
+    Gateway --> Direct["Direct calculation path"]
+    Gateway --> Planner["Task planner and bounded scheduler"]
+    subgraph Specialists["Independent tasks run concurrently when needed"]
+        Filing["Filing researcher"]
+        Quant["Quant analyst"]
+        Val["Valuation analyst"]
+        Macro["Macro and sector analyst"]
+        Forensic["Forensic analyst"]
+        Portfolio["Portfolio analyst"]
+    end
+    Planner --> Specialists
+    Filing --> Browser["Isolated browser and document worker"]
+    Forensic --> Browser
+    Specialists --> Tools["Restricted calculation and retrieval tools"]
+    Direct --> Tools
+    Tools --> Gate["Instrument resolution and data quality checks"]
+    Gate --> Providers["Market, disclosure and macro adapters"]
+    Browser --> Evidence[("Source artifacts and evidence records")]
+    Tools --> Evidence
+    Specialists --> Claims["Claims linked to evidence and calculations"]
+    Evidence --> Validate["Deterministic validation"]
+    Claims --> Validate
+    Validate --> Review["Skeptic and auditor"]
+    Review -->|"Targeted correction within budget"| Planner
+    Review --> Synthesis["Synthesis with unresolved issues"]
+    Synthesis --> Reports[("Reports and thesis history")]
+    Reports --> Client
+    Reports --> Monitor["Scheduled change detection"]
+    Monitor -->|"Material change"| Planner
+```
+
+### Global instrument and observation contracts
+
+Resolve a security to a stable instrument identity plus exchange, listing, and
+currency before retrieving data. Preserve provider symbols as mappings rather
+than universal identifiers. Apply exchange calendars and time zones to session
+boundaries, closed markets, and extended hours.
+
+Each observation should retain its source, provider coverage, market timestamp,
+retrieval timestamp, interval, currency/unit, adjustment policy, and freshness
+assessment. Financial observations additionally need reporting period,
+publication/availability dates, consolidated or standalone basis, and restatement
+version. Missing timestamps remain unknown; a fallback provider must disclose
+changed coverage or delay. Minute-bar tools require interval-aware calculations,
+not merely a new parameter on formulas that assume daily observations.
+
+Implement India and US adapters first, then additional markets against the same
+contracts. Account entitlements and redistribution permissions belong to each
+adapter's configuration and documentation. See [candidate data sources](global-research-roadmap.md#global-market-foundation).
+
+### Browser and document boundary
+
+Use APIs first, direct document parsing second, and browser interaction when a
+site requires it. The browser worker should have an isolated session, narrowly
+scoped navigation/extraction operations, resource limits, and controlled download
+storage. Block access to local/private network services and keep Codex profiles,
+broker credentials, and user files outside its reach. Pages and downloaded files
+are untrusted evidence, not instructions to execute or a reason to expand access.
+
+Return source URL, document and retrieval dates, page/section references, extracted
+passages, and artifact identifiers where retention is permitted. A document hash
+helps detect changes; it does not prove the document's truth. Browser research
+must not masquerade as an exchange-grade streaming quote source. These controls
+need implementation and adversarial testing before enabling browser access.
+
+### Planning and parallel execution
+
+The lead selects only the specialists needed for a question. Filing, quantitative,
+valuation, macro, forensic, and portfolio tasks may run concurrently when their
+inputs are independent. A valuation task that needs extracted statements waits
+for that extraction. Skeptical review follows findings; targeted corrections can
+reopen specific tasks within a shared budget.
+
+Simple quote and calculation requests bypass the research team. The proposed
+scheduler needs bounded per-owner/global concurrency, provider rate limits,
+cancellation, retry policies, checkpointed progress, and time/cost accounting.
+Resumption and multi-job parallelism are future work; the current worker executes
+one job at a time and fails interrupted jobs on restart.
+
+### Evidence and verification contract
+
+Store a claim's supporting artifact or observation IDs, exact passage or numeric
+inputs, calculation method/version, objections, and verification status. Mark
+results as sourced, calculated, inferred, or unresolved. Deterministic checks
+should validate units, periods, arithmetic, freshness, and evidence references;
+models assess interpretation and competing explanations.
+
+A critic must identify the challenged claim and a test that could resolve it.
+Agreement between models is not independent verification. Review exhaustion
+produces a report with unresolved issues rather than automatic acceptance.
+Current SDK traces remain useful execution records but cannot substitute for
+the proposed links between claims and captured results.
+
+### Memory and ongoing research
+
+Thesis history should preserve conclusions, assumptions, supporting evidence,
+invalidation conditions, and next review events. Change detection should trigger
+focused work only when material evidence changes, with deduplication and an
+explicit notification destination. Saved reports and existing price-alert rows
+do not yet provide this behavior.
+
+Historical replay must enforce information availability at the selected time,
+including restatements and delistings. Portfolio scenarios must state shocks,
+currency conversion, exposure assumptions, and limitations. Neither capability
+is supplied by the current portfolio optimizer alone.
+
+### Delivery and acceptance
+
+Ship provider contracts and freshness checks before adding more analyst roles.
+Evaluate instrument resolution, extraction, citation support, reproducible
+calculations, leakage, and failure recovery. Measure latency and cost, and publish
+failure cases alongside successes. See the [delivery sequence and evaluation plan](global-research-roadmap.md#recommended-delivery-order).
+
+User-selected models, a credential-free demo, provider plugins, packaged
+installation, and an evidence dashboard are planned adoption improvements. The
+current runtime uses Codex; a generic model-provider interface is not implemented.
+Order execution is outside both the current system and this research roadmap.

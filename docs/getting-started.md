@@ -2,13 +2,25 @@
 
 Hosted connections require an operator-issued bearer token. Use a client with custom Authorization-header support; this server does not provide an OAuth login flow. See [deployment configuration](deployment.md).
 
-## The URL
+## Choose your endpoint
+
+For a personal VPS, use your configured public URL, such as
+`https://quant.example.com/mcp`, after completing the [VPS setup](vps-deployment.md).
+Replace the Render URL in the examples below with that URL. The example domain
+is a placeholder, not a deployed service.
+
+The existing Render address is:
 
 ```text
 https://mcp-quant-brain.onrender.com/mcp
 ```
 
 Transport: **Streamable HTTP**.
+
+Its deployed revision, authentication, and optional research configuration need
+separate verification. The checked-in Render configuration installs the base
+market server; it does not provision Codex research. `/mcp` is a protocol endpoint,
+not a webpage or dashboard.
 
 ## Personal Codex research setup
 

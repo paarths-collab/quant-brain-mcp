@@ -2,6 +2,11 @@
 
 The public MCP exposes **29 tools**: 25 analysis/alert/chart tools and four research job tools. The internal Codex agents receive only 21 read-only analysis tools; they cannot start research jobs recursively or manage alerts. Parameters marked **required** must be supplied.
 
+For which agents use these tools, see the [agent and tool map](agents-and-tools.md).
+All six implemented roles share the same internal allowlist. The proposed browser,
+filing, broker-feed, memory, and scenario capabilities are roadmap work, not extra
+tools in this reference.
+
 See [Architecture](architecture.md) for the system boundaries and [Research runtime](research-runtime.md) for setup and the Claude connection. HTTP calls require a configured bearer token. Research and alert records are scoped to the authenticated owner; there is no owner parameter to spoof.
 
 Common parameter: `period` — history window. One of `1d` `5d` `1mo` `3mo` `6mo` `1y` `2y` `5y` `10y` `ytd` `max`. Default `2y` unless noted.

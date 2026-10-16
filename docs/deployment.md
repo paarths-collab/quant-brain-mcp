@@ -4,6 +4,12 @@ This revision requires authenticated HTTP access. It does not change an existing
 
 ## Choose a deployment mode
 
+For personal research on Hostinger or another persistent Linux host, use the
+[VPS deployment design](vps-deployment.md): supervised outer/internal services,
+on-host Codex sign-in, durable storage, and HTTPS ingress. This is separate from
+the [proposed global architecture](architecture.md#target-global-research-architecture);
+deploying the current code does not enable browser workers or broker feeds.
+
 | Mode | Processes and dependencies | Intended use |
 |---|---|---|
 | Market tools only | Outer HTTP server, base Python dependencies; PostgreSQL for alerts/telemetry | Authenticated quotes, calculations, charts, and backtests |
@@ -31,6 +37,11 @@ before using a host with an ephemeral filesystem. Do not share a research databa
 between multiple outer workers: the service deliberately holds an exclusive lock.
 
 ## Configuration
+
+The complete environment reference is [.env.example](../.env.example). It contains
+no real secrets and is not loaded automatically. The [VPS installer](../scripts/setup-personal-vps.sh)
+generates private exported server/client configuration files outside the checkout;
+optional settings can be edited there before restarting the services.
 
 - Python 3.12; install the tested `requirements.lock` and provision Chrome for Kaleido image export (see README).
 - `MCP_API_KEYS`: JSON mapping stable, non-personal owner IDs to lowercase SHA-256 digests of random bearer tokens. Generate at least 32 random bytes per token with a secure secrets generator. Supply the raw token only to its intended client through a secret manager, and store its digest in the server configuration. Never commit either value. Rotate a token by replacing its digest while retaining the owner ID, then restart workers.
