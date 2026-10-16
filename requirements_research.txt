@@ -2,3 +2,6 @@
 -r requirements.txt
 openai-codex==0.163.0
 openai-codex-cli-bin==0.163.0
+
+# Bounded official filing text extraction.
+pypdf==6.21.0

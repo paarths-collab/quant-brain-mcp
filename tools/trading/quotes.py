@@ -1,10 +1,4 @@
-"""Delayed-quote snapshots via yfinance fast_info.
-
-Data honesty: Yahoo quotes are near-real-time for US exchanges but ~15
-minutes delayed for NSE/BSE. Every response carries an `as_of` timestamp and
-an explicit delay note -- traders forgive disclosed delay, never undisclosed
-staleness.
-"""
+"""Provider snapshots with retrieval times, never an unverified live-price claim."""
 
 from __future__ import annotations
 
@@ -117,8 +111,10 @@ def get_quotes(tickers: list[str]) -> dict:
         "freshness_status": "unknown",
         "timestamp_note": "as_of/fetched_at records retrieval time, not the quote observation time. fast_info does not provide a verified market timestamp; freshness is unknown.",
         "data_delay_note": (
-            "Prices via Yahoo Finance: US exchanges are near-real-time; "
-            "NSE/BSE quotes are delayed roughly 15 minutes. For to-the-second "
-            "Indian prices during market hours, cross-check with a live source."
+            "Prices via Yahoo Finance may be delayed (often around 15 minutes for "
+            "Indian exchange feeds), cached, or from a previous session. Actual "
+            "delay is not measured here for any exchange. Do not call this a "
+            "verified live price or official close; use a timestamped exchange "
+            "or broker feed when that is required."
         ),
     }

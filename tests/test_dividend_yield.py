@@ -71,11 +71,12 @@ def test_all_three_dividend_fields_agree():
     assert abs(deep_pct - top_level) < 0.01
 
 
-def test_zero_dividend_stock_does_not_crash():
+def test_missing_dividend_is_not_mislabeled_zero():
     mock_ticker = MagicMock()
     mock_ticker.info = _fake_info(dividend_yield=None)
     with patch("yfinance.Ticker", return_value=mock_ticker), patch(
         "tools.intelligence.company_profile.fetch_data", return_value=(_fake_df(), None)
     ):
         result = get_company_info("TSLA")
-    assert result["fundamentals"]["Dividend_Yield"] == "0.00%"
+    assert result["fundamentals"]["Dividend_Yield"] is None
+    assert result["deep_fundamentals"]["Dividend_Yield"] is None

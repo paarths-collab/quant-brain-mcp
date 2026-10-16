@@ -7,5 +7,5 @@ def get_donchian(df, length=20):
     WHEN TO USE: Trend following (Turtle Trading strategy).
     MARKET CONDITION: Trending markets. Buy when price breaks the upper channel.
     """
-    res = ta.donchian(df["High"], df["Low"], length=length)
+    res = ta.donchian(df["High"], df["Low"], lower_length=length, upper_length=length)
     return res.tail(10).to_dict()

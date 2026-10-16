@@ -55,12 +55,37 @@ def _execution_events(result) -> list[dict]:
                 continue
             status = getattr(item, "status", None)
             status = getattr(status, "value", status)
+            tool_result = getattr(item, "result", None)
+            payload = getattr(tool_result, "structured_content", None)
+            has_payload_error = _payload_has_error(payload)
+            for block in getattr(tool_result, "content", ()):
+                text = block.get("text") if isinstance(block, dict) else getattr(block, "text", None)
+                if isinstance(text, str):
+                    try:
+                        has_payload_error |= _payload_has_error(json.loads(text))
+                    except (ValueError, TypeError):
+                        pass
             events.append({"type": "mcpToolCall", "server": "quant_internal", "tool": item.tool,
                            "status": status if status in {"completed", "failed", "inProgress"} else "unknown",
-                           "has_error": getattr(item, "error", None) is not None})
+                           "has_error": getattr(item, "error", None) is not None or has_payload_error})
         elif kind == "webSearch":
             events.append({"type": "webSearch"})
     return events
+
+
+def _payload_has_error(payload) -> bool:
+    """Detect tool-level failures even when the HTTP/SDK call completed.
+
+    Store only a boolean; provider messages and private tool values stay out of
+    the execution trace. Partial grouped-indicator failures count as partial work.
+    """
+    if isinstance(payload, dict):
+        if payload.get("error") or payload.get("isError") is True:
+            return True
+        return any(_payload_has_error(value) for value in payload.values())
+    if isinstance(payload, list):
+        return any(_payload_has_error(value) for value in payload)
+    return False
 
 
 class CodexResearchRuntime:

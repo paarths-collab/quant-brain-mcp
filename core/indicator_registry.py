@@ -106,6 +106,7 @@ def run_group(
     """
     from core import data_loader
     from utils.serializer import serialize_output
+    from core.indicator_metadata import history_metadata, indicator_metadata, finite_value_count
 
     spec = INDICATOR_GROUPS[group]
     available = spec["indicators"]
@@ -128,16 +129,28 @@ def run_group(
         }
 
     results: dict[str, object] = {}
+    metadata = history_metadata(df, period)
+    calculations = {}
     for key in selected:
         module_path, func_name = available[key]
         try:
-            results[key] = serialize_output(_resolve(module_path, func_name)(df))
+            func = _resolve(module_path, func_name)
+            calculations[key] = indicator_metadata(key, func)
+            results[key] = serialize_output(func(df))
+            count = finite_value_count(results[key])
+            calculations[key]["finite_output_values"] = count
+            if count == 0 and not (isinstance(results[key], dict) and "error" in results[key]):
+                results[key] = {"error": "No finite values in the returned window; insufficient history, undefined calculation, or no recent pivot."}
+            calculations[key]["status"] = "error" if isinstance(results[key], dict) and "error" in results[key] else "ok"
         except Exception as exc:
             results[key] = {"error": f"{key} failed: {exc}"}
+            calculations.setdefault(key, {})["status"] = "error"
 
     return {
         "ticker": ticker,
         "group": group,
         "indicators": results,
+        "metadata": metadata,
+        "indicator_metadata": calculations,
         "unknown_indicators": unknown,
     }

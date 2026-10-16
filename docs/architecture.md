@@ -33,6 +33,8 @@ flowchart TB
     Public -->|"start / status / report / cancel"| Jobs
     Jobs <--> SQLite
     Jobs --> Codex
+    Jobs --> Sources["Bounded official HTTPS source retrieval<br/>HTML and PDF text, hashes, explicit failures"]
+    Sources --> SQLite
     Codex --> Search
     Codex --> Internal
     Internal --> Calc
@@ -158,7 +160,7 @@ An exclusive worker lock allows one outer server worker per research database. A
 | External evidence | Role instructions treat pages, documents and tool output as untrusted evidence. Model compliance with those instructions is not a proof against prompt injection. |
 | Metrics | `/metrics/summary` has its own `METRICS_TOKEN`; `/health` is a basic public process check. Neither proves research/model readiness. |
 
-The outer `/mcp` default is 60 requests per minute per owner with four admitted requests per process. The internal surface uses 120 requests per minute and the same default concurrency limit. Both limit request bodies to 1 MiB and body reads to 15 seconds. Browser requests with an `Origin` header require an explicit `MCP_ALLOWED_ORIGINS` match. These controls are per process, not distributed limits.
+The outer `/mcp` default is 60 requests per minute per owner with four admitted requests per process. The internal surface uses 120 requests per minute, four active calculation requests and a separate four-stream limit for long-lived GET listeners. Up to eight calculation requests may wait for at most ten seconds. Rate-limit and capacity failures have distinct messages and bounded `Retry-After` values. No entire agent turn is automatically replayed. Both limit request bodies to 1 MiB and body reads to 15 seconds. Browser requests with an `Origin` header require an explicit `MCP_ALLOWED_ORIGINS` match. These controls are per process, not distributed limits.
 
 For remote hosting, configure HTTPS and ingress restrictions as described in [deployment](deployment.md). Keep Codex profiles, runtime environment files, token material, databases and captured research outside the repository. There is no Google OAuth requirement for this local design: the outer MCP bearer credential and the Codex sign-in are separate.
 
@@ -170,6 +172,10 @@ The latest auditor's assessment bounds the final report. Missing audit support, 
 
 **Verification is model review.** `verification_basis` is explicitly `model_review`. The SDK execution trace records observed web-search events and allowed MCP call names/statuses without prompts, arguments, results or URLs. It shows which tool activity occurred, but does not bind a particular source excerpt or numeric claim to a particular retrieved result. A tool URN identifies a tool; it does not prove execution or factual correctness. Dates and excerpts supplied by a model also require independent checking. Successful tests and agent agreement do not establish investment accuracy.
 
+Before each auditor pass, the server retrieves up to six unique official sources per job, two at a time. The initial allowlist covers NSE, BSE, SEBI, RBI, TCS, Infosys, Reliance and SEC domains. Retrieval validates public DNS addresses, pins the TLS connection to a checked address, and revalidates redirects. It forwards no application credentials or environment proxies. A whole-fetch worker has a 26-second deadline; network content is limited to 2 MiB. PDF parsing occurs in a separate resource-limited process (10 seconds, first 20 pages, at most 16,000 characters; CPU and Linux memory limits). Scanned PDFs requiring OCR, blocked sites, larger files and other domains remain explicit gaps. Cancellation can leave a bounded worker finishing until its deadline.
+
+`source_retrievals` retains server-owned retrieval times, document hashes, extracted text, truncation and failures separately from model-authored evidence. Explicit HTML publication metadata is labeled `publisher_metadata`; missing or conflicting dates remain null, and PDF creation dates are not treated as publication dates. Retrieved text does not establish that a claim is true. `execution_status` distinguishes `observed_calls_passed`, `partial_failure` and `not_observed`; tool payload errors count even when transport succeeds. Failed calls or failed cited retrievals lower confidence to low and prevent a supported outcome. Unknown source dates and unavailable official text prevent high confidence. Server-enforced summary wording reflects these downgrades; original model prose remains in `agent_findings`.
+
 ## Data and calculation conventions
 
 | Area | Convention or limitation |
@@ -177,6 +183,8 @@ The latest auditor's assessment bounds the final report. Missing audit support, 
 | Research market | 1–5 NSE symbols, normalized to `.NS`; reports identify INR and `Asia/Kolkata`. Individual analysis tools may support additional markets. |
 | Historical bars | Shared yfinance loaders request `auto_adjust=True`, incorporating dividend/split adjustments in OHLC prices. |
 | Quote freshness | `as_of` and `fetched_at` are retrieval times. The quote tool returns `market_timestamp: null` and `freshness_status: unknown`; retrieval time is not an exchange observation time. Provider delay notes are not a freshness guarantee. |
+| Profile units | Debt/equity is returned as both percent and times; legacy fields are explicitly percent. Missing metrics remain null. Provider data availability is not a calibrated confidence score. |
+| Indicator metadata | All 38 indicators disclose settings, units, engine versions, history range and adjustment. Empty recent values are explicit errors; freshness and daily-bar completeness remain unknown. |
 | Annualization | 252 trading days for the shared trading-year convention. |
 | Backtests | Inspect each response's benchmark, sample period and cost assumptions. Strategy backtests and portfolio holdout evaluation do not share identical cost models. |
 | Web search | Research evidence, not an exchange-grade live-price feed. |

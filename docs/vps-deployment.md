@@ -176,3 +176,51 @@ Before using the hosted deployment, verify:
 Back up databases with database-aware tooling, protect backups and Codex state,
 and monitor storage, memory, provider failures, and account usage. A healthy
 process or successful CI run alone does not verify this deployment.
+
+## Update an existing personal VPS
+
+Use [the pinned update script](../scripts/update-personal-vps.sh) for an existing
+installation created by `setup-personal-vps.sh`. Wait for active research jobs to
+finish first: restarting the worker interrupts jobs, which become failed and
+require explicit resubmission.
+
+At the root VPS prompt, replace `REVIEWED_COMMIT_SHA` with the full 40-character
+commit SHA you intend to deploy. Download the updater from that same revision:
+
+```sh
+QUANT_RELEASE=REVIEWED_COMMIT_SHA
+curl --fail --location --max-time 60 \
+  "https://raw.githubusercontent.com/paarths-collab/quant-brain-mcp/$QUANT_RELEASE/scripts/update-personal-vps.sh" \
+  --output /root/update-personal-vps.sh &&
+bash /root/update-personal-vps.sh "$QUANT_RELEASE"
+```
+
+The updater checks the repository origin, clean `main` checkout, running services,
+and fast-forward ancestry. It prepares a separate virtual environment at a stable
+path and runs the offline test suite against an archive of the target revision
+before stopping either application service. Existing credentials are not loaded
+into the test process. A failed preparation leaves the running version alone.
+Allow extra disk space and time for a second dependency installation. Optional
+PostgreSQL integration tests remain skipped without a dedicated test database.
+
+After preparation, it stops the outer service, then the private service, updates
+code and the `.venv` link, and starts the private service before the outer service.
+It checks authenticated MCP initialization and tool discovery on both loopback
+endpoints. Those checks do not exercise live market providers, Codex research,
+chart rendering, the public HTTPS route, or Claude itself; rerun the acceptance
+checks above after an update.
+
+The old commit and environment are retained under the private
+`/home/quant/.local/share/quant-brain/releases/` directory. On an activation failure,
+the updater attempts to restore them only if the checkout remains clean; if edits
+appeared, it stops rather than overwriting them. It prints the recovery directory
+for inspection. A restored version still requires a health check. Failed preparation
+may leave a staging directory or virtual environment for diagnosis. Remove old
+release environments only after confirming which `.venv` target is active and
+which release you need for rollback.
+
+The update preserves the runtime configuration, client tokens, Codex profile,
+research database, systemd unit definitions, Traefik, DNS, and firewall settings.
+It does not perform database migrations or restore database state on rollback;
+review migration requirements separately before using it for a future release
+that changes persistent schemas. No OS packages are upgraded.

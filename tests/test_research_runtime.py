@@ -216,6 +216,26 @@ def test_execution_events_only_capture_safe_observed_metadata():
     ]
 
 
+def test_completed_transport_with_nested_tool_error_is_not_all_pass():
+    from core.research_runtime import _execution_events
+    item = SimpleNamespace(type="mcpToolCall", server="quant_internal", tool="analyze_trend",
+                           status="completed", error=None,
+                           result=SimpleNamespace(structured_content={"indicators": {
+                               "zigzag": {"error": "private provider detail"}}}, content=[]))
+    events = _execution_events(SimpleNamespace(items=[item]))
+    assert events[0]["has_error"] is True
+    assert "private" not in str(events)
+
+
+def test_completed_transport_json_text_error_is_detected():
+    from core.research_runtime import _execution_events
+    item = SimpleNamespace(type="mcpToolCall", server="quant_internal", tool="get_quote",
+                           status="completed", error=None,
+                           result=SimpleNamespace(structured_content=None,
+                               content=[{"type": "text", "text": '{"quotes":{"X":{"error":"missing"}}}'}]))
+    assert _execution_events(SimpleNamespace(items=[item]))[0]["has_error"] is True
+
+
 @pytest.mark.anyio
 async def test_runtime_executions_are_separate_from_model_json(runtime):
     runner, _ = runtime

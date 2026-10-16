@@ -172,3 +172,10 @@ Quick research uses company and quant analysts, an auditor, and a synthesizer. S
 ## What still needs validation
 
 The test suite checks orchestration, schemas, citation references, owner isolation, cancellation, and HTTP polling with simulated model responses. It does not establish investment accuracy. Citations and auditor judgments are model-generated; schema validation does not prove a source was fetched or a claim is true. Free market data can be delayed or unavailable. Reports include runtime-owned execution traces (tool names and statuses, without arguments or response payloads). These establish that calls occurred, not that every claim is correct. Before relying on the product, run broader authenticated end-to-end jobs, compare calculations and claims against independent sources, and evaluate a fixed set of Indian-stock questions. Preserve source timestamps and unresolved disagreements in the final answer.
+
+
+## Source and execution quality
+
+Reports now include `execution_status` and `source_retrievals`. The server attempts bounded retrieval of allowlisted official HTML and PDF sources before the auditor reviews them. Records distinguish extracted source text from model-authored excerpts; failures, missing dates and truncation stay visible. A completed job with failed MCP calls is `partial_failure`, not an all-pass result. Failed calls or failed cited retrievals lower confidence and prevent a supported outcome. A source site may still deny automated retrieval; this is reported rather than bypassed or presented as verified evidence.
+
+The private MCP admits four calculation requests plus four independent GET streams, with eight bounded waiting slots for calculation bursts. Public admission limits remain unchanged. See [architecture](architecture.md#evidence-and-report-contract) for the exact retrieval scope and limits.

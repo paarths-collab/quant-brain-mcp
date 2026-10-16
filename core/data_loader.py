@@ -1,4 +1,5 @@
 import warnings
+from datetime import datetime, timezone
 
 import yfinance as yf
 import pandas as pd
@@ -60,6 +61,7 @@ def fetch_stock_data(ticker: str, period: str = "2y", interval: str = "1d"):
 		if isinstance(data.columns, pd.MultiIndex):
 			data.columns = data.columns.get_level_values(0)
 
+		data.attrs.update(resolved_ticker=ticker, retrieved_at=datetime.now(timezone.utc).isoformat())
 		return data
 	except Exception as e:
 		return {"error": f"Failed to fetch data for {ticker}: {str(e)}"}

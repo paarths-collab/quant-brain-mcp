@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime, timezone
+import math
 
 import yfinance as yf
 import pandas as pd
@@ -37,38 +39,48 @@ def _normalize_ticker(ticker: Any) -> str:
     return str(ticker).strip().upper()
 
 
-def get_deep_fundamentals(ticker: str) -> dict[str, Any]:
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+        return number if math.isfinite(number) else None
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _formatted(value: Any, suffix: str = "", multiplier: float = 1) -> str | None:
+    number = _number(value)
+    return f"{number * multiplier:.2f}{suffix}" if number is not None else None
+
+
+def get_deep_fundamentals(ticker: str, *, info: dict | None = None) -> dict[str, Any]:
     """Fetch deep fundamentals from yfinance for a single ticker."""
     normalized = _normalize_ticker(ticker)
-    t = yf.Ticker(normalized)
-    info = t.info or {}
-
-    def _num(key: str, default: float = 0.0) -> float:
-        val = info.get(key, default)
-        try:
-            return float(val) if val is not None else float(default)
-        except Exception:
-            return float(default)
-
-    market_cap = _num("marketCap", 0.0)
-    if normalized.endswith((".NS", ".BO")):
+    if info is None:
+        info = yf.Ticker(normalized).info or {}
+    market_cap = _number(info.get("marketCap"))
+    if market_cap is None:
+        market_cap_fmt = None
+    elif info.get("currency") == "INR" or normalized.endswith((".NS", ".BO")):
         market_cap_fmt = f"₹{market_cap / 1e7:.2f} Cr"
     else:
-        market_cap_fmt = f"${market_cap / 1e9:.2f} B"
+        market_cap_fmt = f"{market_cap / 1e9:.2f} B {info.get('currency') or '(currency unknown)'}"
 
     return {
         "Company": info.get("longName") or info.get("shortName") or normalized,
         "Sector": info.get("sector"),
-        "PE_Ratio": round(_num("trailingPE"), 2),
-        "PB_Ratio": round(_num("priceToBook"), 2),
-        "Debt_to_Equity": round(_num("debtToEquity"), 2),
-        "ROE": f"{_num('returnOnEquity') * 100:.2f}%",
+        "PE_Ratio": _number(info.get("trailingPE")),
+        "PB_Ratio": _number(info.get("priceToBook")),
+        "Debt_to_Equity": _number(info.get("debtToEquity")),
+        "Debt_to_Equity_Unit": "percent",
+        "ROE": _formatted(info.get("returnOnEquity"), "%", 100),
         "Market_Cap": market_cap_fmt,
         # yfinance's dividendYield already returns a percent value (2.42 == 2.42%),
         # not a fraction -- do not multiply by 100 again (bug: previously showed
         # "242.00%" for a stock yielding 2.42%).
-        "Dividend_Yield": f"{_num('dividendYield'):.2f}%",
-        "Short_Ratio": info.get("shortRatio"),
+        "Dividend_Yield": _formatted(info.get("dividendYield"), "%"),
+        "Short_Ratio": _number(info.get("shortRatio")),
     }
 
 
@@ -78,36 +90,39 @@ def get_company_info(ticker: Any) -> dict[str, Any]:
     if not normalized:
         return {"error": "ticker is required and must be a non-empty string", "ticker": ticker}
 
-    base_df, err = fetch_data(normalized)
-    if err:
-        return {"error": err, "ticker": normalized}
-
     try:
         t = yf.Ticker(normalized)
         info = t.info or {}
     except Exception as exc:
         return {"error": f"Failed to fetch company profile for {normalized}: {exc}", "ticker": normalized}
+    if not info:
+        return {"error": "No company profile data available", "ticker": normalized}
 
     def _pick(*keys: str, default=None):
+        numeric = {"trailingPE", "forwardPE", "marketCap", "priceToBook", "dividendYield",
+                   "returnOnEquity", "debtToEquity", "beta", "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "fullTimeEmployees"}
         for key in keys:
             value = info.get(key)
             if value not in (None, "", [], {}):
-                return value
+                return _number(value) if key in numeric else value
         return default
 
     fundamentals = {
         "Name": _pick("longName", "shortName", default=normalized),
         "PE_Ratio": _pick("trailingPE"),
         "Forward_PE": _pick("forwardPE"),
-        "Market_Cap": f"₹{(_pick('marketCap', default=0) or 0) / 1e7:.2f} Cr" if normalized.endswith((".NS", ".BO")) else _pick("marketCap"),
+        "Market_Cap": _formatted(_pick("marketCap"), " Cr INR", 1e-7) if normalized.endswith((".NS", ".BO")) else _number(_pick("marketCap")),
         # See get_deep_fundamentals: dividendYield from yfinance is already a
         # percent value, so it must not be multiplied by 100 again.
-        "Dividend_Yield": f"{(_pick('dividendYield', default=0) or 0):.2f}%",
-        "ROE": f"{((_pick('returnOnEquity', default=0) or 0) * 100):.2f}%",
-        "Debt_To_Equity": _pick("debtToEquity"),
+        "Dividend_Yield": _formatted(_pick("dividendYield"), "%"),
+        "ROE": _formatted(_pick("returnOnEquity"), "%", 100),
+        "Debt_To_Equity": _number(_pick("debtToEquity")),
+        "Debt_To_Equity_Unit": "percent",
     }
 
-    deep_fundamentals = get_deep_fundamentals(normalized)
+    deep_fundamentals = get_deep_fundamentals(normalized, info=info)
+    debt_pct = _number(_pick("debtToEquity"))
+    fetched_at = datetime.now(timezone.utc).isoformat()
 
     return {
         "ticker": normalized,
@@ -122,6 +137,19 @@ def get_company_info(ticker: Any) -> dict[str, Any]:
         "forward_pe": _pick("forwardPE"),
         "price_to_book": _pick("priceToBook"),
         "dividend_yield": _pick("dividendYield"),
+        "debt_to_equity_percent": debt_pct,
+        "debt_to_equity_ratio": debt_pct / 100 if debt_pct is not None else None,
+        "field_units": {
+            "debt_to_equity_percent": "percent (9.83 means 9.83%, not 9.83 times)",
+            "debt_to_equity_ratio": "times (debt divided by equity)",
+            "fundamentals.Debt_To_Equity": "percent",
+            "deep_fundamentals.Debt_to_Equity": "percent",
+            "dividend_yield": "percent",
+            "trailing_pe": "times; trailing earnings",
+            "forward_pe": "times; provider forward estimate, estimate date unknown",
+            "price_to_book": "times",
+            "market_cap": info.get("currency") or "unknown quote currency",
+        },
         "52_week_high": _pick("fiftyTwoWeekHigh"),
         "52_week_low": _pick("fiftyTwoWeekLow"),
         "website": _pick("website"),
@@ -132,14 +160,22 @@ def get_company_info(ticker: Any) -> dict[str, Any]:
         "deep_fundamentals": deep_fundamentals,
         "source": [
             {"name": "yfinance.Ticker.info", "ticker": normalized},
-            {"name": "yfinance historical OHLCV", "period": "2y", "interval": "1d"},
         ],
         "reproducibility": {
             "ticker": normalized,
             "source": "yfinance",
-            "window": "2y",
-            "interval": "1d",
+            "provider_fields": {"debt_to_equity_percent": "debtToEquity", "debt_to_equity_ratio": "debtToEquity / 100"},
+            "retrieved_at": fetched_at,
         },
-        "confidence": 0.92 if info else 0.55,
+        "retrieved_at": fetched_at,
+        "valuation_as_of": None,
+        "freshness_status": "unknown",
+        "confidence": None,
+        "confidence_basis": "Unverified provider snapshot; no calibrated accuracy probability is available.",
+        "warnings": [
+            "Retrieval time is not a financial reporting date or valuation observation time.",
+            "Forward estimates and valuation dates are not verified; missing values are null, not zero.",
+            "Legacy debt-to-equity fields retain the provider percent unit; use debt_to_equity_ratio for a multiple.",
+        ],
         "status": "ok",
     }

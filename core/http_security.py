@@ -10,6 +10,7 @@ from contextvars import ContextVar
 import asyncio
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -39,16 +40,65 @@ def load_api_keys() -> dict[str, str]:
         raise ValueError("MCP_API_KEYS must map unique owner IDs to unique lowercase SHA-256 token digests") from None
 
 
+class _AdmissionGate:
+    """Event-loop-local capacity with a finite waiting room and wait deadline."""
+
+    def __init__(self, capacity, max_waiting=0, wait_seconds=0):
+        self.capacity = capacity
+        self.max_waiting = max_waiting
+        self.wait_seconds = wait_seconds
+        self.active = 0
+        self.waiting = 0
+        self.changed = asyncio.Event()
+
+    async def acquire(self):
+        if self.active < self.capacity:
+            self.active += 1
+            return True
+        if self.waiting >= self.max_waiting:
+            return False
+        self.waiting += 1
+        try:
+            async with asyncio.timeout(self.wait_seconds):
+                while self.active >= self.capacity:
+                    self.changed.clear()
+                    await self.changed.wait()
+                self.active += 1
+                return True
+        except TimeoutError:
+            return False
+        finally:
+            self.waiting -= 1
+
+    def release(self):
+        self.active -= 1
+        self.changed.set()
+
+
 class SecureMCPMiddleware:
     """Fail closed if unconfigured. Limits are per process, not distributed."""
 
-    def __init__(self, app, *, keys=None, requests_per_minute=60, max_inflight=4):
+    def __init__(self, app, *, keys=None, requests_per_minute=60, max_inflight=4,
+                 max_waiting=0, wait_seconds=0, max_streams=None):
         self.app = app
         self.keys = load_api_keys() if keys is None else keys
         self.requests_per_minute = requests_per_minute
         self.max_inflight = max_inflight
-        self.inflight = 0
+        if requests_per_minute < 1 or max_inflight < 1 or max_waiting < 0:
+            raise ValueError("HTTP admission limits must be positive (waiting may be zero)")
+        if max_waiting and not 0 < wait_seconds <= 30:
+            raise ValueError("HTTP admission wait must be between 0 and 30 seconds")
+        if max_streams is not None and max_streams < 1:
+            raise ValueError("HTTP stream capacity must be positive")
+        self._calls = _AdmissionGate(max_inflight, max_waiting, wait_seconds)
+        # Only trusted internal deployments separate long-lived GET listeners.
+        # Public deployments retain the original combined four-request cap.
+        self._streams = _AdmissionGate(max_streams) if max_streams is not None else self._calls
         self.requests = defaultdict(deque)
+
+    @property
+    def inflight(self):
+        return self._calls.active + (self._streams.active if self._streams is not self._calls else 0)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope.get("path", "").rstrip("/") != "/mcp":
@@ -80,14 +130,26 @@ class SecureMCPMiddleware:
         if origin and origin.decode("latin-1") not in allowed:
             await reject(403, "Origin not allowed")
             return
-        now = time.monotonic()
         recent = self.requests[owner]
+        now = time.monotonic()
         while recent and recent[0] <= now - 60:
             recent.popleft()
-        if len(recent) >= self.requests_per_minute or self.inflight >= self.max_inflight:
-            await reject(429, "Request limit reached", {"Retry-After": "60"})
+        if len(recent) >= self.requests_per_minute:
+            retry = str(max(1, math.ceil(60 - (now - recent[0]))))
+            await reject(429, "Request rate limit reached", {"Retry-After": retry})
             return
-        # Bound memory before the MCP transport parses attacker-controlled JSON.
+        gate = self._streams if scope.get("method") == "GET" else self._calls
+        if not await gate.acquire():
+            await reject(429, "Concurrent request capacity reached", {"Retry-After": "1"})
+            return
+        try:
+            await self._serve_authenticated(scope, receive, send, owner, recent, reject)
+        finally:
+            gate.release()
+
+    async def _serve_authenticated(self, scope, receive, send, owner, recent, reject):
+        # Admission also bounds concurrent body readers, before parsing JSON.
+        headers = {k.lower(): v for k, v in scope.get("headers", [])}
         max_body = 1024 * 1024
         try:
             if int(headers.get(b"content-length", b"0")) > max_body:
@@ -125,14 +187,16 @@ class SecureMCPMiddleware:
                 replayed = True
                 return {"type": "http.request", "body": bytes(body), "more_body": False}
             return await receive()
-        if len(recent) >= self.requests_per_minute or self.inflight >= self.max_inflight:
-            await reject(429, "Request limit reached", {"Retry-After": "60"})
+        now = time.monotonic()
+        while recent and recent[0] <= now - 60:
+            recent.popleft()
+        if len(recent) >= self.requests_per_minute:
+            retry = str(max(1, math.ceil(60 - (now - recent[0]))))
+            await reject(429, "Request rate limit reached", {"Retry-After": retry})
             return
         recent.append(now)
-        self.inflight += 1
         context_token = authenticated_owner.set(owner)
         try:
             await self.app(scope, bounded_receive, send)
         finally:
             authenticated_owner.reset(context_token)
-            self.inflight -= 1

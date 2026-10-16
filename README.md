@@ -23,13 +23,15 @@ planned; they are not activated by installing the current release.
 | Markets | NSE research jobs; broader provider-supported symbols in individual tools | Exchange-aware research across India, the US, and other markets |
 | Data | Yahoo Finance history and quotes with freshness limitations | Provider adapters, broker feeds, minute candles, and freshness checks |
 | Research | Six Codex roles; company and quant analysis in parallel | Task-selected filing, valuation, macro, forensic, and portfolio specialists |
-| Web access | Live web search; browser control disabled | Isolated browser worker and document extraction |
-| Verification | Schema checks, model audit, and SDK tool traces | Claims linked to captured evidence and reproducible calculations |
+| Web access | Live web search; bounded official HTML/PDF retrieval; browser control disabled | Isolated browser worker, OCR and broader sources |
+| Verification | Schema checks, model audit, SDK tool traces, retrieved source excerpts/hashes and explicit quality gaps | Per-claim evidence matching and independently reproducible calculations |
 | Memory | Saved jobs and reports | Thesis history, material-change monitoring, and historical replay |
 | Operation | Single-host Python services; deployment configured by operator | Packaged installation, resumable jobs, provider plugins, and optional dashboard |
 
 See the [target architecture](docs/architecture.md#target-global-research-architecture)
 and [delivery roadmap](docs/global-research-roadmap.md).
+
+Recent reliability improvements include separate internal stream/calculation limits, explicit financial units, reproducibility metadata for all indicators, and report downgrades for failed calls or unavailable source documents. See [validation results](docs/testing-results.md) and the [VPS update procedure](docs/vps-deployment.md#update-an-existing-personal-vps).
 
 ## How the current version works
 
@@ -170,12 +172,13 @@ read-only tools; alerts, charts, and research orchestration are excluded.
 
 ## Validation and limits
 
-The [validated code revision](https://github.com/paarths-collab/quant-brain-mcp/commit/a8c0df1fbf5fe80f2e1a374215c818898a5f8208)
-passed **306 tests** in GitHub CI, including PostgreSQL checks, plus HTTP and PNG
-export smoke tests. Authenticated quick and deep research runs completed. The deep
-run exercised all six roles and both correction rounds, then returned a mixed
-result with moderate confidence. Read the [validation report](docs/testing-results.md)
-for the tested scope and unresolved limitations.
+The latest local reliability suite passed **379 tests**, including PostgreSQL and
+VPS updater rollback checks, plus HTTP and real PNG export smoke tests. A quick
+Codex research job completed with six successful MCP calls and five web-search
+events. Blocked source retrieval remained visible and the final report stayed
+insufficient-evidence/low-confidence. See the [validation report](docs/testing-results.md)
+for exact scope, historical results and limitations; consult CI for the published
+revision's Linux checks.
 
 - **Data freshness:** free data can be delayed or unavailable. `as_of` and
   `fetched_at` are retrieval times, not verified trade timestamps. A recent fetch

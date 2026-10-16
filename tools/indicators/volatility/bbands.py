@@ -7,5 +7,5 @@ def get_bbands(df, length=20, std=2):
     WHEN TO USE: Identifying overbought/oversold levels.
     MARKET CONDITION: Sideways/Ranging markets for reversion; Low-volatility markets for Squeeze plays.
     """
-    res = ta.bbands(df["Close"], length=length, std=std)
+    res = ta.bbands(df["Close"], length=length, lower_std=std, upper_std=std)
     return res.tail(10).to_dict()

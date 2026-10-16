@@ -216,3 +216,96 @@ def test_model_cannot_supply_execution_trace():
             return result
     with pytest.raises(ValueError, match="execution_trace"):
         asyncio.run(run_research("Investigate", runtime=Fabricated()))
+
+
+def test_failed_runtime_call_caps_quality_and_discloses_partial_execution():
+    class Optimistic(FakeRuntime):
+        async def run(self, role, prompt):
+            result = await super().run(role, prompt)
+            if role in ("auditor", "synthesizer"):
+                result["confidence"] = "high"
+            return result
+    runtime = Optimistic()
+    runtime.executions = [{"role": "quant", "tool_events": [
+        {"type": "mcpToolCall", "tool": "analyze_momentum", "status": "failed", "has_error": True},
+    ]}]
+    report = asyncio.run(run_research("Investigate", runtime=runtime))
+    assert report.execution_status == "partial_failure"
+    assert report.confidence == "low"
+    assert report.outcome == "mixed"
+    assert report.summary.startswith("Partial research")
+    assert any("not an all-pass" in warning for warning in report.warnings)
+
+
+def test_retrieval_failures_reach_auditor_and_cap_report(monkeypatch):
+    import core.research_workflow as workflow
+    async def retrieve(evidence, cache):
+        return {"company_e1": {"status": "failed", "reason": "Source HTTP 403"}}
+    monkeypatch.setattr(workflow, "retrieve_sources", retrieve)
+    class Capture(FakeRuntime):
+        audit_prompt = None
+        async def run(self, role, prompt):
+            if role == "auditor":
+                self.audit_prompt = prompt
+            return await super().run(role, prompt)
+    runtime = Capture()
+    report = asyncio.run(run_research("Investigate", runtime=runtime))
+    assert "Source HTTP 403" in runtime.audit_prompt
+    assert report.source_retrievals["company_e1"]["status"] == "failed"
+    assert report.outcome == "mixed"
+    assert report.confidence == "low"
+    assert report.execution_status == "not_observed"
+
+
+def test_missing_publication_dates_and_unfetched_sources_prevent_high_confidence():
+    class Optimistic(FakeRuntime):
+        async def run(self, role, prompt):
+            result = await super().run(role, prompt)
+            if role in ("auditor", "synthesizer"):
+                result["confidence"] = "high"
+            return result
+    report = asyncio.run(run_research("Investigate", runtime=Optimistic()))
+    assert report.confidence == "moderate"
+    assert any("Publication dates are unknown" in warning for warning in report.warnings)
+    assert report.source_retrievals["company_e1"]["status"] == "not_attempted"
+
+
+@pytest.mark.parametrize("limitation", ["correction", "tool_failure", "audit_confidence", "audit_outcome", "missing_source"])
+def test_downgraded_summary_does_not_repeat_superseded_model_conclusion(monkeypatch, limitation):
+    import core.research_workflow as workflow
+    raw_summary = "SUPPORTED WITH HIGH CONFIDENCE: an unqualified bullish conclusion."
+    async def retrieve(evidence, cache):
+        status = "not_attempted" if limitation == "missing_source" else "retrieved"
+        return {e.id: {"status": status} for e in evidence}
+    monkeypatch.setattr(workflow, "retrieve_sources", retrieve)
+
+    class Overconfident(FakeRuntime):
+        async def run(self, role, prompt):
+            result = await super().run(role, prompt)
+            if role == "company":
+                result["evidence"] = [{**EVIDENCE, "published_at": "2026-01-01T09:00:00Z"}]
+            if role in ("auditor", "synthesizer"):
+                result["confidence"] = "high"
+            if role == "auditor":
+                if limitation == "correction":
+                    result["needs_correction"] = True
+                if limitation == "audit_confidence":
+                    result["confidence"] = "low"
+                if limitation == "audit_outcome":
+                    result["outcome"] = "mixed"
+            if role == "synthesizer":
+                result["summary"] = raw_summary
+            return result
+    runtime = Overconfident()
+    if limitation == "tool_failure":
+        runtime.executions = [{"tool_events": [{"type": "mcpToolCall", "status": "completed", "has_error": True}]}]
+    report = asyncio.run(run_research("Investigate", depth="quick", runtime=runtime))
+    assert raw_summary not in report.summary
+    assert "confidence: " + report.confidence in report.summary
+    assert report.agent_findings["synthesizer"].summary == raw_summary
+    if limitation == "correction":
+        assert report.summary.startswith("Insufficient evidence")
+    elif limitation == "tool_failure":
+        assert report.summary.startswith("Partial research")
+    else:
+        assert "outcome: " + report.outcome in report.summary
