@@ -67,8 +67,14 @@ class ResearchService:
         tickers = self.normalize_tickers(tickers)
         if self.runtime_factory is None:
             from core.research_runtime import CodexResearchRuntime
-            # Validate configuration before accepting work; model sign-in is
-            # verified by the SDK in the worker, never by reading token files.
+            # Validate configuration before accepting work: constructing the
+            # runtime checks the internal MCP URL and role timeout without any
+            # I/O. Model sign-in is verified by the SDK in the worker, never by
+            # reading token files.
+            try:
+                CodexResearchRuntime()
+            except ValueError as exc:
+                raise ValueError(f"Research runtime is misconfigured: {exc}") from None
             runtime_factory = CodexResearchRuntime
         else:
             runtime_factory = self.runtime_factory
@@ -100,7 +106,13 @@ class ResearchService:
                 if job['status'] == 'cancelled':
                     return
                 self.store.update(owner, job_id, status='running', stage='initializing')
-                runtime = factory()
+                try:
+                    runtime = factory()
+                except ValueError as exc:
+                    # Constructor errors are local configuration messages
+                    # (no provider output), safe and actionable to display.
+                    from core.research_runtime import ResearchConfigurationError
+                    raise ResearchConfigurationError(f"Research runtime is misconfigured: {exc}") from None
                 async def event(role, payload):
                     if self.store.get(owner, job_id)['status'] == 'cancelled':
                         raise asyncio.CancelledError

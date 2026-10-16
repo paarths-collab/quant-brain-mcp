@@ -5,18 +5,24 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from core.data_loader import fetch_data
+from core.data_loader import fetch_data, period_covering
 
 
-def calculate_alpha_metrics(stock_df: pd.DataFrame, benchmark_ticker: str = "^NSEI") -> dict:
+def calculate_alpha_metrics(
+    stock_df: pd.DataFrame, benchmark_ticker: str = "^NSEI", bench_df: pd.DataFrame | None = None
+) -> dict:
     """Institutional alpha/beta decomposition against a benchmark index.
 
     Alpha = annualized stock return - beta * annualized benchmark return
+
+    The benchmark window covers `stock_df` unless `bench_df` is supplied.
     """
     if "Close" not in stock_df.columns:
         raise ValueError("Stock dataframe must contain a 'Close' column")
 
-    bench_df, err = fetch_data(benchmark_ticker, period="2y")
+    err = None
+    if bench_df is None:
+        bench_df, err = fetch_data(benchmark_ticker, period=period_covering(stock_df.index))
     if err or bench_df is None or bench_df.empty:
         return {"error": f"Benchmark data unavailable for {benchmark_ticker}: {err}"}
 

@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from core.data_loader import fetch_data
+from core.data_loader import VALID_PERIODS, fetch_data
 from core.sector_data import INDIAN_SECTORS, US_SECTORS
 from tools.intelligence.alpha_engine import calculate_alpha_metrics
 from tools.intelligence.engine import get_quant_analysis
@@ -13,30 +13,35 @@ from tools.intelligence.engine import get_quant_analysis
 _BREAKOUT_DESCRIPTION = "Close above 20D high with positive regime and risk-adjusted confirmation"
 
 
+# Shorthand accepted in addition to every canonical yfinance period. Every
+# alias must map to a period the data loader accepts.
 _TIMEFRAME_ALIASES = {
     "1m": "1mo",
-    "2m": "2mo",
     "3m": "3mo",
     "6m": "6mo",
-    "1y": "1y",
     "1yr": "1y",
     "12m": "1y",
-    "2y": "2y",
     "24m": "2y",
-    "3y": "3y",
-    "36m": "3y",
-    "5y": "5y",
     "60m": "5y",
-    "10y": "10y",
     "120m": "10y",
 }
 
 
 def _normalize_timeframe(timeframe: str | None, default: str = "1y") -> str:
+    """Map a timeframe to a supported period, rejecting anything else.
+
+    Unknown values used to fall back silently to the default, so canonical
+    inputs such as "6mo" or "ytd" were analysed as one year without notice.
+    """
     raw = (timeframe or "").strip().lower()
     if not raw:
         return default
-    return _TIMEFRAME_ALIASES.get(raw, default)
+    if raw in VALID_PERIODS:
+        return raw
+    if raw in _TIMEFRAME_ALIASES:
+        return _TIMEFRAME_ALIASES[raw]
+    accepted = sorted(VALID_PERIODS | set(_TIMEFRAME_ALIASES))
+    raise ValueError(f"Unsupported timeframe '{timeframe}'. Use one of: {', '.join(accepted)}.")
 
 
 def _pick_universe(market: str) -> dict[str, dict[str, Any]]:
@@ -236,7 +241,6 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
     if not corr_df.empty and len(corr_df.columns) >= 2:
         corr_matrix = corr_df.pct_change(fill_method=None).dropna().corr().round(3).to_dict()
 
-    confidence = min(0.95, 0.55 + len(analytics) * 0.04)
     return {
         "market": market,
         "timeframe": selected_timeframe,
@@ -244,7 +248,16 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
         "best_sector": best_sector,
         "correlation_matrix": corr_matrix,
         "data_trace": data_trace,
-        "confidence": round(confidence, 2),
+        "data_coverage": {
+            "sectors_analyzed": len(analytics),
+            "sectors_requested": len(universe),
+            "sectors_stale": len(stale_sectors),
+        },
+        "confidence": None,
+        "confidence_basis": (
+            "No calibrated confidence is available; rankings are descriptive. "
+            "See data_coverage and data_trace for input completeness."
+        ),
         "stale_sectors": stale_sectors,
         "data_freshness_note": (
             f"{len(stale_sectors)} of {len(analytics)} sector indices are more than "
@@ -255,6 +268,36 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
         if stale_sectors
         else None,
     }
+
+
+def _is_breakout(stock_df) -> bool:
+    close = stock_df["Close"] if stock_df is not None and not stock_df.empty else None
+    if close is None or len(close) < 20:
+        return False
+    return bool(close.iloc[-1] >= close.tail(20).max())
+
+
+# Confirmation thresholds for the stated breakout strategy.
+CONFIRM_MIN_SHARPE = 1.0
+CONFIRM_MIN_VAR_PCT = -3.0
+
+
+def _confirmation(candidate: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Apply the strategy's own confirmation rule; return (confirmed, unmet checks)."""
+    var_pct = None
+    try:
+        var_pct = float(str(candidate.get("var_95") or "").replace("%", ""))
+    except ValueError:
+        pass
+    checks = {
+        "breakout above 20-day high": candidate.get("breakout") is True,
+        "trending regime": candidate.get("regime") == "TRENDING",
+        "positive alpha": isinstance(candidate.get("alpha_annualized"), (int, float)) and candidate["alpha_annualized"] > 0,
+        f"Sharpe >= {CONFIRM_MIN_SHARPE}": isinstance(candidate.get("sharpe_ratio"), (int, float)) and candidate["sharpe_ratio"] >= CONFIRM_MIN_SHARPE,
+        f"95% one-day VaR above {CONFIRM_MIN_VAR_PCT}%": var_pct is not None and var_pct > CONFIRM_MIN_VAR_PCT,
+    }
+    unmet = [name for name, passed in checks.items() if not passed]
+    return not unmet, unmet
 
 
 def _score_stock(stock_df) -> float:
@@ -279,6 +322,9 @@ def _score_stock(stock_df) -> float:
 def find_sector_stock_pipeline(market: str = "india", top_n_sectors: int = 3, top_n_stocks: int = 3) -> dict[str, Any]:
     """Multi-step pipeline: sector performance -> ranking -> stock selection -> strategy confirmation."""
     universe = _pick_universe(market)
+    for name, value in (("top_n_sectors", top_n_sectors), ("top_n_stocks", top_n_stocks)):
+        if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 10:
+            raise ValueError(f"{name} must be an integer between 1 and 10")
 
     sector_intel = analyze_sector_intelligence(market=market, timeframe="1y")
     sector_rankings = sector_intel.get("sector_analytics", [])
@@ -287,34 +333,71 @@ def find_sector_stock_pipeline(market: str = "india", top_n_sectors: int = 3, to
 
     data_trace: list[dict[str, Any]] = list(sector_intel.get("data_trace", []))
 
+    # One benchmark download per index, shared by every stock and both analyses.
+    benchmarks: dict[str, tuple] = {}
+
     stock_candidates: list[dict[str, Any]] = []
     for sector_name, sector_item in sector_map.items():
         tickers = universe.get(sector_name, {}).get("tickers", [])
-        for ticker in tickers[: max(top_n_stocks * 2, top_n_stocks)]:
+        for ticker in tickers[: top_n_stocks * 2]:
             stock_df, stock_err = fetch_data(ticker, period="1y")
             if stock_err or stock_df is None or stock_df.empty:
                 data_trace.append({"stage": "stock", "ticker": ticker, "status": "failed", "error": stock_err})
                 continue
 
-            quant = get_quant_analysis(stock_df, benchmark_ticker=("^NSEI" if ticker.endswith((".NS", ".BO")) else "^GSPC"))
-            alpha = calculate_alpha_metrics(stock_df, benchmark_ticker=("^NSEI" if ticker.endswith((".NS", ".BO")) else "^GSPC"))
-            stock_candidates.append(
-                {
-                    "ticker": ticker,
-                    "sector": sector_name,
-                    "score": round(_score_stock(stock_df), 2),
-                    "regime": quant.get("regime"),
-                    "beta": quant.get("beta"),
-                    "sharpe_ratio": quant.get("sharpe_ratio"),
-                    "alpha": alpha.get("alpha_annualized_pct") if isinstance(alpha, dict) else None,
-                    "alpha_verdict": alpha.get("verdict") if isinstance(alpha, dict) else None,
-                    "breakout_filter": _BREAKOUT_DESCRIPTION,
-                }
-            )
-            data_trace.append({"stage": "stock", "ticker": ticker, "status": "ok", "window": "1y"})
+            benchmark = "^NSEI" if ticker.endswith((".NS", ".BO")) else "^GSPC"
+            if benchmark not in benchmarks:
+                benchmarks[benchmark] = fetch_data(benchmark, period="1y")
+            bench_df, bench_err = benchmarks[benchmark]
+
+            # A failed benchmark or analysis degrades this one candidate; it
+            # must not abort the whole pipeline.
+            problems: list[str] = []
+            quant: dict[str, Any] = {}
+            alpha: dict[str, Any] = {}
+            if bench_err or bench_df is None or bench_df.empty:
+                problems.append(f"Benchmark data unavailable for {benchmark}: {bench_err}")
+            else:
+                try:
+                    quant = get_quant_analysis(stock_df, benchmark_ticker=benchmark, benchmark_df=bench_df)
+                except Exception as exc:
+                    problems.append(f"Quant analysis failed: {exc}")
+                try:
+                    alpha = calculate_alpha_metrics(stock_df, benchmark_ticker=benchmark, bench_df=bench_df)
+                except Exception as exc:
+                    alpha = {"error": f"Alpha analysis failed: {exc}"}
+                if "error" in alpha:
+                    problems.append(str(alpha["error"]))
+                    alpha = {}
+
+            candidate = {
+                "ticker": ticker,
+                "sector": sector_name,
+                "score": round(_score_stock(stock_df), 2),
+                "breakout": _is_breakout(stock_df),
+                "regime": quant.get("regime"),
+                "beta": quant.get("beta"),
+                "sharpe_ratio": quant.get("sharpe_ratio"),
+                "var_95": quant.get("one_day_var_95"),
+                "alpha": alpha.get("alpha_annualized_pct"),
+                "alpha_annualized": alpha.get("alpha_annualized"),
+                "alpha_verdict": alpha.get("verdict"),
+                "breakout_filter": _BREAKOUT_DESCRIPTION,
+            }
+            confirmed, unmet = _confirmation(candidate)
+            candidate["confirmed"] = confirmed
+            candidate["unmet_confirmations"] = unmet
+            if problems:
+                candidate["analysis_errors"] = problems
+            stock_candidates.append(candidate)
+            trace = {"stage": "stock", "ticker": ticker, "status": "partial" if problems else "ok", "window": "1y"}
+            if problems:
+                trace["error"] = "; ".join(problems)
+            data_trace.append(trace)
 
     stock_candidates.sort(key=lambda item: item["score"], reverse=True)
     selected_stocks = stock_candidates[:top_n_stocks]
+    confirmed_stocks = [item["ticker"] for item in selected_stocks if item["confirmed"]]
 
     strategy = {
         "name": "breakout_confirmation",
@@ -322,12 +405,9 @@ def find_sector_stock_pipeline(market: str = "india", top_n_sectors: int = 3, to
         "logic": "Select top-ranked sector, then top-scoring stock, then confirm with regime + alpha + Sharpe + VaR",
     }
 
-    confidence_inputs = len(sector_rankings) + len(stock_candidates)
-    confidence = min(0.95, 0.55 + confidence_inputs * 0.03)
-
     reproducibility = {
         "market": market,
-        "sector_window": "3mo",
+        "sector_window": "1y",
         "stock_window": "1y",
         "top_n_sectors": top_n_sectors,
         "top_n_stocks": top_n_stocks,
@@ -341,8 +421,13 @@ def find_sector_stock_pipeline(market: str = "india", top_n_sectors: int = 3, to
         "sector_correlation_matrix": sector_intel.get("correlation_matrix", {}),
         "selected_stocks": selected_stocks,
         "strategy": strategy,
-        "confidence": round(confidence, 2),
+        "confirmed_stocks": confirmed_stocks,
+        "confidence": None,
+        "confidence_basis": (
+            "No calibrated confidence is available. The verdict reflects only whether a "
+            "selected stock met every confirmation check; see unmet_confirmations."
+        ),
         "data_trace": data_trace,
         "reproducibility": reproducibility,
-        "verdict": "ACCUMULATE" if selected_stocks else "NEUTRAL",
+        "verdict": "ACCUMULATE" if confirmed_stocks else "NEUTRAL",
     }

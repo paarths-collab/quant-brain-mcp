@@ -114,7 +114,7 @@ The core tool: turns analysis into an actionable, sized plan.
 | `direction` | `"long"` \| `"short"` | default long |
 | `period` | period | default 1y |
 
-Returns: `entry` (last close), `stop` (tighter of 10-bar swing level or 2×ATR, with a minimum distance of 0.75 ATR), `stop_basis`, `shares` (whole shares sized so the modeled entry-to-stop loss is at most the risk budget, capped by equity), `position_value`, `max_loss`, `targets` (1R/2R/3R), `liquidity` (your order as % of 20-day turnover, with a warning above ~1%), and a one-line `invalidation`. Despite its field name, `max_loss` is a modeled loss at the stated stop, not a guaranteed cap: gaps, slippage, fees, and execution failures can increase realized loss. No order is placed.
+Returns: `entry` (last close), `stop` (tighter of 10-bar swing level or 2×ATR, with a minimum distance of 0.75 ATR), `stop_basis` (`swing`, `atr`, or `min_distance` when the 0.75 ATR floor set the stop), `shares` (whole shares sized so the modeled entry-to-stop loss is at most the risk budget, capped by equity), `position_value`, `max_loss`, `targets` (1R/2R/3R), `liquidity` (your order as % of 20-day turnover, with a warning above ~1%), and a one-line `invalidation`. Despite its field name, `max_loss` is a modeled loss at the stated stop, not a guaranteed cap: gaps, slippage, fees, and execution failures can increase realized loss. No order is placed.
 
 ### `scan_watchlist`
 
@@ -180,13 +180,15 @@ Optimize on a chronological training split → evaluate on the later holdout →
 | `optimize_type` | enum | `mvo` (default) · `hrp` · `max_sharpe` · `min_volatility` · `black_litterman` · `cvar` · `semivariance` |
 | `period` | period | default 2y |
 
-Returns: `recommended_weights`, `backtest_metrics` (return / Sharpe / drawdown), `portfolio_intelligence` (per-ticker beta, VaR, alpha, regime — **blended by portfolio weight**, so the answer doesn't depend on the order you typed tickers), `risk_assessment` (95% 1-day VaR in % and currency, capital plan, risk flags), `final_verdict` (STRONG BUY / PROPER / ACCUMULATE / NEUTRAL / REDUCE / STAY AWAY), transparency fields (`requested_tickers` / `included_tickers` / `excluded_tickers` with per-ticker errors), and an `fx_note` disclosing that USD/INR currency risk is not modeled.
+Returns: `recommended_weights`, `backtest_metrics` (return / Sharpe / drawdown), `portfolio_intelligence` (per-ticker beta, VaR, alpha, regime — **blended by portfolio weight**, so the answer doesn't depend on the order you typed tickers), `risk_assessment` (95% 1-day VaR in % and currency, capital plan, risk flags), `final_verdict` (STRONG BUY / PROPER / ACCUMULATE / NEUTRAL / REDUCE / STAY AWAY), `optimization_note` (set when max-Sharpe is undefined because no asset beat the risk-free rate in training, and minimum volatility was used instead; applies to `mvo`, `max_sharpe`, `black_litterman`), transparency fields (`requested_tickers` / `included_tickers` / `excluded_tickers` with per-ticker errors), and an `fx_note` disclosing that USD/INR currency risk is not modeled. Benchmarks are fetched over the same window as the holdings. When no held ticker reports VaR, the VaR fields are `null` and `capital_plan` is `UNKNOWN_RISK`; missing VaR is never treated as 0%.
+
+`black_litterman` uses an equal-weight equilibrium prior (risk aversion 2.5) with each asset's historical mean return as an uncertain absolute view, then solves max-Sharpe on the posterior.
 
 ---
 
 ## Backtests
 
-All take `ticker` (**required**) and `period` (default 2y). Fees of 0.1% per trade are applied. Returns include total return, Sharpe (252-day annualized), win rate, max drawdown, and trade count.
+All take `ticker` (**required**) and `period` (default 2y). Fees of 0.1% per trade are applied. Returns include total return, Sharpe (252-day annualized), win rate, max drawdown, and trade count. A period too short for the indicator warm-up (e.g. 6mo for a 200-day crossover) returns an error rather than a zero-trade result; statistics that are undefined because no trade closed are `null`.
 
 | Tool | Strategy | Extra params |
 |---|---|---|
@@ -207,7 +209,7 @@ All take `ticker` (**required**) and `period` (default 2y). Fees of 0.1% per tra
 | Param | Type | Notes |
 |---|---|---|
 | `market` | `"india"` \| `"us"` | default india |
-| `timeframe` | `string` | default 1y |
+| `timeframe` | `string` | default 1y; any period (`1mo`, `6mo`, `ytd`, `5y`, …) or shorthand `1m`/`3m`/`6m`/`12m`/`24m`/`60m`/`120m`. Unsupported values are rejected, not replaced. |
 
 Ranks sectors (8 Indian / 6 US) by a z-scored composite of risk-adjusted return, momentum, and drawdown. Includes a correlation matrix, per-sector `last_observed_date` / `is_stale` flags, and a `data_freshness_note` when index feeds lag.
 
@@ -216,10 +218,10 @@ Ranks sectors (8 Indian / 6 US) by a z-scored composite of risk-adjusted return,
 | Param | Type | Notes |
 |---|---|---|
 | `market` | `"india"` \| `"us"` | default india |
-| `top_n_sectors` | `int` | default 3 |
-| `top_n_stocks` | `int` | default 3 |
+| `top_n_sectors` | `int` | default 3 (1–10) |
+| `top_n_stocks` | `int` | default 3 (1–10) |
 
-The full chain: rank sectors → score each sector's stocks (alpha, beta, Sharpe, regime) → recommend an entry strategy. Includes a `data_trace` of every fetch.
+The full chain: rank sectors over 1y → score each sector's stocks (alpha, beta, Sharpe, regime, VaR) → check the breakout strategy's confirmations. Each stock reports `confirmed` and `unmet_confirmations` (breakout above the 20-day high, trending regime, positive alpha, Sharpe ≥ 1, 95% VaR above −3%). `verdict` is `ACCUMULATE` only when a selected stock passes every check, otherwise `NEUTRAL`. `confidence` is `null`: no calibrated confidence exists, so see `data_trace` (a stock whose benchmark or analysis failed is marked `partial`, not dropped) and `data_coverage`.
 
 ### `get_company_profile`
 

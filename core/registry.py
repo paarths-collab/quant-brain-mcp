@@ -8,6 +8,7 @@ compatible get_*/compute function (~133 tools). It now reads the curated
 
 import importlib
 
+from core.data_loader import VALID_PERIODS
 from core.indicator_registry import _resolve, iter_all_indicators
 
 
@@ -37,7 +38,13 @@ def register_all_tools():
                     "ticker": {
                         "type": "string",
                         "description": "Stock ticker (e.g., AAPL or RELIANCE.NS)",
-                    }
+                    },
+                    "period": {
+                        "type": "string",
+                        "enum": sorted(VALID_PERIODS),
+                        "default": "2y",
+                        "description": "History window for price data.",
+                    },
                 },
                 "required": ["ticker"],
             },

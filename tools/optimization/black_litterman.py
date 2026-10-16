@@ -1,5 +1,9 @@
 import numpy as np
 from pypfopt import BlackLittermanModel, expected_returns, risk_models
+from pypfopt.black_litterman import market_implied_prior_returns
+
+# Conventional equity risk-aversion coefficient (He & Litterman).
+DEFAULT_RISK_AVERSION = 2.5
 
 
 def run_bl_optimization(S, mu, views=None, view_confidences=None):
@@ -36,8 +40,32 @@ def run_black_litterman(S, prior_returns, views=None, view_confidences=None):
     return run_bl_optimization(S, prior_returns, views=views, view_confidences=view_confidences)
 
 
-def optimize(price_df, views=None, view_confidences=None):
-    """Calculate Black-Litterman posterior moments and adjusted weights."""
-    mu = expected_returns.mean_historical_return(price_df)
+def optimize(price_df, views=None, view_confidences=None, risk_aversion=DEFAULT_RISK_AVERSION):
+    """Black-Litterman posterior from an equilibrium prior plus views.
+
+    The prior is the return vector implied by an equal-weight market portfolio
+    (pi = delta * S * w_eq); per-asset market caps are not available offline.
+    Without explicit views, each asset's historical mean return is an absolute
+    view with PyPortfolioOpt's default uncertainty (omega proportional to
+    tau * P S P'), so the posterior shrinks noisy historical means toward
+    equilibrium instead of anchoring on them.
+    """
     S = risk_models.sample_cov(price_df)
-    return run_bl_optimization(S, mu, views=views, view_confidences=view_confidences)
+    equal_caps = {asset: 1.0 for asset in price_df.columns}
+    prior = market_implied_prior_returns(equal_caps, risk_aversion, S)
+    view_source = "explicit"
+    if not views:
+        views = expected_returns.mean_historical_return(price_df).to_dict()
+        view_source = "historical_mean_returns"
+    bl = BlackLittermanModel(S, pi=prior, absolute_views=views, omega=view_confidences,
+                             risk_aversion=risk_aversion)
+    return {
+        "adjusted_weights": dict(bl.bl_weights()),
+        "posterior_returns": bl.bl_returns().to_dict(),
+        "posterior_covariance": bl.bl_cov().to_dict(),
+        "prior": "equal_weight_equilibrium",
+        "prior_returns": prior.to_dict(),
+        "risk_aversion": risk_aversion,
+        "view_mode": view_source,
+        "view_count": len(views),
+    }

@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 
+from tools.strategies._common import history_error, pct, positive_int, ratio
+
 
 def _wilder_rsi(close: pd.Series, length: int = 14) -> pd.Series:
     """Compute RSI using Wilder smoothing for broad compatibility.
@@ -33,7 +35,13 @@ def _wilder_rsi(close: pd.Series, length: int = 14) -> pd.Series:
 
 def run_backtest(df, length=14, lower=30, upper=70):
     """Vectorized backtest for RSI mean reversion."""
+    length = positive_int("length", length)
+    if not 0 <= lower < upper <= 100:
+        return {"error": "RSI thresholds must satisfy 0 <= lower < upper <= 100."}
     close = df["Close"].astype(float)
+    error = history_error(close, length + 2, "RSI Mean Reversion")
+    if error:
+        return error
     rsi = _wilder_rsi(close, length=length)
     entries = rsi < lower
     exits = rsi > upper
@@ -48,9 +56,9 @@ def run_backtest(df, length=14, lower=30, upper=70):
 
     return {
         "strategy_name": "RSI Mean Reversion",
-        "total_return": f"{stats['Total Return [%]']:.2f}%",
+        "total_return": pct(stats['Total Return [%]']),
         "sharpe_ratio": None if np.isnan(sharpe_ratio) else round(sharpe_ratio, 2),
-        "win_rate": f"{stats['Win Rate [%]']:.2f}%",
-        "max_drawdown": f"{stats['Max Drawdown [%]']:.2f}%",
+        "win_rate": pct(stats['Win Rate [%]']),
+        "max_drawdown": pct(stats['Max Drawdown [%]']),
         "expectancy": stats.get('Expectancy', None),
     }

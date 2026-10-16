@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pandas_ta as ta
 
-from core.data_loader import fetch_data
+from core.data_loader import fetch_data, period_covering
 
 
 def _last_valid(series_or_df: pd.Series | pd.DataFrame | None) -> float | None:
@@ -80,7 +80,9 @@ def _regime_from_hurst_adx(hurst: float | None, adx_val: float | None) -> str:
     return "STOCHASTIC"
 
 
-def get_quant_analysis(df: pd.DataFrame, benchmark_ticker: str = "^NSEI") -> dict:
+def get_quant_analysis(
+    df: pd.DataFrame, benchmark_ticker: str = "^NSEI", benchmark_df: pd.DataFrame | None = None
+) -> dict:
     """Institutional-grade analysis for a single asset.
 
     Metrics:
@@ -88,6 +90,9 @@ def get_quant_analysis(df: pd.DataFrame, benchmark_ticker: str = "^NSEI") -> dic
     - Hurst Exponent + regime
     - Sharpe ratio (annualized)
     - 1-day VaR and Expected Shortfall at 95%
+
+    The benchmark is fetched over the window covering `df` (not a fixed 2y),
+    unless the caller supplies `benchmark_df` to reuse one download.
     """
     required_cols = {"High", "Low", "Close"}
     missing = required_cols.difference(df.columns)
@@ -98,7 +103,9 @@ def get_quant_analysis(df: pd.DataFrame, benchmark_ticker: str = "^NSEI") -> dic
     if returns.empty:
         raise ValueError("Insufficient return history for quant analysis")
 
-    benchmark_df, bench_err = fetch_data(benchmark_ticker, period="2y")
+    bench_err = None
+    if benchmark_df is None:
+        benchmark_df, bench_err = fetch_data(benchmark_ticker, period=period_covering(df.index))
     if bench_err or benchmark_df is None or benchmark_df.empty:
         raise ValueError(f"Benchmark data unavailable for {benchmark_ticker}: {bench_err}")
 
@@ -113,9 +120,11 @@ def get_quant_analysis(df: pd.DataFrame, benchmark_ticker: str = "^NSEI") -> dic
     asset_returns = combined["asset"]
     bench_returns = combined["benchmark"]
 
-    covariance = np.cov(asset_returns, bench_returns)[0][1]
-    variance = float(np.var(bench_returns))
-    beta = float(covariance / variance) if variance > 0 else 0.0
+    # Covariance and variance from the same (ddof=1) matrix so beta matches
+    # alpha_engine's estimate exactly.
+    matrix = np.cov(asset_returns, bench_returns)
+    variance = float(matrix[1, 1])
+    beta = float(matrix[0, 1] / variance) if variance > 0 else 0.0
 
     # ADX proxy supports regime detection when Hurst is noisy.
     adx_df = ta.adx(df["High"], df["Low"], df["Close"], length=14)

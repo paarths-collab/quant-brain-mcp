@@ -13,8 +13,8 @@ OPTIMIZATION_KNOWLEDGE = {
     },
     "black_litterman": {
         "file": "black_litterman.py",
-        "goal": "AI Insights + Market Equilibrium.",
-        "use_case": "When the Agent has a 'Strong Verdict' on a specific stock (e.g., 'NVDA will outperform').",
+        "goal": "Equal-weight equilibrium prior blended with historical-mean views.",
+        "use_case": "Shrinks noisy historical return estimates toward equilibrium before max-Sharpe; explicit views can be supplied programmatically.",
         "risk_level": "Variable - based on the accuracy of the 'Views'.",
     },
     "cvar_tail_risk": {

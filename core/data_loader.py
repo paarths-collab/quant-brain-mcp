@@ -19,6 +19,32 @@ warnings.filterwarnings(
 VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"}
 
 
+# Ordered shortest-first, with the calendar span (days) each one reliably covers.
+_COVERING_PERIODS = (("1mo", 28), ("3mo", 88), ("6mo", 178), ("1y", 360), ("2y", 725), ("5y", 1820), ("10y", 3645))
+
+
+def period_covering(index) -> str:
+	"""Smallest yfinance period whose window covers the span of `index`.
+
+	Benchmarks must be fetched over the same window as the asset they are
+	compared with; a hardcoded "2y" silently truncated 5y/10y analyses and
+	padded short ones.
+	"""
+	try:
+		start, end = pd.Timestamp(index.min()), pd.Timestamp(datetime.now(timezone.utc).date())
+		if pd.isna(start):
+			return "2y"
+		if start.tzinfo is not None:
+			start = start.tz_convert(None)
+		span_days = (end - start.normalize()).days
+	except Exception:
+		return "2y"
+	for period, days in _COVERING_PERIODS:
+		if span_days <= days:
+			return period
+	return "max"
+
+
 def fetch_stock_data(ticker: str, period: str = "2y", interval: str = "1d"):
 	"""
 	Fetches data from yfinance.

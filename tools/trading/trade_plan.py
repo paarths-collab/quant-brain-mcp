@@ -111,7 +111,13 @@ def compute_trade_plan(
     if stop_distance <= 0 or not math.isfinite(stop_distance):
         return {"error": "Could not derive a valid stop distance from this history."}
 
-    stop_basis = "swing" if stop == swing_stop else "atr"
+    if stop == swing_stop:
+        stop_basis = "swing"
+    elif stop == atr_stop:
+        stop_basis = "atr"
+    else:
+        # Both candidates were inside daily noise; the 0.75 ATR floor set the stop.
+        stop_basis = "min_distance"
     # Size using the exact prices shown to the user, so rounding cannot increase
     # the displayed maximum loss past the requested risk budget.
     entry, stop = round(entry, 2), round(stop, 2)

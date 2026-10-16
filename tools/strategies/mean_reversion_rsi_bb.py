@@ -1,4 +1,6 @@
 import vectorbt as vbt
+
+from tools.strategies._common import history_error, pct, positive_int, ratio
 import pandas_ta as ta
 
 
@@ -9,7 +11,12 @@ def run_strategy(df, rsi_lower=30, rsi_upper=70):
     MARKET CONDITION: Range-bound or temporarily overextended markets.
     RISK: Falling Knife if bad news persists.
     """
+    if not 0 <= rsi_lower < rsi_upper <= 100:
+        return {"error": "RSI thresholds must satisfy 0 <= rsi_lower < rsi_upper <= 100."}
     close = df["Close"]
+    error = history_error(close, 21, "RSI-BB Mean Reversion")
+    if error:
+        return error
     rsi = ta.rsi(close, length=14)
     bbands = ta.bbands(close, length=20, std=2)
 
@@ -21,9 +28,9 @@ def run_strategy(df, rsi_lower=30, rsi_upper=70):
 
     return {
         "strategy_name": "RSI-BB Mean Reversion",
-        "win_rate": f"{stats['Win Rate [%]']:.2f}%",
-        "max_drawdown": f"{stats['Max Drawdown [%]']:.2f}%",
+        "win_rate": pct(stats['Win Rate [%]']),
+        "max_drawdown": pct(stats['Max Drawdown [%]']),
         "expectancy": stats.get("Expectancy", None),
-        "total_return": f"{stats['Total Return [%]']:.2f}%",
-        "sharpe_ratio": round(stats['Sharpe Ratio'], 2),
+        "total_return": pct(stats['Total Return [%]']),
+        "sharpe_ratio": ratio(stats['Sharpe Ratio']),
     }

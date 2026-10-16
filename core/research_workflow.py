@@ -144,6 +144,70 @@ async def run_research(
     calls = 0
     retrieval_cache: dict[str, dict] = {}
     source_retrievals: dict[str, dict] = {}
+    # IDs withdrawn after a conflicting reuse; never cited, verified or reported.
+    quarantined: set[str] = set()
+    integrity_warnings: list[str] = []
+
+    def quarantine_evidence(evidence_id: str) -> None:
+        evidence.pop(evidence_id, None)
+        quarantined.add(evidence_id)
+        for claim_id in [cid for cid, claim in claims.items() if evidence_id in claim.evidence_ids]:
+            claims.pop(claim_id)
+            quarantined.add(claim_id)
+
+    def admit(key: str, role: str, result: Findings) -> Findings:
+        """Merge one agent's output, dropping anything that breaks integrity.
+
+        A single malformed item (a reused ID with different content, a citation
+        of unknown evidence, an unaudited synthesis claim) used to abort the
+        whole job after up to ten model calls. Instead the offending items are
+        withheld -- conflicting IDs are quarantined in both versions so neither
+        can be verified -- and the report is downgraded with a warning.
+        """
+        issues: list[str] = []
+        prior_claim_ids = set(claims)
+        kept_evidence: list[Evidence] = []
+        for item in result.evidence:
+            existing = evidence.get(item.id)
+            if item.id in quarantined:
+                issues.append(f"evidence {item.id} reuses a quarantined ID; withheld")
+            elif role == "synthesizer" and existing != item:
+                issues.append(f"synthesis evidence {item.id} is not unchanged audited evidence; withheld")
+            elif existing is not None and existing != item:
+                quarantine_evidence(item.id)
+                issues.append(f"conflicting reuse of evidence ID {item.id}; both versions quarantined")
+            else:
+                evidence[item.id] = item
+                kept_evidence.append(item)
+        kept_claims: list[Claim] = []
+        for claim in result.claims:
+            existing = claims.get(claim.id)
+            missing = [eid for eid in claim.evidence_ids if eid not in evidence]
+            if claim.id in quarantined:
+                issues.append(f"claim {claim.id} reuses a quarantined ID; withheld")
+            elif missing:
+                issues.append(f"claim {claim.id} cites unknown or quarantined evidence {', '.join(missing)}; withheld")
+            elif role == "synthesizer" and existing != claim:
+                issues.append(f"synthesis claim {claim.id} is not an unchanged audited claim; withheld")
+            elif existing is not None and existing != claim:
+                claims.pop(claim.id)
+                quarantined.add(claim.id)
+                issues.append(f"conflicting reuse of claim ID {claim.id}; both versions quarantined")
+            else:
+                claims[claim.id] = claim
+                kept_claims.append(claim)
+        # Only auditor assessments determine the report's verified claims, and
+        # only of claims that existed before this audit. Other roles may
+        # describe checks of their own claims without impersonating an audit.
+        targets = prior_claim_ids if role == "auditor" else set(claims)
+        verified: list[str] = []
+        for claim_id in dict.fromkeys(result.verified_claim_ids):
+            if claim_id in targets and claim_id in claims:
+                verified.append(claim_id)
+            else:
+                issues.append(f"verification of unknown or quarantined claim {claim_id}; ignored")
+        integrity_warnings.extend(f"Integrity ({key}): {issue}." for issue in issues)
+        return result.model_copy(update={"evidence": kept_evidence, "claims": kept_claims, "verified_claim_ids": verified})
 
     async def invoke(role: str, label: str | None = None) -> Findings:
         nonlocal calls, source_retrievals
@@ -164,28 +228,7 @@ async def run_research(
         prompt += "\nOUTPUT SCHEMA: " + json.dumps(Findings.model_json_schema())
         if on_event:
             await on_event(key, {"status": "running"})
-        result = Findings.model_validate(await runtime.run(role, prompt))
-        local_evidence = dict(evidence)
-        for item in result.evidence:
-            if item.id in local_evidence and local_evidence[item.id] != item:
-                raise ValueError("Conflicting evidence ID: " + item.id)
-            local_evidence[item.id] = item
-        local_claims = dict(claims)
-        for claim in result.claims:
-            if set(claim.evidence_ids) - local_evidence.keys():
-                raise ValueError("Unknown evidence citation in " + claim.id)
-            if claim.id in local_claims and local_claims[claim.id] != claim:
-                raise ValueError("Conflicting claim ID: " + claim.id)
-            local_claims[claim.id] = claim
-        # Only auditor assessments determine the report's verified claims. Other
-        # roles may describe checks of their own claims without impersonating an audit.
-        verification_targets = claims if role == "auditor" else local_claims
-        if set(result.verified_claim_ids) - verification_targets.keys():
-            raise ValueError("Auditor referenced unknown prior claim" if role == "auditor" else "Unknown checked claim")
-        if role == "synthesizer" and (any(c.id not in claims for c in result.claims) or any(e.id not in evidence for e in result.evidence)):
-            raise ValueError("Synthesis introduced unaudited evidence or claims")
-        evidence.update(local_evidence)
-        claims.update(local_claims)
+        result = admit(key, role, Findings.model_validate(await runtime.run(role, prompt)))
         findings[key] = result
         if on_event:
             await on_event(key, {"status": "completed"})
@@ -211,8 +254,8 @@ async def run_research(
         audit = await invoke("auditor", f"audit_{index + 1}")
     synthesis = await invoke("synthesizer")
     source_retrievals = await retrieve_sources(evidence.values(), retrieval_cache)
-    verified = set(audit.verified_claim_ids)
-    selected = synthesis.claims
+    verified = set(audit.verified_claim_ids) & claims.keys()
+    selected = [claim for claim in synthesis.claims if claim.id in claims]
     warnings = list(dict.fromkeys(w for f in findings.values() for w in f.warnings))
     warnings.append("Claim verification is an AI reviewer assessment. Calculation execution and claim support have not been independently attested by this report. Server source_retrievals attest only document retrieval and extraction, not claim correctness.")
     outcome = synthesis.outcome
@@ -231,6 +274,12 @@ async def run_research(
         outcome = "mixed"
     if outcome == "insufficient_evidence":
         confidence = "low"
+    if integrity_warnings:
+        warnings.extend(integrity_warnings)
+        warnings.append("Agent output had integrity problems; affected items were withheld from the report and confidence is capped at low.")
+        confidence = "low"
+        if outcome == "supported":
+            outcome = "mixed"
     execution_trace = getattr(runtime, "executions", [])
     tool_events = [event for call in execution_trace for event in call.get("tool_events", [])
                    if event.get("type") == "mcpToolCall"]
@@ -264,8 +313,8 @@ async def run_research(
     # remains available in agent_findings.synthesizer for transparent review.
     if outcome == "insufficient_evidence":
         summary = "Insufficient evidence; confidence: low. The report does not establish a supported conclusion. Review the claims, warnings and unresolved audit findings."
-    elif failures or cited_ids.intersection(failed_sources):
-        summary = f"Partial research; outcome: {outcome}; confidence: {confidence}. Unresolved execution or source retrieval failures limit the conclusion. Review the claims and warnings."
+    elif failures or cited_ids.intersection(failed_sources) or integrity_warnings:
+        summary = f"Partial research; outcome: {outcome}; confidence: {confidence}. Unresolved execution, source retrieval or agent-output integrity failures limit the conclusion. Review the claims and warnings."
     elif outcome != synthesis.outcome or confidence != synthesis.confidence:
         summary = f"Research outcome: {outcome}; confidence: {confidence}. The final assessment was limited by audit or evidence checks. Review the claims and warnings; the original agent synthesis is retained in agent_findings."
     else:

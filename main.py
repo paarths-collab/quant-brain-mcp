@@ -112,7 +112,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
             func = dynamic_tools[name]["func"]
             # Most indicators expect a df. We'll fetch it here.
             from core.data_loader import fetch_data
-            df, err = fetch_data(ticker)
+            df, err = fetch_data(ticker, period=arguments.get("period", "2y"))
             if err:
                 return [types.TextContent(type="text", text=f"Error: {err}")]
             
@@ -136,15 +136,20 @@ def _infer_benchmark_ticker(symbol: str) -> str:
     return "^GSPC"
 
 
-def _to_float_pct(value, default: float = 0.0) -> float:
-    """Parse a value like '-2.50%' into -2.50. Returns `default` on failure."""
+def _to_float_pct(value, default: float | None = None) -> float | None:
+    """Parse a value like '-2.50%' into -2.50. Returns `default` on failure.
+
+    The default is None, not 0.0: an unparseable VaR must read as "unknown",
+    never as "no tail risk".
+    """
     try:
-        return float(str(value).replace("%", "").strip())
+        number = float(str(value).replace("%", "").strip())
     except Exception:
         return default
+    return number if math.isfinite(number) else default
 
 
-def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benchmark):
+def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benchmark, benchmark_cache: dict | None = None):
     """Run quant/alpha analysis per HELD ticker and blend by portfolio weight.
 
     Previously only ONE ticker (whichever resolved first) drove every risk
@@ -157,8 +162,13 @@ def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benc
     still reported in per_ticker with their error, but excluded from the
     blend; blend weights are renormalized over the tickers that succeeded.
     blended is None only when every held ticker's analysis failed.
+
+    With `benchmark_cache` (a dict), each benchmark is downloaded once per
+    window and reused by every ticker and both analyses instead of twice per
+    ticker. Missing VaR values are excluded from the VaR blend (renormalized
+    over tickers that reported one) rather than counted as 0%.
     """
-    from core.data_loader import fetch_data
+    from core import data_loader
     from tools.intelligence.alpha_engine import calculate_alpha_metrics
     from tools.intelligence.engine import get_quant_analysis
 
@@ -174,13 +184,31 @@ def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benc
         benchmark = infer_benchmark(ticker)
         entry = {"ticker": ticker, "weight": round(weight, 4), "benchmark": benchmark}
 
+        bench_df = None
+        if benchmark_cache is not None:
+            key = (benchmark, data_loader.period_covering(ohlc_frames[ticker].index))
+            if key not in benchmark_cache:
+                benchmark_cache[key] = data_loader.fetch_data(benchmark, period=key[1])
+            cached_df, cached_err = benchmark_cache[key]
+            if cached_err or cached_df is None or cached_df.empty:
+                error = {"error": f"Benchmark data unavailable for {benchmark}: {cached_err}"}
+                entry["quant_analysis"] = error
+                entry["alpha_analysis"] = error
+                per_ticker.append(entry)
+                continue
+            bench_df = cached_df
+
         try:
-            entry["quant_analysis"] = get_quant_analysis(ohlc_frames[ticker], benchmark_ticker=benchmark)
+            entry["quant_analysis"] = get_quant_analysis(
+                ohlc_frames[ticker], benchmark_ticker=benchmark, benchmark_df=bench_df
+            )
         except Exception as exc:
             entry["quant_analysis"] = {"error": str(exc)}
 
         try:
-            entry["alpha_analysis"] = calculate_alpha_metrics(ohlc_frames[ticker], benchmark_ticker=benchmark)
+            entry["alpha_analysis"] = calculate_alpha_metrics(
+                ohlc_frames[ticker], benchmark_ticker=benchmark, bench_df=bench_df
+            )
         except Exception as exc:
             entry["alpha_analysis"] = {"error": str(exc)}
 
@@ -198,7 +226,13 @@ def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benc
     def _weighted_avg(values):
         return sum(e["weight"] * v for e, v in zip(usable, values)) / total_weight
 
-    var_pcts = [_to_float_pct(e["quant_analysis"].get("one_day_var_95")) for e in usable]
+    var_pairs = [
+        (e["weight"], v)
+        for e in usable
+        if (v := _to_float_pct(e["quant_analysis"].get("one_day_var_95"))) is not None
+    ]
+    var_weight = sum(w for w, _ in var_pairs)
+    blended_var = sum(w * v for w, v in var_pairs) / var_weight if var_weight > 0 else None
     betas = [float(e["alpha_analysis"].get("beta", 0.0)) for e in usable]
     alphas = [float(e["alpha_analysis"].get("alpha_annualized", 0.0)) for e in usable]
     r_squareds = [float(e["alpha_analysis"].get("r_squared", 0.0)) for e in usable]
@@ -209,7 +243,7 @@ def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benc
     dominant_regime = Counter(regimes).most_common(1)[0][0] if regimes else None
 
     blended = {
-        "one_day_var_95_pct": round(_weighted_avg(var_pcts), 2),
+        "one_day_var_95_pct": round(blended_var, 2) if blended_var is not None else None,
         "beta": round(_weighted_avg(betas), 3),
         "alpha_annualized": round(_weighted_avg(alphas), 4),
         "r_squared": round(_weighted_avg(r_squareds), 3),
@@ -221,12 +255,22 @@ def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benc
 
 
 def run_generate_optimized_verdict(
-    tickers: list, amount: float, optimize_type: str = "mvo", period: str = "2y"
+    tickers: list,
+    amount: float,
+    optimize_type: str = "mvo",
+    period: str = "2y",
+    *,
+    prefetched: dict | None = None,
+    benchmark_cache: dict | None = None,
 ):
     """Internal logic for the optimized verdict tool.
 
     `period` selects the price-history window for every held ticker (e.g.
     "1y", "5y", "10y"); see core.data_loader.VALID_PERIODS.
+
+    Callers running several optimizers over the same tickers (the chart pack)
+    pass `prefetched` ({raw_ticker: (df, err, resolved)}) and a shared
+    `benchmark_cache` so prices and benchmarks are downloaded once, not per run.
     """
     import pandas as pd
     from core.data_loader import resolve_ticker
@@ -238,6 +282,8 @@ def run_generate_optimized_verdict(
     data_dict = {}
     ohlc_frames = {}
     excluded_tickers = []
+    if benchmark_cache is None:
+        benchmark_cache = {}
     for t in tickers:
         # resolve_ticker (not fetch_data) so the dict key is the symbol that
         # ACTUALLY resolved -- e.g. "RELIANCE" -> "RELIANCE.NS" -- rather than
@@ -245,7 +291,11 @@ def run_generate_optimized_verdict(
         # unsuffixed Indian tickers against the S&P 500 (no ".NS" to detect)
         # and let case variants ("aapl" vs "AAPL") become two "different"
         # portfolio assets instead of one.
-        df, err, resolved = resolve_ticker(t, period=period)
+        if prefetched is not None and t in prefetched:
+            df, err, resolved = prefetched[t]
+            df = df.copy() if df is not None else None
+        else:
+            df, err, resolved = resolve_ticker(t, period=period)
         if not err and df is not None and not df.empty:
             df.index = df.index.tz_localize(None).normalize()
             ohlc_frames[resolved] = df
@@ -270,6 +320,7 @@ def run_generate_optimized_verdict(
         # either way) -- it gave the appearance of modeling FX risk while
         # doing nothing. It has been removed; see `fx_note` in the result.
         opt_key = str(optimize_type or "mvo").strip().lower()
+        optimization_note = None
         returns = training_prices.pct_change(fill_method=None).dropna()
         mu = returns.mean() * 252
         S = returns.cov() * 252
@@ -285,20 +336,19 @@ def run_generate_optimized_verdict(
 
             opt_results = run_markowitz_optimize(training_prices)
             weights = opt_results["optimized_weights"]
+            optimization_note = opt_results.get("fallback_note")
         elif opt_key == "black_litterman":
             from pypfopt import EfficientFrontier
             from tools.optimization.black_litterman import optimize as run_black_litterman_optimize
+            from tools.optimization.mean_variance import max_sharpe_or_min_volatility
 
-            implied_views = None
-            if not mu.empty:
-                best_asset = str(mu.idxmax())
-                implied_views = {best_asset: float(mu.loc[best_asset])}
-
-            bl_res = run_black_litterman_optimize(training_prices, views=implied_views)
+            # Equal-weight equilibrium prior, historical means as uncertain views.
+            bl_res = run_black_litterman_optimize(training_prices)
             posterior_returns = pd.Series(bl_res["posterior_returns"])
             posterior_cov = pd.DataFrame(bl_res["posterior_covariance"])
-            ef = EfficientFrontier(posterior_returns, posterior_cov)
-            ef.max_sharpe()
+            ef, _target, optimization_note = max_sharpe_or_min_volatility(
+                lambda: EfficientFrontier(posterior_returns, posterior_cov)
+            )
             weights = ef.clean_weights()
             opt_results = {"optimized_weights": weights, **bl_res}
         elif opt_key in {"cvar", "semivariance"}:
@@ -312,6 +362,7 @@ def run_generate_optimized_verdict(
             opt_key = "mvo"
             opt_results = run_mvo_basic(mu, S, target="max_sharpe")
             weights = opt_results["weights"]
+            optimization_note = opt_results.get("fallback_note")
         
         # Step 2: Backtest
         bt_results = backtest_optimized_portfolio(validation_prices, weights)
@@ -325,7 +376,7 @@ def run_generate_optimized_verdict(
         # and blended by portfolio weight (renormalized over tickers whose
         # analysis succeeded).
         per_ticker_intel, blended_intel = _compute_portfolio_intelligence(
-            weights, ohlc_frames, _infer_benchmark_ticker
+            weights, ohlc_frames, _infer_benchmark_ticker, benchmark_cache=benchmark_cache
         )
 
         # A single representative ticker (highest-weighted with usable data) is
@@ -354,15 +405,16 @@ def run_generate_optimized_verdict(
         alpha_value = blended_intel["alpha_annualized"] if blended_intel else None
         beta_value = blended_intel["beta"] if blended_intel else None
         r_squared = blended_intel["r_squared"] if blended_intel else None
-        one_day_var_pct = blended_intel["one_day_var_95_pct"] if blended_intel else 0.0
+        one_day_var_pct = blended_intel["one_day_var_95_pct"] if blended_intel else None
 
         # Verdict is based exclusively on held-out performance. Full-history
         # alpha/risk diagnostics are descriptive and never upgrade this label.
         strategic_verdict = backtest_verdict
 
-        capital_at_risk = abs(one_day_var_pct) / 100 * float(amount)
-        capital_plan = "LUMP_SUM_ACCEPTABLE"
-        if float(amount) <= 5000 and capital_at_risk > (0.025 * float(amount)):
+        # Unknown VaR stays unknown: no capital-at-risk figure, no plan upgrade.
+        capital_at_risk = abs(one_day_var_pct) / 100 * float(amount) if one_day_var_pct is not None else None
+        capital_plan = "UNKNOWN_RISK" if capital_at_risk is None else "LUMP_SUM_ACCEPTABLE"
+        if capital_at_risk is not None and float(amount) <= 5000 and capital_at_risk > (0.025 * float(amount)):
             capital_plan = "SIP_PREFERRED"
 
         factor_exposure = "SYSTEMATIC_BETA"
@@ -374,7 +426,9 @@ def run_generate_optimized_verdict(
             risk_flags.append("High systematic sensitivity (beta > 1.5)")
         if isinstance(r_squared, (int, float)) and r_squared > 0.9:
             risk_flags.append("Closet indexer risk (R-squared > 0.9)")
-        if one_day_var_pct < -3.0:
+        if one_day_var_pct is None:
+            risk_flags.append("Tail risk unknown (VaR unavailable for every held ticker)")
+        elif one_day_var_pct < -3.0:
             risk_flags.append("Tail risk elevated (95% 1-day VaR below -3%)")
 
         reasoning = (
@@ -387,7 +441,9 @@ def run_generate_optimized_verdict(
                 f" Portfolio-weighted risk (blended across {blended_intel['tickers_used']}, "
                 f"coverage {blended_intel['coverage_weight']*100:.0f}% of allocation): "
                 f"Beta={blended_intel['beta']}, Alpha={blended_intel['alpha_annualized']*100:.2f}%, "
-                f"R-squared={blended_intel['r_squared']}, VaR95={blended_intel['one_day_var_95_pct']:.2f}%, "
+                f"R-squared={blended_intel['r_squared']}, VaR95="
+                + (f"{one_day_var_pct:.2f}%" if one_day_var_pct is not None else "unavailable")
+                + ", "
                 f"dominant regime={blended_intel['dominant_regime']}."
             )
             if intel_ticker:
@@ -395,10 +451,16 @@ def run_generate_optimized_verdict(
         elif per_ticker_intel:
             reasoning += " Institutional intelligence unavailable: analysis failed for every held ticker."
 
-        reasoning += (
-            f" Estimated 95% one-day capital-at-risk on notional {amount} is {capital_at_risk:.2f}. "
-            f"Capital plan: {capital_plan}."
-        )
+        if capital_at_risk is not None:
+            reasoning += (
+                f" Estimated 95% one-day capital-at-risk on notional {amount} is {capital_at_risk:.2f}. "
+                f"Capital plan: {capital_plan}."
+            )
+        else:
+            reasoning += " One-day capital-at-risk is unavailable because no held ticker reported VaR."
+
+        if optimization_note:
+            reasoning += f" {optimization_note}"
 
         if risk_flags:
             reasoning += " Risk flags: " + "; ".join(risk_flags) + "."
@@ -421,7 +483,7 @@ def run_generate_optimized_verdict(
             "limitations": [
                 "A single chronological holdout is not walk-forward validation or evidence of future returns.",
                 "Repeated strategy selection against this holdout can overfit it.",
-                "Risk and alpha diagnostics use full history and are descriptive, not out-of-sample evidence.",
+                "Risk and alpha diagnostics use the full requested history (benchmark fetched over the same window) and are descriptive, not out-of-sample evidence.",
                 "Transaction costs, slippage, taxes, and currency conversion are not modeled.",
             ],
             "portfolio_intelligence": {
@@ -432,9 +494,10 @@ def run_generate_optimized_verdict(
             "quant_analysis": quant_analysis,
             "alpha_analysis": alpha_analysis,
             "factor_exposure": factor_exposure,
+            "optimization_note": optimization_note,
             "risk_assessment": {
-                "one_day_var_95_pct": f"{one_day_var_pct:.2f}%",
-                "one_day_var_95_amount": round(capital_at_risk, 2),
+                "one_day_var_95_pct": f"{one_day_var_pct:.2f}%" if one_day_var_pct is not None else None,
+                "one_day_var_95_amount": round(capital_at_risk, 2) if capital_at_risk is not None else None,
                 "capital_plan": capital_plan,
                 "risk_flags": risk_flags,
             },
