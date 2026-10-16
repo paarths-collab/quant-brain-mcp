@@ -3,9 +3,11 @@
 ## Automated checks
 
 The local suite passed **306 tests**, including the PostgreSQL integration tests
-and 22 additional calculation/data-quality regressions. The previous published
-GitHub CI run passed 284 tests. These counts cover different revisions; CI must
-run again after the latest fixes are published.
+and 22 additional calculation/data-quality regressions.
+[GitHub CI for revision a8c0df1](https://github.com/paarths-collab/quant-brain-mcp/actions/runs/38928497618)
+also passed all 306 tests, dependency checks, registration of all 29 tools, HTTP
+startup, and real PNG export. This is a record of that tested revision; consult the
+repository CI badge for subsequent changes.
 
 ## Authenticated research smoke test
 

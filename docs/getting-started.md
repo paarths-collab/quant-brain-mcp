@@ -65,13 +65,13 @@ Claude will call `get_quote`, `analyze_momentum`, and `analyze_trend` and synthe
 | India (BSE) | symbol + `.BO` | `RELIANCE.BO` |
 | Indices | caret prefix | `^GSPC` (S&P 500), `^NSEI` (NIFTY 50) |
 
-Forgot the `.NS`? The server tries it automatically — `RELIANCE` resolves to `RELIANCE.NS` and is benchmarked against NIFTY, not the S&P.
+Market tools can try `.NS` automatically — `RELIANCE` resolves to `RELIANCE.NS` and is benchmarked against NIFTY, not the S&P.
 
 ## Troubleshooting
 
 ### First request times out / "connection lost"
 
-The server runs on a free tier that sleeps after ~15 minutes idle and takes **~50 seconds** to wake. Wait a minute and retry — subsequent requests are fast. Check liveness anytime:
+A sleeping hosted service can take time to wake. Retry a transient timeout with bounded backoff and check deployment logs if it persists. Authentication errors need configuration changes rather than repeated retries. Check liveness anytime:
 
 ```bash
 curl https://mcp-quant-brain.onrender.com/health
@@ -84,12 +84,14 @@ The server runs stateless HTTP. Reconnect the client and confirm the URL ends in
 ### A ticker returns "No data found"
 
 - Indian stocks need `.NS` (auto-tried) or `.BO` (not auto-tried).
-- Some symbols change after corporate actions — e.g. Tata Motors' passenger-vehicle listing is now `TMPV.NS`.
+- Symbols can change after corporate actions; verify the current exchange symbol.
 - Yahoo occasionally rate-limits; retry after a few seconds.
 
 ## Data expectations
 
-- **US quotes**: near-real-time.
-- **NSE/BSE quotes**: ~15 minutes delayed. Every quote response carries `as_of` and a delay note.
+- **Quote freshness**: provider delay varies. `as_of` / `fetched_at` record retrieval, not trade time; `market_timestamp` is unknown when the provider does not supply it.
+- **NSE/BSE quotes**: the tool discloses an approximate delay; actual price age is unknown without a provider observation timestamp.
 - **History**: daily bars, selectable window from `1d` to `max` via the `period` parameter (default `2y`).
-- **Dividends**: included — prices are dividend/split-adjusted, so returns are total returns.
+- **History adjustment**: historical analysis requests dividend/split-adjusted bars; this is distinct from quote snapshots.
+
+Research jobs are NSE-only and normalize bare symbols to `.NS`; the broader market-tool formats above do not extend the research workflow to other exchanges.

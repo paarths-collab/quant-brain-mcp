@@ -1,8 +1,76 @@
 # Tool Reference
 
-All 25 tools, grouped the way you'd use them. Parameters marked **required**; everything else has a sensible default.
+The public MCP exposes **29 tools**: 25 analysis/alert/chart tools and four research job tools. The internal Codex agents receive only 21 read-only analysis tools; they cannot start research jobs recursively or manage alerts. Parameters marked **required** must be supplied.
+
+See [Architecture](architecture.md) for the system boundaries and [Research runtime](research-runtime.md) for setup and the Claude connection. HTTP calls require a configured bearer token. Research and alert records are scoped to the authenticated owner; there is no owner parameter to spoof.
 
 Common parameter: `period` — history window. One of `1d` `5d` `1mo` `3mo` `6mo` `1y` `2y` `5y` `10y` `ytd` `max`. Default `2y` unless noted.
+
+
+## Research jobs
+
+These optional tools require `QUANT_RESEARCH_ENABLED=1`, the research dependencies, a signed-in Codex runtime, and the internal calculation server. They consume the selected Codex account's allowance. Start once, poll status, then fetch the finished report; an HTTP request does not stay open for the entire investigation.
+
+### `start_research`
+
+| Param | Type | Notes |
+|---|---|---|
+| `question` | `string` **required** | Nonblank, at most 12,000 characters |
+| `tickers` | `string[]` **required** | 1–5 NSE stock symbols; trimmed, uppercased, deduplicated, with `.NS` appended if absent |
+| `depth` | `"quick"` \| `"standard"` \| `"deep"` | Default `standard` |
+
+Symbols such as `TCS` and `RELIANCE.NS` are accepted. Other exchange suffixes are rejected. Bare symbols are interpreted as NSE symbols, so confirm the company identity in the findings.
+
+| Depth | Workflow | Maximum role invocations |
+|---|---|---|
+| `quick` | Company + quant in parallel → auditor → synthesizer | 4 |
+| `standard` | Lead → company + quant in parallel → skeptic → auditor → up to one correction/re-audit → synthesizer | 8 |
+| `deep` | Standard with up to two correction/re-audit rounds | 10 |
+
+Returns the status object described below, including `id`. A fast worker may already have changed the initial `queued` status to `running` when this response arrives.
+
+### `get_research_status`
+
+| Param | Type | Notes |
+|---|---|---|
+| `job_id` | `string` **required** | The `id` returned by `start_research` |
+
+Returns `id`, `status`, `stage`, `created`, `updated`, `tickers`, `depth`, and nullable `error`. Status is `queued`, `running`, `completed`, `failed`, or `cancelled`. `stage` identifies the latest workflow activity (for example `quant`, `auditor`, or `correction_1`); it is not a percentage, and parallel roles can overlap.
+
+### `get_research_report`
+
+| Param | Type | Notes |
+|---|---|---|
+| `job_id` | `string` **required** | The `id` returned by `start_research` |
+
+A completed response contains `id`, `status: "completed"`, `report`, and chronological `events`. Other known jobs return `status`, `stage`, `error`, and `report: null`.
+
+The report contains:
+
+- Request context: `question`, `tickers`, `market: "NSE"`, `currency: "INR"`, `market_timezone: "Asia/Kolkata"`, `created_at`, and `depth`.
+- Conclusions: `summary`, `outcome` (`supported`, `mixed`, or `insufficient_evidence`), `confidence` (`low`, `moderate`, or `high`), `assumptions`, `warnings`, and `disagreements`.
+- Traceable findings: `claims` with evidence IDs, claim kind, assumptions, and a calculation method where applicable; `evidence` with URL/tool URI, title, publication date when known, retrieval date, source type, and excerpt.
+- Review details: `verified_claim_ids`, `verification_basis: "model_review"`, `agent_findings`, `invocation_count`, and `execution_trace`.
+
+`execution_trace` records SDK-observed web searches and allowed MCP tool-call names/statuses, without raw tool arguments, results, or URLs. It does **not** prove that each cited source supports its claim or that a calculation is correct. A `urn:tool:quant_internal:<tool_name>` citation identifies a tool; it is not itself execution proof. Check the claims, sources, warnings, and actual observation dates before relying on the summary. A completed job can correctly return `insufficient_evidence`.
+
+### `cancel_research`
+
+| Param | Type | Notes |
+|---|---|---|
+| `job_id` | `string` **required** | The `id` returned by `start_research` |
+
+Requests cancellation of queued or running work and returns the status object. Completed, failed, and cancelled jobs remain terminal; cancellation does not delete a report or restart a job.
+
+### Limits and errors
+
+The queue accepts at most four active jobs globally and two per authenticated owner, counting both queued and running jobs. One job runs at a time; its company and quant roles run in parallel. The current job execution budget is 900 seconds after a worker starts it, excluding queue time. Each role defaults to 120 seconds, configurable with `QUANT_CODEX_ROLE_TIMEOUT` from 1–600 seconds. These are wall-clock and invocation limits, not a fixed token or cost budget.
+
+Use one outer server worker per research SQLite database. Interrupted work becomes `failed` with stage `interrupted` after recovery; jobs are not automatically resumed. Results survive restarts. There is currently no report-deletion MCP tool or automatic retention policy.
+
+Tool-level failures return an `error` object for disabled research, invalid input, queue capacity, or an unknown/inaccessible job. Another owner's job returns the same `Research job not found` error as a nonexistent ID. Failures after job creation appear in job status with a safe error message; failed jobs have no report. A timeout suggests quick mode or fewer companies. Do not repeatedly resubmit a failed job without checking its error.
+
+Transport failures are separate: missing/invalid bearer credentials return HTTP 401, missing server authentication configuration returns 503, and rate/concurrency limits return 429 with `Retry-After`. The HTTP middleware defaults to 60 requests per minute per owner and four concurrent requests per process; poll with a delay rather than a tight loop.
 
 ---
 
@@ -16,7 +84,7 @@ Price snapshot for one or many tickers in a single call.
 |---|---|---|
 | `tickers` | `string[]` **required** | e.g. `["AAPL", "RELIANCE.NS"]` |
 
-Returns per ticker: `last_price`, `previous_close`, `day_change_pct`, `day_range`, `52w_range`, `pct_of_52w_range`, `volume`, `volume_vs_3mo_avg`, `currency`, `exchange`. Top level: `as_of` timestamp + `data_delay_note` (US near-real-time, NSE ~15 min delayed). One bad ticker never breaks the batch.
+Returns per ticker: `last_price`, `previous_close`, `day_change_pct`, `day_range`, `52w_range`, `pct_of_52w_range`, `volume`, `volume_vs_3mo_avg`, `currency`, `exchange`. Top level: `as_of` and `fetched_at` are retrieval timestamps, **not quote observation timestamps**. `market_timestamp` is currently null and `freshness_status` is `unknown`. `timestamp_note` explains this distinction. `data_delay_note` describes approximate provider delays (including roughly 15 minutes for NSE/BSE), not a verified freshness guarantee. Web search is not a real-time quote feed. One bad ticker is reported in its own batch slot.
 
 ### `get_news`
 
@@ -41,7 +109,7 @@ The core tool: turns analysis into an actionable, sized plan.
 | `direction` | `"long"` \| `"short"` | default long |
 | `period` | period | default 1y |
 
-Returns: `entry` (last close), `stop` (tighter of 10-bar swing level or 2×ATR, floored at 0.75 ATR so daily noise can't tag it), `stop_basis`, `shares` (sized so a stop-out loses exactly the risk budget, capped by equity — no implicit leverage), `position_value`, `max_loss`, `targets` (1R/2R/3R), `liquidity` (your order as % of 20-day turnover, with a warning above ~1%), and a one-line `invalidation`.
+Returns: `entry` (last close), `stop` (tighter of 10-bar swing level or 2×ATR, with a minimum distance of 0.75 ATR), `stop_basis`, `shares` (whole shares sized so the modeled entry-to-stop loss is at most the risk budget, capped by equity), `position_value`, `max_loss`, `targets` (1R/2R/3R), `liquidity` (your order as % of 20-day turnover, with a warning above ~1%), and a one-line `invalidation`. Despite its field name, `max_loss` is a modeled loss at the stated stop, not a guaranteed cap: gaps, slippage, fees, and execution failures can increase realized loss. No order is placed.
 
 ### `scan_watchlist`
 
@@ -90,7 +158,7 @@ Example call shape:
 { "ticker": "RELIANCE.NS", "indicators": ["rsi", "macd"], "period": "5y" }
 ```
 
-Note: CCI is computed in-house — the upstream pandas_ta implementation has a broken formula (see [Architecture](architecture.md)).
+CCI uses the project's own implementation; see [Architecture](architecture.md).
 
 ---
 
@@ -98,7 +166,7 @@ Note: CCI is computed in-house — the upstream pandas_ta implementation has a b
 
 ### `generate_optimized_verdict`
 
-Optimize → backtest → risk-blend → verdict, in one call.
+Optimize on a chronological training split → evaluate on the later holdout → risk-blend → verdict, in one call. The split is 70/30 with at least 126 training and 63 holdout observations; insufficient histories return an error. The historical verdict uses holdout performance. This is a historical validation split, not a forecast or a full walk-forward study.
 
 | Param | Type | Notes |
 |---|---|---|
@@ -160,7 +228,7 @@ Business summary, sector/industry, valuation ratios, market cap (₹ Cr for Indi
 
 ## Charts
 
-All three take `tickers[]` (**required**), `amount`, `market`, `company_ticker`, `timeframe`.
+All three take `tickers` (`string[]`, **required**), `amount` (default `10000`), `market` (default `"us"`), `company_ticker` (default empty), and `timeframe` (default `"2y"`). Set `market: "india"` for Indian-market charts.
 
 | Tool | Output |
 |---|---|

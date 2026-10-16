@@ -1,115 +1,153 @@
-<div align="center">
+# Quant Brain MCP
 
-# 🧠 Quant Brain MCP
+**Market calculations and multi-agent research for Claude and other MCP clients.**
 
-**Turn Claude into a quantitative analyst for US and Indian equities.**
+Quant Brain combines 25 market tools with four research-job tools. Ask for a quote,
+run a backtest, size a hypothetical trade, or start an Indian-equity research job
+that coordinates Codex specialists and returns evidence, disagreements, and an
+execution trace. Claude reviews the report and explains its judgment to you.
 
-Ask in plain English. Get sized trade plans, portfolio optimization, backtests, and price alerts — grounded in real market data, not vibes.
-
-[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-listed-0e6e5c)](https://registry.modelcontextprotocol.io/v0.1/servers?search=quant-brain-mcp)
 [![Tests](https://github.com/paarths-collab/quant-brain-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/paarths-collab/quant-brain-mcp/actions/workflows/test.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](requirements.txt)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-</div>
-
----
-
-```text
-You:    "Scan my watchlist and build a trade plan for whatever looks most actionable.
-         ₹2,00,000 equity, 1% risk."
-
-Claude: RELIANCE.NS flagged (at 20-DMA, volume 1.8x average).
-
-        TRADE PLAN — RELIANCE.NS (long)
-        Entry           ₹1,310.00
-        Stop            ₹1,270.10   (swing low, 2.1 ATR)
-        Size            50 shares   (₹65,500 — 32.8% of equity)
-        Max loss        ₹1,995      (1.0% of equity)
-        Targets         1R ₹1,349.90 · 2R ₹1,389.80 · 3R ₹1,429.70
-        Invalidation    Thesis invalid below ₹1,270.10 — exit without debate.
-```
-
-Hosted access requires an operator-issued bearer token. See [deployment and release checks](docs/deployment.md) for authentication, storage, and verification.
-
-For self-hosting, follow [deployment configuration](docs/deployment.md) and [dependency maintenance](docs/dependency-maintenance.md). The documented hosted URL may run an earlier release until its operator deploys these changes.
-
-## ⚡ Quickstart
-
-**Claude Desktop / Claude Web** → Settings → Connectors → Add custom connector → **Streamable HTTP**:
-
-```text
-https://mcp-quant-brain.onrender.com/mcp
-```
-
-Configure your client to send its bearer token. Clients without custom authorization-header support need a compatible authenticated gateway. Try: *"What's RELIANCE trading at, and is it overbought?"*
-
-> Free-tier note: the server sleeps when idle and takes ~50 s to wake. If the first request times out, retry once. Details in [Getting Started](docs/getting-started.md).
-
-## 🛠 What you get — 29 tools
-
-| | Tools | What they answer |
-|---|---|---|
-| 📋 **Trader workflow** | `get_quote` · `get_news` · `build_trade_plan` · `scan_watchlist` · `price_alert` | *What's it at? What happened? **What do I do?** What moved this week? Tell me when it hits my level.* |
-| 📊 **Indicators** | 6 grouped `analyze_*` tools — 38 curated indicators | *Is it overbought? Trending or chopping? How volatile?* |
-| 💼 **Portfolio** | `generate_optimized_verdict` — 7 optimization methods | *How do I split my money? What's my risk?* |
-| 🧪 **Backtests** | 7 rule-based strategies | *Does this strategy actually work, or does it just feel like it?* |
-| 🔭 **Intelligence** | Sector ranking · sector→stock pipeline · company profiles | *Which sector is leading? Which stocks inside it?* |
-| 📈 **Charts** | Institutional chart pack, rendered as images | *Show me.* |
-
-Full reference with every parameter: **[docs/tools.md](docs/tools.md)**
-
-## 🔄 The workflow it's built around
+## How it works
 
 ```mermaid
-flowchart LR
-    S["🔍 <b>scan_watchlist</b><br/>what moved this week?"] --> N["📰 <b>get_news</b><br/>why did it move?"]
-    N --> P["📐 <b>build_trade_plan</b><br/>entry · stop · size · targets"]
-    P --> A["🔔 <b>price_alert</b><br/>watch my levels"]
-    A -.->|level breaks → notified| P
-    subgraph deeper["go deeper anytime"]
-        I["📊 indicators"] ~~~ B["🧪 backtests"] ~~~ O["💼 optimizer"]
-    end
-    S -.-> deeper
+flowchart TB
+    User["You"] --> Claude["Claude / MCP client"]
+    Claude -->|"Bearer-authenticated HTTP"| Outer["Quant Brain MCP<br/>25 market + 4 research tools"]
+    Outer -->|"Direct market requests"| Engines["Calculation engines"]
+    Outer -->|"Background research job"| Worker["Codex research roles"]
+    Worker --> Search["Live web search"]
+    Worker -->|"Separate internal token"| Inner["Private MCP<br/>21 read-only tools"]
+    Inner --> Engines
+    Engines --> Data["Yahoo Finance / yfinance"]
+    Worker --> Report["Evidence + review + execution trace"]
+    Report -->|"Poll and retrieve"| Claude
+    Claude --> Answer["Answer with sources and limitations"]
 ```
 
-## 🔔 Price alerts that survive restarts
+The optional research runtime runs locally beside the MCP servers. It uses Codex's
+supported sign-in flow; credentials stay with the runtime. Claude receives a
+separate MCP bearer token. No Google login is required. There is no order execution.
 
-```text
-You:  "Alert me if RELIANCE drops below ₹1,270"        → stored server-side (Postgres)
-      ...
-Bot:  "PRICE ALERT FIRED — RELIANCE.NS moved below 1270.00, now at 1268.20"
-```
+## Start here
 
-Alerts are one-shot, persist across server restarts, and pair with a scheduled Claude task that checks hourly during market hours and pushes to your phone. Setup in **[docs/price-alerts.md](docs/price-alerts.md)**.
-
-## 🎯 Why this instead of a stock screener?
-
-1. **It answers the trading question, not just the data question.** Indicators tell you RSI is 43. `build_trade_plan` tells you *entry, stop, how many shares, and where your thesis dies* — sized to your account.
-2. **India is a first-class citizen.** NSE tickers, NIFTY benchmarking, 8 Indian sector indices, ₹ formatting. Not a US tool with `.NS` bolted on.
-3. **Regression-tested calculations.** Automated tests cover indicators, allocation, ticker handling, and historical validation. Passing tests do not establish predictive investment performance. See [docs/architecture.md](docs/architecture.md).
-4. **Honest about its data.** Delayed quotes are labeled with timestamps. Stale feeds are flagged, not hidden. FX limitations are disclosed, not papered over.
-
-## 📚 Documentation
-
-| Page | What's in it |
+| What you want | Guide |
 |---|---|
-| [Getting Started](docs/getting-started.md) | Connecting from Claude Desktop, Web, and Code; cold starts; troubleshooting |
-| [Tool Reference](docs/tools.md) | 25 market tools, every parameter, response shapes |
-| [Example Prompts](docs/examples.md) | The prompt cookbook — from one-liners to full workflows |
-| [Price Alerts](docs/price-alerts.md) | Persistent alerts + the scheduled watcher pattern |
-| [Architecture & Methodology](docs/architecture.md) | How it works, data conventions, the bug audit, telemetry |
+| Run research locally and connect Claude Code | [Personal research setup](docs/research-runtime.md) |
+| Connect Claude Desktop/web or another client | [Getting started](docs/getting-started.md) |
+| Deploy authenticated market tools | [Deployment](docs/deployment.md) |
+| Understand the system and its boundaries | [Architecture and diagrams](docs/architecture.md) |
 
-## ⚠️ Honest limits
+For the local research setup, install Python 3.12 dependencies with
+`python -m pip install -r requirements_research.txt`, then follow the research
+setup guide to generate private tokens, start both servers, and connect Claude.
+The base market server only needs `requirements.txt`.
 
-- **Data**: Yahoo Finance. US quotes near-real-time; NSE/BSE ~15 min delayed. Daily bars for analysis.
-- **No** options chains, futures, intraday candles, or tick data.
-- **Not investment advice.** Educational analysis tooling. Every trade plan says so and means it.
+**Claude Code can reach your local HTTP endpoint.** Claude Desktop/web remote
+connectors connect from Anthropic's cloud and need a reachable HTTPS endpoint;
+they cannot reach your computer's `localhost`. Local Desktop stdio integrations
+are a separate connection method and are not configured by this research setup.
+
+The existing hosted endpoint is `https://mcp-quant-brain.onrender.com/mcp`.
+It requires an operator-issued bearer token. Its deployed version, research
+configuration, and Codex sign-in must be checked separately; a GitHub push or
+successful CI run does not verify that hosted deployment.
+
+## The six research roles
+
+| Role | Responsibility |
+|---|---|
+| Lead | Break the question into a research plan. |
+| Company analyst | Investigate the business, filings, and news. |
+| Quant analyst | Use calculation tools and identify data limitations. |
+| Skeptic | Challenge assumptions and conflicting evidence. |
+| Auditor | Review existing claims, request corrections, and retain uncertainty. |
+| Synthesizer | Assemble the audited conclusions and unresolved points. |
+
+Company and quant work run in parallel. **Quick** uses four roles/calls;
+**standard** adds the lead and skeptic with up to one correction round (6–8 calls);
+**deep** permits two correction rounds (6–10 calls). Calls and jobs have timeouts.
+Reports persist in owner-scoped SQLite storage; clients poll rather than hold a
+single HTTP request open. See the [workflow and lifecycle diagrams](docs/architecture.md).
+
+Example request:
+
+> Use Quant Brain to run quick research on TCS.NS. Check the latest available
+> quote and company disclosures. Poll until finished, retrieve the report,
+> and give your judgment with source dates, uncertainties, and disagreements.
+
+## What you can use it for
+
+| Ask Claude | What Quant Brain does |
+|---|---|
+| “Research TCS.NS and explain the strongest counterargument.” | Collects evidence, runs quant tools, challenges claims, and returns an audited report. |
+| “Compare RELIANCE.NS and INFY.NS over two years.” | Retrieves historical data and computes requested indicators or backtests. |
+| “Size a hypothetical long trade with ₹100,000 equity and 1% risk.” | Calculates entry, stop, shares, targets, and modeled loss with assumptions. |
+| “Review this portfolio's historical risk.” | Fits allocation on training history and evaluates frozen weights on held-out observations. |
+| “Watch these prices.” | Stores owner-scoped alerts; an external scheduler/client must poll and deliver notifications. |
+
+### From a question to an answer
+
+1. Claude calls `start_research` with your question, 1–5 NSE symbols, and a depth.
+2. Quant Brain returns a job ID and runs the specialists in the background.
+3. Claude polls `get_research_status`, then fetches `get_research_report`.
+4. Claude uses the evidence, audit warnings, and execution trace to explain its judgment.
+
+Use `cancel_research` to stop an owned job. A completed job can still report
+`insufficient_evidence`; successful execution does not imply a confident answer.
+For direct calculations, Claude calls the market tools without starting agents.
+
+## Tools
+
+| Area | Tools and capabilities |
+|---|---|
+| Research jobs | `start_research`, `get_research_status`, `get_research_report`, `cancel_research` |
+| Trading research | Quotes, news, trade sizing, watchlist scans, persistent price alerts |
+| Indicators | Six grouped tools exposing 38 curated indicators |
+| Portfolio | Seven optimization methods with chronological holdout evaluation |
+| Backtests | Seven rule-based strategy tools |
+| Intelligence | Company profiles, sector ranking, sector-to-stock pipeline |
+| Charts | Chart packs returned as rendered images |
+
+All **29 tool names, parameters, and response conventions** are documented in the
+[tool reference](docs/tools.md). The internal research MCP exposes only 21
+read-only tools; alerts, charts, and research orchestration are excluded.
+
+## Validation and limits
+
+The [validated code revision](https://github.com/paarths-collab/quant-brain-mcp/commit/a8c0df1fbf5fe80f2e1a374215c818898a5f8208)
+passed **306 tests** in GitHub CI, including PostgreSQL checks, plus HTTP and PNG
+export smoke tests. Authenticated quick and deep research runs completed. The deep
+run exercised all six roles and both correction rounds, then returned a mixed
+result with moderate confidence. Read the [validation report](docs/testing-results.md)
+for the tested scope and unresolved limitations.
+
+- **Data freshness:** free data can be delayed or unavailable. `as_of` and
+  `fetched_at` are retrieval times, not verified trade timestamps. A recent fetch
+  does not establish a fresh market price.
+- **Evidence:** SDK traces show that tools ran. They do not independently prove
+  every claim, citation, or model-written excerpt. `verification_basis` is
+  `model_review`.
+- **Backtests:** holdout performance is historical. Costs vary by tool; portfolio
+  holdout results omit fees, slippage, taxes, and currency conversion.
+- **Trade plans:** sizing limits modeled loss at the displayed stop; gaps,
+  slippage, and execution conditions can produce larger actual losses.
+- **Scope:** research jobs currently accept NSE symbols. The broader market tools
+  also support US and BSE symbols where their providers do. No automatic trading.
+
+## Documentation
+
+- [Architecture, workflow, job lifecycle, and security boundaries](docs/architecture.md)
+- [Research runtime, authentication, and Claude connection](docs/research-runtime.md)
+- [Tool reference](docs/tools.md) and [example prompts](docs/examples.md)
+- [Price alerts](docs/price-alerts.md)
+- [Deployment and operations](docs/deployment.md)
+- [Dependency maintenance](docs/dependency-maintenance.md)
+- [Validation results and remaining limitations](docs/testing-results.md)
 
 ## License
 
-[MIT](LICENSE) — use it, fork it, ship it.
-
-## Personal research agents
-
-Claude can start Indian-equity research through four additional tools: `start_research`, `get_research_status`, `get_research_report`, and `cancel_research`. The optional Codex runtime coordinates a lead, company analyst, quant analyst, skeptic, auditor, and synthesizer. See [runtime setup](docs/research-runtime.md) for installation, authentication, and both MCP servers. An authenticated quick research job has completed with live web search and quote calls; broader accuracy evaluation remains necessary before relying on its reports.
+[MIT](LICENSE).

@@ -220,10 +220,10 @@ def get_quote(tickers: list[str]) -> dict:
     """Current price snapshot for one or more tickers (US and Indian).
 
     Returns last price, day change %, day and 52-week ranges, position within
-    the 52-week range, and volume vs 3-month average, with an `as_of`
-    timestamp. US quotes are near-real-time; NSE/BSE quotes are ~15 minutes
-    delayed (disclosed in the response). For to-the-second Indian prices
-    during market hours, supplement with a live web search.
+    the 52-week range, and volume vs 3-month average. `as_of` and `fetched_at`
+    record retrieval time, not market observation time. `market_timestamp`
+    is null and freshness is unknown. The provider delay note is approximate;
+    web search is not a real-time quote feed.
     """
     return serialize_output(run_get_quotes(tickers))
 
@@ -240,11 +240,12 @@ def build_trade_plan(
 
     The answer to "what do I do?": given account equity and the percent of it
     you are willing to risk, returns an entry reference (last close), a
-    structural stop (tighter of recent swing level or 2x ATR, never inside
-    daily noise), the exact number of shares so a stop-out loses only the
-    risk budget, 1R/2R/3R targets, a liquidity check (order as % of 20-day
-    turnover), and a one-line invalidation. Educational analysis, not
-    investment advice.
+    structural stop (tighter of recent swing level or 2x ATR, with a minimum
+    distance of 0.75 ATR), whole shares sized within the modeled risk budget,
+    1R/2R/3R targets, a liquidity check (order as % of 20-day turnover), and
+    a one-line invalidation. `max_loss` assumes execution at the stop; gaps,
+    slippage and fees can increase actual losses. This calculation places
+    no order.
     """
     from core.data_loader import resolve_ticker
 
