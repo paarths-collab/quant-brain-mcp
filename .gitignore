@@ -25,3 +25,25 @@ coverage.xml
 # OS artifacts
 .DS_Store
 Thumbs.db
+
+# Private research state and credentials
+.quant-brain/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.worker.lock
+
+# Local authentication, agent installations, and diagnostics
+.env.*
+!.env.example
+.codex/
+.auth/
+auth.json
+credentials.json
+*.pem
+*.key
+*.log
+codex
+codex-cli
+codex.exe
+codex-cli.exe

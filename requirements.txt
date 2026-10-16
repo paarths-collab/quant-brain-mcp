@@ -1,11 +1,2 @@
-mcp==1.26.0
-uvicorn
-yfinance
-pandas-ta==0.4.71b0
-vectorbt
-plotly
-kaleido
-PyPortfolioOpt
-pandas
-numpy
-psycopg2-binary
+# Canonical reproducible runtime installation (Python 3.12).
+-r requirements.lock

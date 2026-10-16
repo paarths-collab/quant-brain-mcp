@@ -28,6 +28,14 @@ sequenceDiagram
     Note over S: alert deactivates (one-shot, never spams)
 ```
 
+## Authentication and migration
+
+Alerts require a verified bearer token configured by the server's `MCP_API_KEYS` setting. Each configured owner receives a separate token. Ownership is derived from the authenticated request, never from tool arguments. The scheduled watcher must use the same owner's credentials. Requests without an authenticated owner cannot access alerts.
+
+Existing tables are migrated with a nullable `owner_id` column. Historical ownerless alerts remain inaccessible; an administrator must assign them to a verified owner or remove them. Never automatically assign all historical alerts to the first caller.
+
+Concurrent polls use an atomic conditional update: only the poll that deactivates an active alert reports it as triggered. This prevents duplicate reports, but notification delivery is not guaranteed if the connection is lost after the database update. Alerts are informational polling reminders, not execution guarantees or broker stop orders.
+
 ## Setting alerts
 
 In any Claude chat with the connector attached:
@@ -74,6 +82,7 @@ The alert tool is callable like any MCP tool, so you can also wire it into your 
 
 ```bash
 curl -s -X POST https://mcp-quant-brain.onrender.com/mcp \
+  -H "Authorization: Bearer $QUANT_API_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{

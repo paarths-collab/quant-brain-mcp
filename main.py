@@ -40,7 +40,7 @@ async def handle_list_tools() -> list[types.Tool]:
     tools = [
         types.Tool(
             name="generate_optimized_verdict",
-            description="The Ultimate Tool: Optimizes a cross-market portfolio (US/India), backtests it, and provides a final Verdict.",
+            description="Fits portfolio weights to early historical data and evaluates frozen weights on a later holdout; returns historical research diagnostics.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -232,7 +232,7 @@ def run_generate_optimized_verdict(
     from core.data_loader import resolve_ticker
     from tools.optimization.mean_variance import run_mvo_basic
     from tools.optimization.hierarchical_risk_parity import optimize as run_hrp_optimize
-    from tools.backtesting.portfolio_bt import backtest_optimized_portfolio
+    from tools.backtesting.portfolio_bt import backtest_optimized_portfolio, split_validation_history
 
     requested_tickers = list(tickers)
     data_dict = {}
@@ -256,10 +256,13 @@ def run_generate_optimized_verdict(
     if not data_dict:
         return {"error": "Could not fetch data for provided tickers.", "excluded_tickers": excluded_tickers}
 
-    price_df = pd.DataFrame(data_dict).ffill().dropna()
+    price_df = pd.DataFrame(data_dict).sort_index().ffill().dropna()
     
     try:
-        # Step 1: Optimize
+        # Split before estimating any moments, views, or weights. The held-out
+        # segment never enters optimization; weights remain frozen thereafter.
+        training_prices, validation_prices, validation_metadata = split_validation_history(price_df)
+        # Step 1: Optimize on training data only.
         # NOTE: prices are each ticker's own LOCAL currency (USD for US
         # tickers, INR for .NS/.BO). A previous "USD normalization" step
         # divided Indian prices by a single spot FX rate, which cancels out
@@ -267,12 +270,12 @@ def run_generate_optimized_verdict(
         # either way) -- it gave the appearance of modeling FX risk while
         # doing nothing. It has been removed; see `fx_note` in the result.
         opt_key = str(optimize_type or "mvo").strip().lower()
-        returns = price_df.pct_change(fill_method=None).dropna()
+        returns = training_prices.pct_change(fill_method=None).dropna()
         mu = returns.mean() * 252
         S = returns.cov() * 252
 
         if opt_key == "hrp":
-            opt_results = run_hrp_optimize(price_df)
+            opt_results = run_hrp_optimize(training_prices)
             weights = opt_results["optimized_weights"]
         elif opt_key == "min_volatility":
             opt_results = run_mvo_basic(mu, S, target="min_volatility")
@@ -280,7 +283,7 @@ def run_generate_optimized_verdict(
         elif opt_key == "max_sharpe":
             from tools.optimization.markowitz_mvo import optimize as run_markowitz_optimize
 
-            opt_results = run_markowitz_optimize(price_df)
+            opt_results = run_markowitz_optimize(training_prices)
             weights = opt_results["optimized_weights"]
         elif opt_key == "black_litterman":
             from pypfopt import EfficientFrontier
@@ -291,7 +294,7 @@ def run_generate_optimized_verdict(
                 best_asset = str(mu.idxmax())
                 implied_views = {best_asset: float(mu.loc[best_asset])}
 
-            bl_res = run_black_litterman_optimize(price_df, views=implied_views)
+            bl_res = run_black_litterman_optimize(training_prices, views=implied_views)
             posterior_returns = pd.Series(bl_res["posterior_returns"])
             posterior_cov = pd.DataFrame(bl_res["posterior_covariance"])
             ef = EfficientFrontier(posterior_returns, posterior_cov)
@@ -311,7 +314,7 @@ def run_generate_optimized_verdict(
             weights = opt_results["weights"]
         
         # Step 2: Backtest
-        bt_results = backtest_optimized_portfolio(price_df, weights)
+        bt_results = backtest_optimized_portfolio(validation_prices, weights)
         actual_sharpe = float(bt_results['portfolio_sharpe'])
         
         # Step 3: Institutional intelligence, blended across the WHOLE portfolio.
@@ -343,9 +346,9 @@ def run_generate_optimized_verdict(
 
         # Step 4: Risk-adjusted verdicts, computed from the portfolio-wide blend.
         backtest_verdict = "STAY AWAY"
-        if actual_sharpe > 1.2:
+        if math.isfinite(actual_sharpe) and actual_sharpe > 1.2:
             backtest_verdict = "STRONG BUY"
-        elif actual_sharpe > 0.7:
+        elif math.isfinite(actual_sharpe) and actual_sharpe > 0.7:
             backtest_verdict = "PROPER"
 
         alpha_value = blended_intel["alpha_annualized"] if blended_intel else None
@@ -353,23 +356,9 @@ def run_generate_optimized_verdict(
         r_squared = blended_intel["r_squared"] if blended_intel else None
         one_day_var_pct = blended_intel["one_day_var_95_pct"] if blended_intel else 0.0
 
-        # A clearly bad backtest (non-finite or non-positive Sharpe) must be
-        # able to surface as STAY AWAY. Previously this branch unconditionally
-        # overwrote strategic_verdict with REDUCE/ACCUMULATE/NEUTRAL whenever
-        # alpha was numeric -- true almost every call -- which made STAY AWAY
-        # structurally unreachable even for a portfolio that lost money with a
-        # deeply negative Sharpe (it would still show e.g. "NEUTRAL").
-        if not math.isfinite(actual_sharpe) or actual_sharpe <= 0:
-            strategic_verdict = "STAY AWAY"
-        elif isinstance(alpha_value, (int, float)):
-            if alpha_value < 0:
-                strategic_verdict = "REDUCE"
-            elif actual_sharpe >= 0.9 and alpha_value > 0.02:
-                strategic_verdict = "ACCUMULATE"
-            else:
-                strategic_verdict = "NEUTRAL"
-        else:
-            strategic_verdict = backtest_verdict
+        # Verdict is based exclusively on held-out performance. Full-history
+        # alpha/risk diagnostics are descriptive and never upgrade this label.
+        strategic_verdict = backtest_verdict
 
         capital_at_risk = abs(one_day_var_pct) / 100 * float(amount)
         capital_plan = "LUMP_SUM_ACCEPTABLE"
@@ -389,7 +378,7 @@ def run_generate_optimized_verdict(
             risk_flags.append("Tail risk elevated (95% 1-day VaR below -3%)")
 
         reasoning = (
-            f"Portfolio optimization ({opt_key.upper()}) produced Sharpe {actual_sharpe:.2f}, "
+            f"Chronological holdout evaluation ({opt_key.upper()}, frozen training weights) produced Sharpe {actual_sharpe:.2f}, "
             f"total return {bt_results['portfolio_total_return']}, and max drawdown {bt_results['portfolio_drawdown']}."
         )
 
@@ -426,6 +415,15 @@ def run_generate_optimized_verdict(
                 "INR for .NS/.BO tickers); FX risk between markets is not modeled."
             ),
             "recommended_weights": weights,
+            "weight_basis": "Training-period weights, frozen before holdout; not refit on full history.",
+            "validation": validation_metadata,
+            "assessment_type": "Historical research heuristic; not a suitability assessment or prediction.",
+            "limitations": [
+                "A single chronological holdout is not walk-forward validation or evidence of future returns.",
+                "Repeated strategy selection against this holdout can overfit it.",
+                "Risk and alpha diagnostics use full history and are descriptive, not out-of-sample evidence.",
+                "Transaction costs, slippage, taxes, and currency conversion are not modeled.",
+            ],
             "portfolio_intelligence": {
                 "per_ticker": per_ticker_intel,
                 "blended": blended_intel,

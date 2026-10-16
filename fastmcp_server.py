@@ -5,6 +5,12 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Literal
 import base64
+import functools
+import asyncio
+import inspect
+import threading
+
+from core.http_security import authenticated_owner
 
 import plotly.graph_objects as go
 import mcp.types as types
@@ -105,6 +111,9 @@ mcp = FastMCP(
 )
 
 
+_TOOL_SLOTS = threading.BoundedSemaphore(4)
+
+
 def tracked_tool(category: str):
     """Register an MCP tool with usage telemetry attached.
 
@@ -113,7 +122,33 @@ def tracked_tool(category: str):
     """
 
     def decorator(fn):
-        return mcp.tool()(telemetry.instrument(fn, category, mcp.get_context))
+        instrumented = telemetry.instrument(fn, category, mcp.get_context)
+
+        @functools.wraps(fn)
+        async def dispatch(*args, **kwargs):
+            # Reject oversized workloads before network calls or numerical work.
+            bound = inspect.signature(fn).bind(*args, **kwargs)
+            for name in ("tickers", "indicators"):
+                value = bound.arguments.get(name)
+                if value is not None and len(value) > 25:
+                    raise ValueError(f"{name} accepts at most 25 entries")
+            # Yahoo, solvers, and chart rendering are synchronous. Run them off
+            # the event loop so health checks and other clients remain responsive.
+            if not _TOOL_SLOTS.acquire(blocking=False):
+                raise ValueError("Analysis capacity reached; retry when current jobs finish")
+            def run_bounded():
+                try:
+                    return instrumented(*args, **kwargs)
+                finally:
+                    _TOOL_SLOTS.release()
+            # Cancellation of HTTP must not free a slot while its thread still
+            # runs. The worker itself owns/relinquishes its capacity token.
+            task = asyncio.create_task(asyncio.to_thread(run_bounded))
+            task.add_done_callback(lambda done: done.exception() if not done.cancelled() else None)
+            return await asyncio.shield(task)
+
+        mcp.tool()(dispatch)
+        return fn
 
     return decorator
 
@@ -140,8 +175,8 @@ async def metrics_summary(request: Request) -> Response:
 
     try:
         summary = await asyncio.to_thread(telemetry.fetch_summary)
-    except Exception as exc:
-        return JSONResponse({"error": f"metrics query failed: {exc}"}, status_code=500)
+    except Exception:
+        return JSONResponse({"error": "metrics storage unavailable"}, status_code=503)
 
     if summary is None:
         return JSONResponse({"error": "DATABASE_URL not configured"}, status_code=503)
@@ -260,7 +295,8 @@ def price_alert(
     """
     return serialize_output(
         manage_alert(
-            action, ticker=ticker, level=level, direction=direction, alert_id=alert_id, note=note
+            action, ticker=ticker, level=level, direction=direction, alert_id=alert_id, note=note,
+            owner_id=authenticated_owner.get()
         )
     )
 
@@ -636,5 +672,54 @@ def analyze_statistics(ticker: str, indicators: list[str] | None = None, period:
     return run_group("statistics", ticker, indicators, period=period)
 
 
+
+def _research_call(method: str, **kwargs) -> dict:
+    owner = authenticated_owner.get()
+    if not owner:
+        return {"error": "Authentication required for research jobs"}
+    from core.research_service import get_research_service
+    try:
+        return getattr(get_research_service(), method)(owner, **kwargs)
+    except (ValueError, ImportError) as exc:
+        # These are local validation/configuration errors, not provider output.
+        return {"error": str(exc) if isinstance(exc, ValueError) else "Install requirements_research.txt to enable research agents"}
+
+
+@tracked_tool("research")
+def start_research(question: str, tickers: list[str], depth: Literal["quick", "standard", "deep"] = "standard") -> dict:
+    """Start private NSE equity research with internal Codex agents; returns a job ID.
+
+    Use 1–5 NSE symbols (e.g. RELIANCE.NS). Quick uses four model calls;
+    standard uses up to eight, deep up to ten. Jobs consume the configured
+    Codex account allowance. Poll get_research_status, then retrieve the report.
+    Prices may be delayed. No orders are placed. Research is not a guarantee.
+    """
+    return _research_call("start", question=question, tickers=tickers, depth=depth)
+
+
+@tracked_tool("research")
+def get_research_status(job_id: str) -> dict:
+    """Read the owner's research job state/stage. Poll no more often than every 5 seconds."""
+    return _research_call("status", job_id=job_id)
+
+
+@tracked_tool("research")
+def get_research_report(job_id: str) -> dict:
+    """Retrieve the owner's completed evidence report, disagreements, limitations and stage history.
+
+    Verification claims are agent assessments; independently inspect sources before
+    relying on conclusions. Incomplete or failed jobs never return a fabricated report.
+    """
+    return _research_call("report", job_id=job_id)
+
+
+@tracked_tool("research")
+def cancel_research(job_id: str) -> dict:
+    """Cancel the owner's queued/running research. Already spent model usage is not refunded."""
+    return _research_call("cancel", job_id=job_id)
+
+
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    import uvicorn
+
+    uvicorn.run("render_app:app", host=os.getenv("HOST", "127.0.0.1"), port=int(os.getenv("PORT", "8000")))

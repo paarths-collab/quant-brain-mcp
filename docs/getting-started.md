@@ -1,6 +1,6 @@
 # Getting Started
 
-Connect once, then everything is plain English. No API keys, no accounts, no local install.
+Hosted connections require an operator-issued bearer token. Use a client with custom Authorization-header support; this server does not provide an OAuth login flow. See [deployment configuration](deployment.md).
 
 ## The URL
 
@@ -15,13 +15,13 @@ Transport: **Streamable HTTP**.
 1. Open **Settings → Connectors** (or MCP integrations).
 2. **Add custom connector**.
 3. Transport: **Streamable HTTP**, URL as above.
-4. Save and connect. Approve the tool permissions when prompted.
+4. Supply the operator-issued bearer token if your client supports custom headers. Otherwise use a compatible authenticated gateway; the URL alone is insufficient.
 
 ## Claude Web (claude.ai)
 
 1. **Settings → Connectors → Add custom connector**.
 2. Streamable HTTP, same URL.
-3. Connect.
+3. Configure bearer authentication through a supported client or gateway before connecting.
 
 ## Claude Code (CLI)
 
@@ -31,7 +31,7 @@ claude mcp add quant-brain --transport http https://mcp-quant-brain.onrender.com
 
 ## Other MCP clients
 
-Any client that speaks MCP streamable HTTP works — point it at the URL above. The server is also listed in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=quant-brain-mcp) as `io.github.paarths-collab/quant-brain-mcp`.
+An MCP streamable HTTP client with bearer-header support works — point it at the URL above. The server is also listed in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=quant-brain-mcp) as `io.github.paarths-collab/quant-brain-mcp`.
 
 ## First prompt to try
 
@@ -70,7 +70,7 @@ The server runs stateless HTTP. Reconnect the client and confirm the URL ends in
 - Some symbols change after corporate actions — e.g. Tata Motors' passenger-vehicle listing is now `TMPV.NS`.
 - Yahoo occasionally rate-limits; retry after a few seconds.
 
-## Data expectations (read once, trust forever)
+## Data expectations
 
 - **US quotes**: near-real-time.
 - **NSE/BSE quotes**: ~15 minutes delayed. Every quote response carries `as_of` and a delay note.

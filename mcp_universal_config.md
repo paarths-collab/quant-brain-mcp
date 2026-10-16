@@ -4,8 +4,8 @@ This guide provides the configuration snippets required to connect the `mcp-quan
 
 ## Global Parameters
 
-- **Python Executable**: `c:/Users/PaarthGala/Coding/mcp-quant-brain/.venv/Scripts/python.exe`
-- **Main Script**: `c:/Users/PaarthGala/Coding/mcp-quant-brain/main.py`
+- **Python Executable**: `C:/projects/quant-brain-mcp/.venv/Scripts/python.exe`
+- **Main Script**: `C:/projects/quant-brain-mcp/main.py`
 
 ---
 
@@ -19,8 +19,8 @@ Add the following to your `mcpServers` object:
 {
   "mcpServers": {
     "mcp-quant-brain": {
-      "command": "c:/Users/PaarthGala/Coding/mcp-quant-brain/.venv/Scripts/python.exe",
-      "args": ["c:/Users/PaarthGala/Coding/mcp-quant-brain/main.py"],
+      "command": "C:/projects/quant-brain-mcp/.venv/Scripts/python.exe",
+      "args": ["C:/projects/quant-brain-mcp/main.py"],
       "env": {
         "YFINANCE_CACHE": "True",
         "DEFAULT_MARKET": "US"
@@ -42,8 +42,8 @@ Add the following to your `mcpServers` object:
 {
   "mcpServers": {
     "mcp-quant-brain": {
-      "command": "c:/Users/PaarthGala/Coding/mcp-quant-brain/.venv/Scripts/python.exe",
-      "args": ["c:/Users/PaarthGala/Coding/mcp-quant-brain/main.py"],
+      "command": "C:/projects/quant-brain-mcp/.venv/Scripts/python.exe",
+      "args": ["C:/projects/quant-brain-mcp/main.py"],
       "env": {
         "YFINANCE_CACHE": "True",
         "DEFAULT_MARKET": "US"
@@ -66,8 +66,8 @@ Add the following configuration:
 {
   "mcpServers": {
     "mcp-quant-brain": {
-      "command": "c:/Users/PaarthGala/Coding/mcp-quant-brain/.venv/Scripts/python.exe",
-      "args": ["c:/Users/PaarthGala/Coding/mcp-quant-brain/main.py"],
+      "command": "C:/projects/quant-brain-mcp/.venv/Scripts/python.exe",
+      "args": ["C:/projects/quant-brain-mcp/main.py"],
       "env": {
         "YFINANCE_CACHE": "True",
         "DEFAULT_MARKET": "US"
@@ -91,7 +91,7 @@ Cursor allows you to add MCP servers via the GUI:
 5. Set the type to `command`.
 6. Use the following command string:
    ```text
-   c:/Users/PaarthGala/Coding/mcp-quant-brain/.venv/Scripts/python.exe c:/Users/PaarthGala/Coding/mcp-quant-brain/main.py
+   C:/projects/quant-brain-mcp/.venv/Scripts/python.exe C:/projects/quant-brain-mcp/main.py
    ```
 
 ---
@@ -100,8 +100,8 @@ Cursor allows you to add MCP servers via the GUI:
 
 For any client that supports the MCP protocol via `stdio`, use:
 
-- **Command**: `c:/Users/PaarthGala/Coding/mcp-quant-brain/.venv/Scripts/python.exe`
-- **Arguments**: `["c:/Users/PaarthGala/Coding/mcp-quant-brain/main.py"]`
+- **Command**: `C:/projects/quant-brain-mcp/.venv/Scripts/python.exe`
+- **Arguments**: `["C:/projects/quant-brain-mcp/main.py"]`
 - **Environment**:
   - `YFINANCE_CACHE`: `True`
   - `DEFAULT_MARKET`: `US`

@@ -115,3 +115,12 @@ Optional environment variables:
 | `METRICS_TOKEN` | Bearer token for `/metrics/summary`. Unset = endpoint returns 503 (fails closed). |
 
 Passwords with special characters (`@`, `#`) in `DATABASE_URL` are handled — paste them raw.
+
+
+## Chronological portfolio validation
+
+Portfolio optimization fits weights on the earliest 70% of aligned history and evaluates those frozen weights on the latest 30%. At least 126 training observations and 63 holdout observations are required. Purchases occur at the first holdout close, with no return credited across the training boundary. Returned weights are the historical training allocation, not a refit using current data.
+
+The historical verdict uses holdout performance only. Full-history alpha and risk fields are descriptive diagnostics and cannot upgrade that verdict. Response metadata discloses training/evaluation dates, unmodeled fees and slippage, and other limitations. A single holdout is not walk-forward validation or evidence of future returns.
+
+Hosted HTTP is protected by operator-provisioned bearer tokens; stable verified owner IDs scope persistent alerts. Authentication, request admission, and deployment prerequisites are described in [deployment configuration](deployment.md).

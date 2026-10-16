@@ -5,7 +5,7 @@ services:
     plan: free
     region: oregon
     autoDeploy: true
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && kaleido_get_chrome && python smoke_test.py
     startCommand: uvicorn render_app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
@@ -16,6 +16,8 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: DATABASE_URL
+        sync: false
+      - key: MCP_API_KEYS
         sync: false
       - key: METRICS_TOKEN
         sync: false

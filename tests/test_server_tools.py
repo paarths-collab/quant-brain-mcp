@@ -6,6 +6,7 @@ import importlib
 import pytest
 
 EXPECTED_TOOLS = {
+    "start_research", "get_research_status", "get_research_report", "cancel_research",
     # grouped indicators
     "analyze_momentum",
     "analyze_technical_levels",
@@ -54,13 +55,13 @@ def _list_tools(server):
 def test_tool_surface_is_exactly_the_curated_set(server):
     names = {tool.name for tool in _list_tools(server)}
     assert names == EXPECTED_TOOLS
-    assert len(names) == 25
+    assert len(names) == 29
 
 
 def test_no_individual_indicator_tools_exposed(server):
     """get_* names are reserved for non-indicator tools; the 38 indicators
     must only surface through the 6 grouped analyze_* tools."""
-    allowed_get_tools = {"get_company_profile", "get_quote", "get_news"}
+    allowed_get_tools = {"get_company_profile", "get_quote", "get_news", "get_research_status", "get_research_report"}
     names = {tool.name for tool in _list_tools(server)}
     assert not any(name.startswith("get_") and name not in allowed_get_tools for name in names)
 
@@ -150,3 +151,14 @@ def test_metrics_summary_503_when_no_database(server, monkeypatch):
         _get(server, "/metrics/summary", {"authorization": "Bearer secret-token"})
     )
     assert response["status"] == 503
+
+
+def test_metrics_storage_failure_does_not_disclose_connection_details(server, monkeypatch):
+    monkeypatch.setenv("METRICS_TOKEN", "secret-token")
+    def fail():
+        raise RuntimeError("postgres://user:private-password@internal-host/database")
+    monkeypatch.setattr(server.telemetry, "fetch_summary", fail)
+    response = asyncio.run(_get(server, "/metrics/summary", {"authorization": "Bearer secret-token"}))
+    assert response["status"] == 503
+    assert b"private-password" not in response["body"]
+    assert b"internal-host" not in response["body"]

@@ -159,7 +159,8 @@ def test_stay_away_reachable_on_bad_backtest():
 
 def test_verdict_reasonable_paths_still_reachable():
     """Regression: a healthy uptrending portfolio should not be STAY AWAY."""
-    stub = _stub({"GOODCO": 1, "^GSPC": 2}, drift=0.0015, vol=0.008)
+    # Strong positive drift in the held-out segment, not merely full history.
+    stub = _stub({"GOODCO": 1, "^GSPC": 2}, drift=0.003, vol=0.008)
     with patch("core.data_loader.fetch_stock_data", side_effect=stub):
         result = run_generate_optimized_verdict(["GOODCO"], 10000, "min_volatility")
 

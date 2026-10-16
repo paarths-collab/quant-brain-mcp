@@ -7,7 +7,7 @@
 Ask in plain English. Get sized trade plans, portfolio optimization, backtests, and price alerts — grounded in real market data, not vibes.
 
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-listed-0e6e5c)](https://registry.modelcontextprotocol.io/v0.1/servers?search=quant-brain-mcp)
-[![Tests](https://img.shields.io/badge/tests-161%20passing-0e6e5c)](tests/)
+[![Tests](https://github.com/paarths-collab/quant-brain-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/paarths-collab/quant-brain-mcp/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](requirements.txt)
 
@@ -30,7 +30,9 @@ Claude: RELIANCE.NS flagged (at 20-DMA, volume 1.8x average).
         Invalidation    Thesis invalid below ₹1,270.10 — exit without debate.
 ```
 
-No API keys. No accounts. Connect one URL and start asking.
+Hosted access requires an operator-issued bearer token. See [deployment and release checks](docs/deployment.md) for authentication, storage, and verification.
+
+For self-hosting, follow [deployment configuration](docs/deployment.md) and [dependency maintenance](docs/dependency-maintenance.md). The documented hosted URL may run an earlier release until its operator deploys these changes.
 
 ## ⚡ Quickstart
 
@@ -40,11 +42,11 @@ No API keys. No accounts. Connect one URL and start asking.
 https://mcp-quant-brain.onrender.com/mcp
 ```
 
-That's the whole setup. Try: *"What's RELIANCE trading at, and is it overbought?"*
+Configure your client to send its bearer token. Clients without custom authorization-header support need a compatible authenticated gateway. Try: *"What's RELIANCE trading at, and is it overbought?"*
 
 > Free-tier note: the server sleeps when idle and takes ~50 s to wake. If the first request times out, retry once. Details in [Getting Started](docs/getting-started.md).
 
-## 🛠 What you get — 25 tools
+## 🛠 What you get — 29 tools
 
 | | Tools | What they answer |
 |---|---|---|
@@ -85,7 +87,7 @@ Alerts are one-shot, persist across server restarts, and pair with a scheduled C
 
 1. **It answers the trading question, not just the data question.** Indicators tell you RSI is 43. `build_trade_plan` tells you *entry, stop, how many shares, and where your thesis dies* — sized to your account.
 2. **India is a first-class citizen.** NSE tickers, NIFTY benchmarking, 8 Indian sector indices, ₹ formatting. Not a US tool with `.NS` bolted on.
-3. **The numbers are audited.** Every calculation was adversarially tested against textbook references and live data — 161 automated tests pin the math, including regression tests for 11 real bugs found and fixed along the way. See [docs/architecture.md](docs/architecture.md).
+3. **Regression-tested calculations.** Automated tests cover indicators, allocation, ticker handling, and historical validation. Passing tests do not establish predictive investment performance. See [docs/architecture.md](docs/architecture.md).
 4. **Honest about its data.** Delayed quotes are labeled with timestamps. Stale feeds are flagged, not hidden. FX limitations are disclosed, not papered over.
 
 ## 📚 Documentation
@@ -93,7 +95,7 @@ Alerts are one-shot, persist across server restarts, and pair with a scheduled C
 | Page | What's in it |
 |---|---|
 | [Getting Started](docs/getting-started.md) | Connecting from Claude Desktop, Web, and Code; cold starts; troubleshooting |
-| [Tool Reference](docs/tools.md) | All 25 tools, every parameter, response shapes |
+| [Tool Reference](docs/tools.md) | 25 market tools, every parameter, response shapes |
 | [Example Prompts](docs/examples.md) | The prompt cookbook — from one-liners to full workflows |
 | [Price Alerts](docs/price-alerts.md) | Persistent alerts + the scheduled watcher pattern |
 | [Architecture & Methodology](docs/architecture.md) | How it works, data conventions, the bug audit, telemetry |
@@ -107,3 +109,7 @@ Alerts are one-shot, persist across server restarts, and pair with a scheduled C
 ## License
 
 [MIT](LICENSE) — use it, fork it, ship it.
+
+## Personal research agents
+
+Claude can start Indian-equity research through four additional tools: `start_research`, `get_research_status`, `get_research_report`, and `cancel_research`. The optional Codex runtime coordinates a lead, company analyst, quant analyst, skeptic, auditor, and synthesizer. See [runtime setup](docs/research-runtime.md) for installation, authentication, and both MCP servers. An authenticated quick research job has completed with live web search and quote calls; broader accuracy evaluation remains necessary before relying on its reports.

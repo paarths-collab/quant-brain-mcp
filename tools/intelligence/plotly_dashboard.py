@@ -32,7 +32,7 @@ def _to_pct_number(value: Any) -> float | None:
 
 def _to_plotly_json(fig: go.Figure) -> dict[str, Any]:
     # Round-trip via JSON to guarantee each chart payload is fully detached.
-    return json.loads(json.dumps(fig.to_plotly_json(), default=str))
+    return json.loads(fig.to_json())
 
 
 _DEFAULT_CHART_ORDER = [

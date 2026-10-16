@@ -1,4 +1,6 @@
 from fastmcp_server import mcp
+from core.http_security import SecureMCPMiddleware
+from core.research_service import ResearchLifecycle
 
-# Use FastMCP's Starlette app directly so lifespan initializes session manager.
-app = mcp.streamable_http_app()
+# Preserve the FastMCP lifespan while authenticating all hosted MCP traffic.
+app = ResearchLifecycle(SecureMCPMiddleware(mcp.streamable_http_app()))

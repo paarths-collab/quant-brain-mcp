@@ -1,0 +1,4 @@
+# Optional local agent runtime; install with Python 3.12.
+-r requirements.txt
+openai-codex==0.163.0
+openai-codex-cli-bin==0.163.0
