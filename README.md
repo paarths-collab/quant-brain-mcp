@@ -201,6 +201,7 @@ revision's Linux checks.
 
 - [Proposed global market research roadmap](docs/global-research-roadmap.md)
 - [Architecture, workflow, job lifecycle, and security boundaries](docs/architecture.md)
+- [Evaluation metrics and public benchmark design](docs/evaluation.md)
 - [Agents, exact tool catalog, and proposed permissions](docs/agents-and-tools.md)
 - [Research runtime, authentication, and Claude connection](docs/research-runtime.md)
 - [Tool reference](docs/tools.md) and [example prompts](docs/examples.md)
