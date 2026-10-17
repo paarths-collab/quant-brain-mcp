@@ -53,7 +53,21 @@ The outer server uses FastMCP's stateless HTTP transport. Research jobs are inde
 The [agent and tool map](agents-and-tools.md) lists exact role IDs, tool names,
 inputs/outputs, and the distinction between intended use and enforced access.
 
-The agents are roles implemented by separate Codex turns, not six permanently running services. Python controls their ordering and budgets. Each turn uses a temporary working directory and an ephemeral Codex thread. Model selection is configurable with `QUANT_CODEX_MODEL`; an unset value uses the runtime default.
+The agents are roles implemented by separate Codex turns, not six permanently running services. A Python LangGraph `StateGraph` controls their ordering, parallel analyst join, and bounded correction loop. Each turn uses a temporary working directory and an ephemeral Codex thread. Model selection is configurable with `QUANT_CODEX_MODEL`; an unset value uses the runtime default.
+
+`core/research_graph.py` compiles a graph per job. Separate state fields hold role
+results, the latest audit, and the correction-round counter. The existing
+`research_workflow.py` retains prompt construction, evidence admission, invocation
+budgets and report quality checks. LangGraph schedules company and quant as
+parallel nodes; a join edge waits for both before review. Auditor conditional
+edges either request another correction or proceed to synthesis.
+
+No LangGraph cloud service, API key or LangSmith account is required. Remote
+LangSmith tracing is disabled for these jobs. Nodes do not automatically retry
+model calls. The existing SQLite store still persists job status and final
+reports; graph checkpoints and automatic restart/resume are **not enabled**.
+Enabling durable resume later requires persisting evidence and runtime state
+together and preventing duplicate model/tool calls.
 
 | Role | Responsibility |
 |---|---|
@@ -217,7 +231,8 @@ core/
   http_security.py         Bearer identities and HTTP admission limits
   research_service.py      Queue, worker lock, cancellation and job deadline
   research_store.py        SQLite jobs, reports and progress events
-  research_workflow.py     Role ordering, schemas and report validation
+  research_graph.py        LangGraph nodes, parallel join and correction routing
+  research_workflow.py     Role prompts, evidence admission, schemas and report validation
   research_runtime.py      Codex SDK configuration, turn limits and execution trace
   research_tools.py        Internal tool allowlist
   data_loader.py           Historical market-data retrieval
@@ -235,8 +250,8 @@ The implementation is a single-host research system. Distributed job scheduling,
 
 Status: proposed design. Keep the Python calculation engines and MCP interface,
 then add provider contracts, isolated research workers, and evidence storage in
-stages. The current single-host system remains the starting point; no new
-orchestration framework or distributed queue has been selected or implemented.
+stages. The current single-host system uses LangGraph for role orchestration;
+distributed queues and durable graph resumption remain future work.
 
 ```mermaid
 flowchart TB

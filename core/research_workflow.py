@@ -1,7 +1,6 @@
 """Bounded, evidence-first research orchestration; no model credentials live here."""
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, Literal, Protocol
@@ -191,25 +190,11 @@ async def run_research(
             await on_event(key, {"status": "completed"})
         return result
 
-    if depth != "quick":
-        await invoke("lead")
-    tasks = [asyncio.create_task(invoke(role)) for role in ("company", "quant")]
-    try:
-        await asyncio.gather(*tasks)
-    except BaseException:
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        raise
-    if depth != "quick":
-        await invoke("skeptic")
-    audit = await invoke("auditor")
-    for index in range(0 if depth == "quick" else 2 if depth == "deep" else 1):
-        if not audit.needs_correction:
-            break
-        await invoke("company", f"correction_{index + 1}")
-        audit = await invoke("auditor", f"audit_{index + 1}")
-    synthesis = await invoke("synthesizer")
+    from core.research_graph import run_role_graph
+
+    graph_state = await run_role_graph(invoke, depth)
+    audit = graph_state["audit_result"]
+    synthesis = graph_state["synthesis_result"]
     source_retrievals = await retrieve_sources(evidence.values(), retrieval_cache)
     verified = set(audit.verified_claim_ids)
     selected = synthesis.claims

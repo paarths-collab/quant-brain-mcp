@@ -1,5 +1,6 @@
 # Supported runtime: Python 3.12. Regenerate requirements.lock with uv pip compile.
 mcp==1.26.0
+langgraph==1.2.16
 uvicorn==0.54.0
 yfinance==1.7.0
 pandas-ta==0.4.71b0

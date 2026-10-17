@@ -98,7 +98,11 @@ Company and quant work run in parallel. **Quick** uses four roles/calls;
 **standard** adds the lead and skeptic with up to one correction round (6–8 calls);
 **deep** permits two correction rounds (6–10 calls). Calls and jobs have timeouts.
 Reports persist in owner-scoped SQLite storage; clients poll rather than hold a
-single HTTP request open. See the [workflow and lifecycle diagrams](docs/architecture.md).
+single HTTP request open. LangGraph orchestrates the research roles: company and
+quant run in parallel, then review and bounded correction precede synthesis.
+It runs locally inside the backend; no LangGraph cloud account is needed.
+SQLite stores jobs and reports; automatic graph crash-resume is not enabled.
+See the [workflow and lifecycle diagrams](docs/architecture.md).
 Separate jobs execute one at a time; parallel role execution does not mean
 unlimited simultaneous research jobs.
 

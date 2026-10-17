@@ -26,7 +26,7 @@ from introducing new claims or evidence. Role-specific allowlists are future wor
 
 A correction is an additional invocation of `company`, instructed to address
 all audit challenges, including recalculating quantitative errors. It is not a
-seventh permanent agent. The Python workflow schedules roles; agents cannot spawn
+seventh permanent agent. The Python LangGraph workflow schedules roles; agents cannot spawn
 nested agents or recursively call `start_research`.
 
 ```mermaid
