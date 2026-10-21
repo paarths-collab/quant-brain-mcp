@@ -7,6 +7,9 @@ import pytest
 
 from core.research_service import ResearchService
 from core.research_store import ResearchStore
+from tests.research_fakes import FakeMarketData
+
+pytestmark = pytest.mark.usefixtures("no_live_network")
 
 
 class EmptyRuntime:
@@ -29,7 +32,7 @@ class WaitingRuntime:
 
 @pytest.fixture
 def service(tmp_path):
-    instance = ResearchService(ResearchStore(tmp_path / "jobs.sqlite3"), EmptyRuntime, timeout=3)
+    instance = ResearchService(ResearchStore(tmp_path / "jobs.sqlite3"), EmptyRuntime, timeout=3, instrument_resolver=FakeMarketData())
     yield instance
     instance.close()
 
@@ -97,7 +100,7 @@ def test_cancel_running_cleans_up_runtime(service):
 def test_worker_lock_prevents_second_service_and_releases(service):
     first = start(service)
     wait_terminal(service, first["id"])
-    other = ResearchService(ResearchStore(service.store.path), EmptyRuntime)
+    other = ResearchService(ResearchStore(service.store.path), EmptyRuntime, instrument_resolver=FakeMarketData())
     try:
         with pytest.raises(ValueError, match="already active"):
             start(other)

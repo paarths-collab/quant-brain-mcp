@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.research_evidence import source_coverage
 from core.research_workflow import ResearchReport
 
 
@@ -50,9 +51,9 @@ def evaluate_report(
     calculations = [claim for claim in claims if claim.kind == "calculation"]
     verified = set(parsed.verified_claim_ids)
 
-    retrieval_records = [parsed.source_retrievals.get(item.id) for item in web_evidence]
-    retrieval_records = [record for record in retrieval_records if record is not None]
-    retrieved = sum(record.get("status") == "retrieved" for record in retrieval_records)
+    # Cited web sources with no retrieval record (never fetched) stay in the
+    # denominator rather than being dropped from it.
+    retrieval = source_coverage(web_evidence, parsed.source_retrievals)
 
     tool_events = [
         event
@@ -84,7 +85,11 @@ def evaluate_report(
         "verified_claim_coverage": _ratio(sum(claim.id in verified for claim in claims), len(claims)),
         "calculation_method_coverage": _ratio(sum(bool(claim.method) for claim in calculations), len(calculations)),
         "publication_date_coverage": _ratio(sum(item.published_at is not None for item in web_evidence), len(web_evidence)),
-        "retrieved_source_coverage": _ratio(retrieved, len(retrieval_records)),
+        "retrieved_source_coverage": retrieval["coverage"],
+        "retrieval_attempt_success_rate": retrieval["attempt_success_rate"],
+        "cited_web_source_count": retrieval["total"],
+        "risk_data_status": parsed.risk_data_status,
+        "risk_unavailable_tool_calls": parsed.risk_unavailable_calls,
         "tool_call_success_rate": _ratio(successful_tools, len(tool_events)),
         "failed_source_citation_rate": _ratio(
             sum(
@@ -110,7 +115,7 @@ def evaluate_report(
         "estimated_cost_usd": None if estimated_cost_usd is None else round(float(estimated_cost_usd), 6),
     }
     return {
-        "metric_version": "1.0",
+        "metric_version": "1.1",
         "automatic": automatic,
         "adjudicated": adjudicated,
         "operations": operations,

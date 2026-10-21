@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from core.data_loader import fetch_data
+from core.risk_state import unavailable
 
 
 def calculate_alpha_metrics(stock_df: pd.DataFrame, benchmark_ticker: str = "^NSEI") -> dict:
@@ -18,7 +19,7 @@ def calculate_alpha_metrics(stock_df: pd.DataFrame, benchmark_ticker: str = "^NS
 
     bench_df, err = fetch_data(benchmark_ticker, period="2y")
     if err or bench_df is None or bench_df.empty:
-        return {"error": f"Benchmark data unavailable for {benchmark_ticker}: {err}"}
+        return unavailable(f"Benchmark data unavailable for {benchmark_ticker}: {err}")
 
     combined = pd.DataFrame(
         {
@@ -28,17 +29,23 @@ def calculate_alpha_metrics(stock_df: pd.DataFrame, benchmark_ticker: str = "^NS
     ).ffill().pct_change(fill_method=None).dropna()
 
     if combined.empty or len(combined) < 40:
-        return {"error": "Insufficient overlap with benchmark for alpha calculation"}
+        return unavailable("Insufficient overlap with benchmark for alpha calculation")
 
     matrix = np.cov(combined["stock"], combined["bench"])
     bench_var = float(matrix[1, 1])
-    beta = float(matrix[0, 1] / bench_var) if bench_var > 0 else 0.0
+    if not np.isfinite(bench_var) or bench_var <= 0:
+        # beta=0 would report the stock's whole return as "alpha" and derive a
+        # verdict from it; with no benchmark variance neither is defined.
+        return unavailable(f"Benchmark {benchmark_ticker} has no return variance; beta and alpha are undefined")
+    beta = float(matrix[0, 1] / bench_var)
 
     stock_ann_ret = float(combined["stock"].mean() * 252)
     bench_ann_ret = float(combined["bench"].mean() * 252)
     alpha = float(stock_ann_ret - (beta * bench_ann_ret))
 
     correlation = float(combined["stock"].corr(combined["bench"]))
+    if not np.isfinite(correlation):
+        return unavailable("Stock has no return variance; correlation, R-squared and alpha are undefined")
     r_squared = float(correlation**2)
     outperf_prob = float((combined["stock"] > combined["bench"]).mean())
 

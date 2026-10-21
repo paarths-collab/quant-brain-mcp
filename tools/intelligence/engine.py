@@ -113,9 +113,14 @@ def get_quant_analysis(df: pd.DataFrame, benchmark_ticker: str = "^NSEI") -> dic
     asset_returns = combined["asset"]
     bench_returns = combined["benchmark"]
 
+    unavailable_metrics: dict[str, str] = {}
+
     covariance = np.cov(asset_returns, bench_returns)[0][1]
     variance = float(np.var(bench_returns))
-    beta = float(covariance / variance) if variance > 0 else 0.0
+    beta = float(covariance / variance) if variance > 0 else None
+    if beta is None or not np.isfinite(beta):
+        beta = None
+        unavailable_metrics["beta"] = f"Benchmark {benchmark_ticker} has no return variance over the overlap window"
 
     # ADX proxy supports regime detection when Hurst is noisy.
     adx_df = ta.adx(df["High"], df["Low"], df["Close"], length=14)
@@ -130,21 +135,29 @@ def get_quant_analysis(df: pd.DataFrame, benchmark_ticker: str = "^NSEI") -> dic
     expected_shortfall_95 = float(tail_losses.mean()) if not tail_losses.empty else var_95
 
     volatility_ann = float(asset_returns.std() * np.sqrt(252))
-    sharpe = float((asset_returns.mean() / asset_returns.std()) * np.sqrt(252)) if asset_returns.std() > 0 else 0.0
+    sharpe = float((asset_returns.mean() / asset_returns.std()) * np.sqrt(252)) if asset_returns.std() > 0 else None
+    if sharpe is None:
+        unavailable_metrics["sharpe_ratio"] = "Asset has no return variance over the window; Sharpe ratio is undefined"
 
-    alpha_signal = "NEUTRAL"
-    if sharpe >= 1.0 and var_95 > -0.03:
-        alpha_signal = "ACCUMULATE"
-    elif sharpe < 0.2 or var_95 < -0.05:
-        alpha_signal = "REDUCE"
+    # Without a Sharpe ratio the signal cannot be judged; do not let a
+    # placeholder 0.0 fall through to REDUCE.
+    alpha_signal = "UNAVAILABLE"
+    if sharpe is not None:
+        alpha_signal = "NEUTRAL"
+        if sharpe >= 1.0 and var_95 > -0.03:
+            alpha_signal = "ACCUMULATE"
+        elif sharpe < 0.2 or var_95 < -0.05:
+            alpha_signal = "REDUCE"
 
     return {
         "benchmark": benchmark_ticker,
-        "beta": round(beta, 2),
+        "risk_status": "partial" if unavailable_metrics else "available",
+        "unavailable_metrics": unavailable_metrics,
+        "beta": None if beta is None else round(beta, 2),
         "hurst_exponent": None if hurst is None else round(hurst, 3),
         "regime": regime,
         "adx_14": None if adx_val is None else round(adx_val, 2),
-        "sharpe_ratio": round(sharpe, 2),
+        "sharpe_ratio": None if sharpe is None else round(sharpe, 2),
         "one_day_var_95": f"{var_95 * 100:.2f}%",
         "expected_shortfall_95": f"{expected_shortfall_95 * 100:.2f}%",
         "volatility_ann": f"{volatility_ann * 100:.2f}%",
@@ -161,7 +174,7 @@ def get_quant_context(df: pd.DataFrame) -> dict:
     return {
         "regime": quant["regime"],
         "adx_14": quant["adx_14"],
-        "consensus_score": f"Sharpe {quant['sharpe_ratio']}",
+        "consensus_score": "Sharpe unavailable" if quant["sharpe_ratio"] is None else f"Sharpe {quant['sharpe_ratio']}",
         "tail_risk_warning": (
             f"95% one-day VaR: {quant['one_day_var_95']}; "
             f"Expected Shortfall: {quant['expected_shortfall_95']}"

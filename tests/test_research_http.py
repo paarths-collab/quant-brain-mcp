@@ -9,6 +9,7 @@ from starlette.testclient import TestClient
 from core.http_security import SecureMCPMiddleware
 from core.research_service import ResearchLifecycle, ResearchService
 from core.research_store import ResearchStore
+from tests.research_fakes import FakeMarketData
 
 
 class FakeRuntime:
@@ -27,7 +28,8 @@ def test_research_over_authenticated_mcp_http(tmp_path, monkeypatch, request):
     from core import research_service
 
     calls = []
-    service = ResearchService(ResearchStore(tmp_path / "research.sqlite3"), runtime_factory=lambda: FakeRuntime(calls))
+    service = ResearchService(ResearchStore(tmp_path / "research.sqlite3"), runtime_factory=lambda: FakeRuntime(calls),
+                              instrument_resolver=FakeMarketData())
     request.addfinalizer(service.close)
     monkeypatch.setenv("QUANT_RESEARCH_ENABLED", "1")
     monkeypatch.setenv("QUANT_RESEARCH_DB", str(tmp_path / "research.sqlite3"))

@@ -24,7 +24,7 @@ These optional tools require `QUANT_RESEARCH_ENABLED=1`, the research dependenci
 | `tickers` | `string[]` **required** | 1–5 NSE stock symbols; trimmed, uppercased, deduplicated, with `.NS` appended if absent |
 | `depth` | `"quick"` \| `"standard"` \| `"deep"` | Default `standard` |
 
-Symbols such as `TCS` and `RELIANCE.NS` are accepted. Other exchange suffixes are rejected. Bare symbols are interpreted as NSE symbols, so confirm the company identity in the findings.
+Symbols such as `TCS` and `RELIANCE.NS` are accepted. Other exchange suffixes are rejected. Each symbol is then looked up in the market-data provider **before** a job is created: unknown symbols, non-NSE listings and non-equity instruments are rejected with a message naming them, and a provider outage is reported as "could not verify" rather than "unknown". A rejected request creates no job and uses no queue capacity. Bare symbols are interpreted as NSE symbols, so confirm the company identity in the findings.
 
 | Depth | Workflow | Maximum role invocations |
 |---|---|---|
@@ -180,7 +180,9 @@ Optimize on a chronological training split → evaluate on the later holdout →
 | `optimize_type` | enum | `mvo` (default) · `hrp` · `max_sharpe` · `min_volatility` · `black_litterman` · `cvar` · `semivariance` |
 | `period` | period | default 2y |
 
-Returns: `recommended_weights`, `backtest_metrics` (return / Sharpe / drawdown), `portfolio_intelligence` (per-ticker beta, VaR, alpha, regime — **blended by portfolio weight**, so the answer doesn't depend on the order you typed tickers), `risk_assessment` (95% 1-day VaR in % and currency, capital plan, risk flags), `final_verdict` (STRONG BUY / PROPER / ACCUMULATE / NEUTRAL / REDUCE / STAY AWAY), transparency fields (`requested_tickers` / `included_tickers` / `excluded_tickers` with per-ticker errors), and an `fx_note` disclosing that USD/INR currency risk is not modeled.
+Returns: `recommended_weights`, `backtest_metrics` (return / Sharpe / drawdown), `portfolio_intelligence` (per-ticker beta, VaR, alpha, regime — **blended by portfolio weight**, so the answer doesn't depend on the order you typed tickers), `risk_assessment` (95% 1-day VaR in % and currency, capital plan, risk flags, plus a `status` of `available`, `partial` or `unavailable` with a `reason` and `coverage_weight`), `final_verdict` (STRONG BUY / PROPER / ACCUMULATE / NEUTRAL / REDUCE / STAY AWAY), transparency fields (`requested_tickers` / `included_tickers` / `excluded_tickers` with per-ticker errors), `data_coverage` (included ÷ requested tickers), and an `fx_note` disclosing that USD/INR currency risk is not modeled.
+
+**Missing risk is never zero.** If risk analysis fails for every held ticker (benchmark outage, short history, zero-variance inputs), `risk_assessment.status` is `unavailable`: VaR and capital-at-risk are `null`, `capital_plan` is `UNAVAILABLE`, `risk_flags` is `null` (an empty list would mean "none raised") and `factor_exposure` is `UNAVAILABLE`. If only some tickers fail, the status is `partial`, the blend covers the remaining weight, and `coverage_weight` is analysed weight ÷ all held weight. `final_verdict` still depends only on the held-out backtest; it is not a risk statement.
 
 ---
 

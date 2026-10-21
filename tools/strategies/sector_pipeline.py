@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from core.data_loader import fetch_data
+from core.risk_state import finite, is_unavailable, unavailable
 from core.sector_data import INDIAN_SECTORS, US_SECTORS
 from tools.intelligence.alpha_engine import calculate_alpha_metrics
 from tools.intelligence.engine import get_quant_analysis
@@ -136,6 +137,7 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
     selected_timeframe = _normalize_timeframe(timeframe, default="1y")
 
     analytics: list[dict[str, Any]] = []
+    unranked: list[dict[str, Any]] = []
     prices: dict[str, pd.Series] = {}
     data_trace: list[dict[str, Any]] = []
     trace_by_sector: dict[str, dict[str, Any]] = {}
@@ -171,8 +173,27 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
         returns = close.pct_change(fill_method=None).dropna()
         start_price = float(close.iloc[0])
         end_price = float(close.iloc[-1])
-        pct_return = ((end_price / start_price) - 1) * 100 if start_price else float("-inf")
-        annualized_vol = float(returns.std() * np.sqrt(252) * 100) if not returns.empty else 0.0
+        pct_return = ((end_price / start_price) - 1) * 100 if start_price else float("nan")
+        annualized_vol = float(returns.std() * np.sqrt(252) * 100) if len(returns) > 1 else float("nan")
+
+        # A sector whose risk cannot be computed is reported as unranked with a
+        # reason. Scoring it would publish vol=0 as a measured risk (and, for a
+        # rising index, divide by 1e-6 for an enormous risk-adjusted score);
+        # z-scoring a NaN as 0 would rank it as exactly average.
+        risk_problem = None
+        if not finite(pct_return):
+            risk_problem = "Index start price is zero; return is undefined"
+        elif not finite(annualized_vol):
+            risk_problem = "Fewer than three price observations; volatility is undefined"
+        elif annualized_vol <= 0:
+            risk_problem = "Index has no return variance; risk-adjusted return is undefined"
+        if risk_problem:
+            unranked.append({"sector": sector_name, "index": index_ticker, **unavailable(risk_problem),
+                             "risk_status": "unavailable"})
+            data_trace.append({"stage": "sector_index", "sector": sector_name, "ticker": index_ticker,
+                               "status": "risk_unavailable", "error": risk_problem})
+            continue
+
         fifty_two_week_high = float(close.max())
         dist_from_high = ((end_price / fifty_two_week_high) - 1) * 100 if fifty_two_week_high else 0.0
         max_drawdown = _max_drawdown_pct(close)
@@ -180,13 +201,14 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
 
         # Raw score components. The composite is computed after the loop, once
         # every sector is known, so each term can be z-scored onto a common scale.
-        risk_adjusted = pct_return / max(annualized_vol, 1e-6)
+        risk_adjusted = pct_return / annualized_vol
         drawdown_penalty = abs(max_drawdown)
 
         analytics.append(
             {
                 "sector": sector_name,
                 "index": index_ticker,
+                "risk_status": "available",
                 "return_pct": round(pct_return, 2),
                 "risk_volatility_pct": round(annualized_vol, 2),
                 "distance_from_52w_high_pct": round(dist_from_high, 2),
@@ -236,11 +258,25 @@ def analyze_sector_intelligence(market: str = "india", timeframe: str = "1y") ->
     if not corr_df.empty and len(corr_df.columns) >= 2:
         corr_matrix = corr_df.pct_change(fill_method=None).dropna().corr().round(3).to_dict()
 
+    attempted = len(universe)
+    failed = sum(1 for row in data_trace if row.get("status") == "failed")
+    coverage = {
+        "attempted": attempted,
+        "ranked": len(analytics),
+        "failed": failed,
+        "risk_unavailable": len(unranked),
+        # Failed and unscorable sectors stay in the denominator.
+        "coverage": round(len(analytics) / attempted, 4) if attempted else None,
+    }
     confidence = min(0.95, 0.55 + len(analytics) * 0.04)
+    if coverage["coverage"] is not None:
+        confidence *= coverage["coverage"]
     return {
         "market": market,
         "timeframe": selected_timeframe,
         "sector_analytics": analytics,
+        "unranked_sectors": unranked,
+        "coverage": coverage,
         "best_sector": best_sector,
         "correlation_matrix": corr_matrix,
         "data_trace": data_trace,
@@ -296,25 +332,57 @@ def find_sector_stock_pipeline(market: str = "india", top_n_sectors: int = 3, to
                 data_trace.append({"stage": "stock", "ticker": ticker, "status": "failed", "error": stock_err})
                 continue
 
-            quant = get_quant_analysis(stock_df, benchmark_ticker=("^NSEI" if ticker.endswith((".NS", ".BO")) else "^GSPC"))
-            alpha = calculate_alpha_metrics(stock_df, benchmark_ticker=("^NSEI" if ticker.endswith((".NS", ".BO")) else "^GSPC"))
-            stock_candidates.append(
-                {
-                    "ticker": ticker,
-                    "sector": sector_name,
-                    "score": round(_score_stock(stock_df), 2),
-                    "regime": quant.get("regime"),
-                    "beta": quant.get("beta"),
-                    "sharpe_ratio": quant.get("sharpe_ratio"),
-                    "alpha": alpha.get("alpha_annualized_pct") if isinstance(alpha, dict) else None,
-                    "alpha_verdict": alpha.get("verdict") if isinstance(alpha, dict) else None,
-                    "breakout_filter": _BREAKOUT_DESCRIPTION,
-                }
-            )
-            data_trace.append({"stage": "stock", "ticker": ticker, "status": "ok", "window": "1y"})
+            benchmark = "^NSEI" if ticker.endswith((".NS", ".BO")) else "^GSPC"
+            try:
+                quant = get_quant_analysis(stock_df, benchmark_ticker=benchmark)
+            except Exception as exc:
+                quant = unavailable(str(exc))
+            try:
+                alpha = calculate_alpha_metrics(stock_df, benchmark_ticker=benchmark)
+            except Exception as exc:
+                alpha = unavailable(str(exc))
 
-    stock_candidates.sort(key=lambda item: item["score"], reverse=True)
-    selected_stocks = stock_candidates[:top_n_stocks]
+            reason = None
+            if is_unavailable(quant):
+                reason = quant["reason"]
+            elif is_unavailable(alpha):
+                reason = alpha["reason"]
+            candidate = {
+                "ticker": ticker,
+                "sector": sector_name,
+                "score": round(_score_stock(stock_df), 2),
+                "risk_status": "available" if reason is None else "unavailable",
+                "regime": quant.get("regime"),
+                "beta": quant.get("beta"),
+                "sharpe_ratio": quant.get("sharpe_ratio"),
+                "alpha": alpha.get("alpha_annualized_pct"),
+                "alpha_verdict": alpha.get("verdict"),
+                "breakout_filter": _BREAKOUT_DESCRIPTION,
+            }
+            if reason is not None:
+                candidate["reason"] = reason
+            stock_candidates.append(candidate)
+            data_trace.append({
+                "stage": "stock", "ticker": ticker,
+                "status": "ok" if reason is None else "risk_unavailable", "window": "1y",
+                **({"error": reason} if reason is not None else {}),
+            })
+
+    # The strategy confirms a breakout with regime + alpha + Sharpe + VaR. A
+    # candidate whose risk could not be computed is unconfirmed, not neutral, so
+    # it cannot be selected.
+    confirmable = [c for c in stock_candidates if c["risk_status"] == "available"]
+    unconfirmed_stocks = [c for c in stock_candidates if c["risk_status"] != "available"]
+    confirmable.sort(key=lambda item: item["score"], reverse=True)
+    selected_stocks = confirmable[:top_n_stocks]
+    stock_attempts = [row for row in data_trace if row.get("stage") == "stock"]
+    stock_coverage = {
+        "attempted": len(stock_attempts),
+        "confirmed": len(confirmable),
+        "failed": sum(1 for row in stock_attempts if row["status"] == "failed"),
+        "risk_unavailable": len(unconfirmed_stocks),
+        "coverage": round(len(confirmable) / len(stock_attempts), 4) if stock_attempts else None,
+    }
 
     strategy = {
         "name": "breakout_confirmation",
@@ -322,8 +390,11 @@ def find_sector_stock_pipeline(market: str = "india", top_n_sectors: int = 3, to
         "logic": "Select top-ranked sector, then top-scoring stock, then confirm with regime + alpha + Sharpe + VaR",
     }
 
-    confidence_inputs = len(sector_rankings) + len(stock_candidates)
+    confidence_inputs = len(sector_rankings) + len(confirmable)
     confidence = min(0.95, 0.55 + confidence_inputs * 0.03)
+    for part in (sector_intel.get("coverage", {}), stock_coverage):
+        if part.get("coverage") is not None:
+            confidence *= part["coverage"]
 
     reproducibility = {
         "market": market,
@@ -340,6 +411,8 @@ def find_sector_stock_pipeline(market: str = "india", top_n_sectors: int = 3, to
         "best_sector": sector_intel.get("best_sector"),
         "sector_correlation_matrix": sector_intel.get("correlation_matrix", {}),
         "selected_stocks": selected_stocks,
+        "unconfirmed_stocks": unconfirmed_stocks,
+        "coverage": {"sectors": sector_intel.get("coverage"), "stocks": stock_coverage},
         "strategy": strategy,
         "confidence": round(confidence, 2),
         "data_trace": data_trace,

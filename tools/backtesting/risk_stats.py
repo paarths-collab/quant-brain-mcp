@@ -1,5 +1,7 @@
 import vectorbt as vbt
 
+from core.risk_state import unavailable
+
 
 def get_risk_analysis(pf):
     """
@@ -12,6 +14,6 @@ def get_risk_analysis(pf):
         "expectancy": stats["Expectancy"],
         "profit_factor": stats["Profit Factor"],
         "max_drawdown_duration": stats["Max Drawdown Duration"],
-        "alpha": stats.get("Alpha", "N/A"),
-        "beta": stats.get("Beta", "N/A"),
+        "alpha": stats["Alpha"] if "Alpha" in stats else unavailable("Backtest engine did not report alpha"),
+        "beta": stats["Beta"] if "Beta" in stats else unavailable("Backtest engine did not report beta"),
     }

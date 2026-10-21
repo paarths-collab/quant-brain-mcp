@@ -314,3 +314,31 @@ async def retrieve_sources(evidence, cache: dict[str, dict]) -> dict[str, dict]:
             pending.append(url)
     await asyncio.gather(*(retrieve(url) for url in pending))
     return {e.id: cache[str(e.url)] for e in selected}
+
+
+def source_coverage(evidence, retrievals: dict[str, dict]) -> dict:
+    """Retrieval coverage over web evidence, with failures and gaps in the denominator.
+
+    ``coverage`` is retrieved / total web sources. A source that failed, was
+    never attempted (outside the allowlist, over the per-job limit, or a type
+    the server does not fetch) or has no retrieval record at all still counts in
+    the total, so it lowers coverage instead of vanishing from it.
+    ``attempt_success_rate`` is retrieved / attempted (retrieved + failed).
+    Either ratio is None, never 1.0, when its denominator is empty. Tool URNs
+    are not retrievable documents and are excluded.
+    """
+    web = [e for e in evidence if str(e.url).startswith(("http://", "https://"))]
+    statuses = [(retrievals.get(e.id) or {}).get("status", "not_attempted") for e in web]
+    retrieved = statuses.count("retrieved")
+    failed = statuses.count("failed")
+    attempted = retrieved + failed
+    total = len(web)
+    return {
+        "total": total,
+        "attempted": attempted,
+        "retrieved": retrieved,
+        "failed": failed,
+        "not_attempted": total - attempted,
+        "coverage": round(retrieved / total, 4) if total else None,
+        "attempt_success_rate": round(retrieved / attempted, 4) if attempted else None,
+    }

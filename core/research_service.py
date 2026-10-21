@@ -13,10 +13,35 @@ from core.research_store import ResearchStore
 from core.research_workflow import run_research
 
 
+class InstrumentLookupError(RuntimeError):
+    """The market-data lookup itself failed, so the symbol could not be judged either way."""
+
+
+def default_instrument_resolver(symbol: str) -> dict | None:
+    """Look a normalized NSE symbol (e.g. ``TCS.NS``) up in the market-data provider.
+
+    Returns a mapping for a known instrument and None for an unknown one. Raises
+    InstrumentLookupError when the provider failed, which is not the same as the
+    symbol not existing. The provider's own message is never surfaced: it can
+    carry request URLs.
+    """
+    from core.data_loader import fetch_stock_data
+
+    result = fetch_stock_data(symbol, period='5d')
+    if isinstance(result, dict) and 'error' in result:
+        if result['error'].startswith('No data found'):
+            return None
+        raise InstrumentLookupError('market-data lookup failed')
+    return {'symbol': symbol, 'exchange': 'NSE'}
+
+
 class ResearchService:
-    def __init__(self, store=None, runtime_factory: Callable | None = None, timeout=900):
+    def __init__(self, store=None, runtime_factory: Callable | None = None, timeout=900,
+                 instrument_resolver: Callable[[str], dict | None] | None = None):
         self.store = store or ResearchStore()
         self.runtime_factory = runtime_factory
+        # Injectable so tests (and other market-data providers) never need a live feed.
+        self.instrument_resolver = instrument_resolver or default_instrument_resolver
         self.timeout = timeout
         self._guard = threading.RLock()
         self._executor = None
@@ -57,6 +82,37 @@ class ResearchService:
                 result.append(symbol)
         return result
 
+    def validate_instruments(self, symbols):
+        """Reject unknown or unsupported symbols; called before any job exists.
+
+        The resolver receives normalized symbols (``TCS.NS``) and returns a
+        mapping for a known instrument or None for an unknown one. An
+        ``exchange`` other than NSE or a ``quote_type`` other than EQUITY marks
+        it unsupported. All problems are reported together.
+        """
+        unknown, unsupported, unverified = [], [], []
+        for symbol in symbols:
+            try:
+                info = self.instrument_resolver(symbol)
+            except Exception:
+                unverified.append(symbol)
+                continue
+            if not info:
+                unknown.append(symbol)
+            elif str(info.get('exchange', 'NSE')).upper() not in {'NSE', 'NSI'}:
+                unsupported.append(f"{symbol} (listed on {info['exchange']}, not NSE)")
+            elif str(info.get('quote_type', 'EQUITY')).upper() != 'EQUITY':
+                unsupported.append(f"{symbol} ({info['quote_type']}, not an equity)")
+        problems = []
+        if unknown:
+            problems.append('Unknown NSE symbol(s): ' + ', '.join(unknown) + '. Check the spelling; examples: RELIANCE.NS, TCS.NS')
+        if unsupported:
+            problems.append('Unsupported instrument(s): ' + ', '.join(unsupported))
+        if unverified:
+            problems.append('Could not verify symbol(s) ' + ', '.join(unverified) + ': market-data lookup failed; retry shortly')
+        if problems:
+            raise ValueError('. '.join(problems))
+
     def start(self, owner, question, tickers, depth='standard'):
         if not owner:
             raise ValueError('Authentication required')
@@ -65,6 +121,8 @@ class ResearchService:
         if depth not in {'quick', 'standard', 'deep'}:
             raise ValueError('Depth must be quick, standard, or deep')
         tickers = self.normalize_tickers(tickers)
+        # Before the worker, database or any job exists: nothing is left behind on rejection.
+        self.validate_instruments(tickers)
         if self.runtime_factory is None:
             from core.research_runtime import CodexResearchRuntime
             # Validate configuration before accepting work; model sign-in is
@@ -124,13 +182,25 @@ class ResearchService:
                     self._running.pop(job_id, None)
         asyncio.run(work())
 
+    def _recover_before_read(self):
+        """Fail jobs orphaned by a previous process before anyone reads them.
+
+        Recovery otherwise only ran when a new job was started, so a client
+        polling after a restart saw a dead job as "running" indefinitely.
+        """
+        with self._guard:
+            if not self._closing:
+                self._initialize()
+
     def status(self, owner, job_id):
+        self._recover_before_read()
         job = self.store.get(owner, job_id)
         if job is None:
             return {'error': 'Research job not found'}
         return {k: job[k] for k in ('id', 'status', 'stage', 'created', 'updated', 'tickers', 'depth', 'error')}
 
     def report(self, owner, job_id):
+        self._recover_before_read()
         job = self.store.get(owner, job_id)
         if job is None:
             return {'error': 'Research job not found'}
@@ -140,6 +210,8 @@ class ResearchService:
 
     def cancel(self, owner, job_id):
         with self._guard:
+            if not self._closing:
+                self._initialize()
             job = self.store.cancel(owner, job_id)
             if job is None:
                 return {'error': 'Research job not found'}

@@ -3,6 +3,7 @@ import json
 import math
 
 from core import quant_settings  # noqa: F401  (252-day annualization, applied on import)
+from core.risk_state import finite, is_unavailable, unavailable
 
 import mcp.types as types
 from mcp.server import Server, NotificationOptions
@@ -136,12 +137,17 @@ def _infer_benchmark_ticker(symbol: str) -> str:
     return "^GSPC"
 
 
-def _to_float_pct(value, default: float = 0.0) -> float:
-    """Parse a value like '-2.50%' into -2.50. Returns `default` on failure."""
+def _to_float_pct(value, default: float | None = None) -> float | None:
+    """Parse a value like '-2.50%' into -2.50. Returns `default` (None) on failure.
+
+    The default is deliberately not 0.0: a VaR that failed to parse is unknown,
+    not a risk-free 0%.
+    """
     try:
-        return float(str(value).replace("%", "").strip())
+        parsed = float(str(value).replace("%", "").strip())
     except Exception:
         return default
+    return parsed if math.isfinite(parsed) else default
 
 
 def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benchmark):
@@ -154,11 +160,13 @@ def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benc
 
     Returns (per_ticker: list[dict], blended: dict | None). Tickers whose
     analysis fails (insufficient history, benchmark fetch error, etc.) are
-    still reported in per_ticker with their error, but excluded from the
-    blend; blend weights are renormalized over the tickers that succeeded.
-    blended is None only when every held ticker's analysis failed.
+    still reported in per_ticker with `risk_status: "unavailable"` and a
+    reason, but excluded from the blend; blend weights are renormalized over
+    the tickers that succeeded and `coverage_weight` reports the share of the
+    HELD weight that was actually analysed (usable / all held, so failures stay
+    in the denominator). blended is None only when every held ticker's
+    analysis failed -- callers must treat that as "risk unavailable", never 0.
     """
-    from core.data_loader import fetch_data
     from tools.intelligence.alpha_engine import calculate_alpha_metrics
     from tools.intelligence.engine import get_quant_analysis
 
@@ -168,54 +176,79 @@ def _compute_portfolio_intelligence(weights: dict, ohlc_frames: dict, infer_benc
             weight = float(raw_weight)
         except (TypeError, ValueError):
             continue
-        if weight <= 0 or ticker not in ohlc_frames:
+        if weight <= 0:
             continue
 
         benchmark = infer_benchmark(ticker)
         entry = {"ticker": ticker, "weight": round(weight, 4), "benchmark": benchmark}
 
-        try:
-            entry["quant_analysis"] = get_quant_analysis(ohlc_frames[ticker], benchmark_ticker=benchmark)
-        except Exception as exc:
-            entry["quant_analysis"] = {"error": str(exc)}
+        if ticker not in ohlc_frames:
+            entry["quant_analysis"] = unavailable("No price history loaded for this held ticker")
+            entry["alpha_analysis"] = unavailable("No price history loaded for this held ticker")
+        else:
+            try:
+                entry["quant_analysis"] = get_quant_analysis(ohlc_frames[ticker], benchmark_ticker=benchmark)
+            except Exception as exc:
+                entry["quant_analysis"] = unavailable(str(exc))
 
-        try:
-            entry["alpha_analysis"] = calculate_alpha_metrics(ohlc_frames[ticker], benchmark_ticker=benchmark)
-        except Exception as exc:
-            entry["alpha_analysis"] = {"error": str(exc)}
+            try:
+                entry["alpha_analysis"] = calculate_alpha_metrics(ohlc_frames[ticker], benchmark_ticker=benchmark)
+            except Exception as exc:
+                entry["alpha_analysis"] = unavailable(str(exc))
 
+        entry["_var_pct"] = _to_float_pct(entry["quant_analysis"].get("one_day_var_95"))
+        reason = None
+        if is_unavailable(entry["quant_analysis"]):
+            reason = entry["quant_analysis"].get("reason") or entry["quant_analysis"].get("error")
+        elif is_unavailable(entry["alpha_analysis"]):
+            reason = entry["alpha_analysis"].get("reason") or entry["alpha_analysis"].get("error")
+        elif entry["_var_pct"] is None:
+            reason = "One-day VaR could not be read from the quant analysis"
+        elif not all(finite(entry["alpha_analysis"].get(k)) for k in ("beta", "alpha_annualized", "r_squared")):
+            reason = "Beta, alpha or R-squared is undefined for this ticker"
+        if reason is None:
+            entry["risk_status"] = "available"
+        else:
+            entry["risk_status"] = "unavailable"
+            entry["reason"] = str(reason)
         per_ticker.append(entry)
 
-    usable = [
-        e
-        for e in per_ticker
-        if "error" not in e["quant_analysis"] and "error" not in e["alpha_analysis"]
-    ]
+    usable = [e for e in per_ticker if e["risk_status"] == "available"]
     total_weight = sum(e["weight"] for e in usable)
+    requested_weight = sum(e["weight"] for e in per_ticker)
     if not usable or total_weight <= 0:
+        for entry in per_ticker:
+            entry.pop("_var_pct", None)
         return per_ticker, None
 
     def _weighted_avg(values):
         return sum(e["weight"] * v for e, v in zip(usable, values)) / total_weight
 
-    var_pcts = [_to_float_pct(e["quant_analysis"].get("one_day_var_95")) for e in usable]
-    betas = [float(e["alpha_analysis"].get("beta", 0.0)) for e in usable]
-    alphas = [float(e["alpha_analysis"].get("alpha_annualized", 0.0)) for e in usable]
-    r_squareds = [float(e["alpha_analysis"].get("r_squared", 0.0)) for e in usable]
+    var_pcts = [e["_var_pct"] for e in usable]
+    betas = [float(e["alpha_analysis"]["beta"]) for e in usable]
+    alphas = [float(e["alpha_analysis"]["alpha_annualized"]) for e in usable]
+    r_squareds = [float(e["alpha_analysis"]["r_squared"]) for e in usable]
+    for entry in per_ticker:
+        entry.pop("_var_pct", None)
 
     from collections import Counter
 
     regimes = [e["quant_analysis"].get("regime") for e in usable if e["quant_analysis"].get("regime")]
     dominant_regime = Counter(regimes).most_common(1)[0][0] if regimes else None
 
+    unavailable_tickers = [{"ticker": e["ticker"], "weight": e["weight"], "reason": e["reason"]}
+                           for e in per_ticker if e["risk_status"] == "unavailable"]
+    coverage = total_weight / requested_weight
     blended = {
         "one_day_var_95_pct": round(_weighted_avg(var_pcts), 2),
         "beta": round(_weighted_avg(betas), 3),
         "alpha_annualized": round(_weighted_avg(alphas), 4),
         "r_squared": round(_weighted_avg(r_squareds), 3),
         "dominant_regime": dominant_regime,
-        "coverage_weight": round(total_weight, 4),
+        "risk_status": "available" if not unavailable_tickers else "partial",
+        "coverage_weight": round(coverage, 4),
         "tickers_used": [e["ticker"] for e in usable],
+        "tickers_unavailable": unavailable_tickers,
     }
     return per_ticker, blended
 
@@ -354,28 +387,50 @@ def run_generate_optimized_verdict(
         alpha_value = blended_intel["alpha_annualized"] if blended_intel else None
         beta_value = blended_intel["beta"] if blended_intel else None
         r_squared = blended_intel["r_squared"] if blended_intel else None
-        one_day_var_pct = blended_intel["one_day_var_95_pct"] if blended_intel else 0.0
+        # None means "not computed". It must never become 0.0: a zero VaR reads
+        # as risk-free and would also pick LUMP_SUM_ACCEPTABLE below.
+        one_day_var_pct = blended_intel["one_day_var_95_pct"] if blended_intel else None
 
         # Verdict is based exclusively on held-out performance. Full-history
         # alpha/risk diagnostics are descriptive and never upgrade this label.
         strategic_verdict = backtest_verdict
 
-        capital_at_risk = abs(one_day_var_pct) / 100 * float(amount)
-        capital_plan = "LUMP_SUM_ACCEPTABLE"
-        if float(amount) <= 5000 and capital_at_risk > (0.025 * float(amount)):
-            capital_plan = "SIP_PREFERRED"
+        if blended_intel:
+            risk_status = blended_intel.get("risk_status", "available")
+            risk_reason = None
+            if risk_status == "partial":
+                gaps = "; ".join(f"{g['ticker']}: {g['reason']}" for g in blended_intel.get("tickers_unavailable", []))
+                risk_reason = (f"Risk metrics cover {blended_intel['coverage_weight'] * 100:.0f}% of the held allocation; "
+                               f"unavailable for {gaps}")
+        else:
+            risk_status = "unavailable"
+            reasons = [f"{e['ticker']}: {e['reason']}" for e in per_ticker_intel if e.get("reason")]
+            risk_reason = ("Risk analysis failed for every held ticker" + (" (" + "; ".join(reasons) + ")" if reasons else "")
+                           if per_ticker_intel else "No held ticker had price history for risk analysis")
 
-        factor_exposure = "SYSTEMATIC_BETA"
-        if isinstance(alpha_value, (int, float)) and alpha_value > 0.05:
-            factor_exposure = "IDIOSYNCRATIC_ALPHA"
+        capital_at_risk = None
+        capital_plan = "UNAVAILABLE"
+        if one_day_var_pct is not None:
+            capital_at_risk = abs(one_day_var_pct) / 100 * float(amount)
+            capital_plan = "LUMP_SUM_ACCEPTABLE"
+            if float(amount) <= 5000 and capital_at_risk > (0.025 * float(amount)):
+                capital_plan = "SIP_PREFERRED"
 
-        risk_flags = []
-        if isinstance(beta_value, (int, float)) and beta_value > 1.5:
-            risk_flags.append("High systematic sensitivity (beta > 1.5)")
-        if isinstance(r_squared, (int, float)) and r_squared > 0.9:
-            risk_flags.append("Closet indexer risk (R-squared > 0.9)")
-        if one_day_var_pct < -3.0:
-            risk_flags.append("Tail risk elevated (95% 1-day VaR below -3%)")
+        factor_exposure = "UNAVAILABLE"
+        if isinstance(alpha_value, (int, float)):
+            factor_exposure = "IDIOSYNCRATIC_ALPHA" if alpha_value > 0.05 else "SYSTEMATIC_BETA"
+
+        # None (not []) when nothing was evaluated: an empty list would read as
+        # "no risk flags raised".
+        risk_flags = None
+        if blended_intel:
+            risk_flags = []
+            if isinstance(beta_value, (int, float)) and beta_value > 1.5:
+                risk_flags.append("High systematic sensitivity (beta > 1.5)")
+            if isinstance(r_squared, (int, float)) and r_squared > 0.9:
+                risk_flags.append("Closet indexer risk (R-squared > 0.9)")
+            if one_day_var_pct < -3.0:
+                risk_flags.append("Tail risk elevated (95% 1-day VaR below -3%)")
 
         reasoning = (
             f"Chronological holdout evaluation ({opt_key.upper()}, frozen training weights) produced Sharpe {actual_sharpe:.2f}, "
@@ -392,13 +447,22 @@ def run_generate_optimized_verdict(
             )
             if intel_ticker:
                 reasoning += f" Representative single-name detail: {intel_ticker} vs {benchmark_ticker}."
-        elif per_ticker_intel:
-            reasoning += " Institutional intelligence unavailable: analysis failed for every held ticker."
 
-        reasoning += (
-            f" Estimated 95% one-day capital-at-risk on notional {amount} is {capital_at_risk:.2f}. "
-            f"Capital plan: {capital_plan}."
-        )
+        if risk_status == "available":
+            reasoning += (
+                f" Estimated 95% one-day capital-at-risk on notional {amount} is {capital_at_risk:.2f}. "
+                f"Capital plan: {capital_plan}."
+            )
+        elif risk_status == "partial":
+            reasoning += (
+                f" Estimated 95% one-day capital-at-risk on notional {amount} is {capital_at_risk:.2f}, "
+                f"but PARTIAL: {risk_reason}. Capital plan: {capital_plan}."
+            )
+        else:
+            reasoning += (
+                f" Risk metrics UNAVAILABLE: {risk_reason}. VaR, beta, alpha, risk flags and the capital plan "
+                "were not computed; this is not evidence of low risk."
+            )
 
         if risk_flags:
             reasoning += " Risk flags: " + "; ".join(risk_flags) + "."
@@ -410,6 +474,12 @@ def run_generate_optimized_verdict(
             "requested_tickers": requested_tickers,
             "included_tickers": list(data_dict.keys()),
             "excluded_tickers": excluded_tickers,
+            "data_coverage": {
+                "requested": len(requested_tickers),
+                "included": len(data_dict),
+                "excluded": len(excluded_tickers),
+                "coverage": round(len(data_dict) / len(requested_tickers), 4) if requested_tickers else None,
+            },
             "fx_note": (
                 "Prices are each ticker's own local currency (USD for US tickers, "
                 "INR for .NS/.BO tickers); FX risk between markets is not modeled."
@@ -432,11 +502,15 @@ def run_generate_optimized_verdict(
             "quant_analysis": quant_analysis,
             "alpha_analysis": alpha_analysis,
             "factor_exposure": factor_exposure,
+            "risk_status": risk_status,
             "risk_assessment": {
-                "one_day_var_95_pct": f"{one_day_var_pct:.2f}%",
-                "one_day_var_95_amount": round(capital_at_risk, 2),
+                "status": risk_status,
+                "reason": risk_reason,
+                "one_day_var_95_pct": None if one_day_var_pct is None else f"{one_day_var_pct:.2f}%",
+                "one_day_var_95_amount": None if capital_at_risk is None else round(capital_at_risk, 2),
                 "capital_plan": capital_plan,
                 "risk_flags": risk_flags,
+                "coverage_weight": blended_intel["coverage_weight"] if blended_intel else 0.0,
             },
             "intelligence_ticker": intel_ticker,
             "benchmark_ticker": benchmark_ticker,

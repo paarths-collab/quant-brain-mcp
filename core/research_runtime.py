@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from core.research_workflow import schema_for_role
+from core.risk_state import count_unavailable
 
 
 class ResearchRuntimeError(RuntimeError):
@@ -58,16 +59,23 @@ def _execution_events(result) -> list[dict]:
             tool_result = getattr(item, "result", None)
             payload = getattr(tool_result, "structured_content", None)
             has_payload_error = _payload_has_error(payload)
+            unavailable_count = count_unavailable(payload)
             for block in getattr(tool_result, "content", ()):
                 text = block.get("text") if isinstance(block, dict) else getattr(block, "text", None)
                 if isinstance(text, str):
                     try:
-                        has_payload_error |= _payload_has_error(json.loads(text))
+                        parsed = json.loads(text)
                     except (ValueError, TypeError):
-                        pass
+                        continue
+                    has_payload_error |= _payload_has_error(parsed)
+                    # The same payload may arrive as structured content and as
+                    # text; count it once.
+                    unavailable_count = max(unavailable_count, count_unavailable(parsed))
             events.append({"type": "mcpToolCall", "server": "quant_internal", "tool": item.tool,
                            "status": status if status in {"completed", "failed", "inProgress"} else "unknown",
-                           "has_error": getattr(item, "error", None) is not None or has_payload_error})
+                           "has_error": getattr(item, "error", None) is not None or has_payload_error or unavailable_count > 0,
+                           # Present only when non-zero so existing traces keep their shape.
+                           **({"risk_unavailable": unavailable_count} if unavailable_count else {})})
         elif kind == "webSearch":
             events.append({"type": "webSearch"})
     return events
@@ -78,9 +86,10 @@ def _payload_has_error(payload) -> bool:
 
     Store only a boolean; provider messages and private tool values stay out of
     the execution trace. Partial grouped-indicator failures count as partial work.
+    A metric reported as unavailable is a failure to compute, not a result.
     """
     if isinstance(payload, dict):
-        if payload.get("error") or payload.get("isError") is True:
+        if payload.get("error") or payload.get("isError") is True or payload.get("status") == "unavailable":
             return True
         return any(_payload_has_error(value) for value in payload.values())
     if isinstance(payload, list):

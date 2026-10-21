@@ -11,6 +11,7 @@ import vectorbt as vbt
 import yfinance as yf
 
 from core.data_loader import fetch_data
+from core.risk_state import finite, is_unavailable
 from core.sector_data import INDIAN_SECTORS, US_SECTORS
 from main import run_generate_optimized_verdict
 from tools.intelligence.alpha_engine import calculate_alpha_metrics
@@ -551,20 +552,25 @@ def build_chart_pack(
                 alpha = calculate_alpha_metrics(stock_df, benchmark_ticker=benchmark)
 
                 bench_ann = float(combo["bench"].mean() * 252)
-                beta_val = float(alpha.get("beta", 0.0)) if isinstance(alpha, dict) else 0.0
-                alpha_val = float(alpha.get("alpha_annualized", 0.0)) if isinstance(alpha, dict) else 0.0
-                contrib = [bench_ann, beta_val * bench_ann, alpha_val]
-                fig_wf = go.Figure(
-                    go.Waterfall(
-                        name="Alpha Decomposition",
-                        orientation="v",
-                        measure=["relative", "relative", "total"],
-                        x=["Benchmark Return", "Beta Contribution", "Alpha"],
-                        y=contrib,
+                if is_unavailable(alpha) or not (finite(alpha.get("beta")) and finite(alpha.get("alpha_annualized"))):
+                    # Plotting beta=0/alpha=0 would present a failed regression as a measured result.
+                    reason = alpha.get("reason") if isinstance(alpha, dict) else None
+                    warnings.append(
+                        f"Alpha decomposition unavailable for {stock_ticker}: {reason or 'beta/alpha undefined'}"
                     )
-                )
-                fig_wf.update_layout(title="Alpha Decomposition Waterfall")
-                charts["alpha_decomposition_waterfall"] = _to_plotly_json(fig_wf)
+                else:
+                    contrib = [bench_ann, float(alpha["beta"]) * bench_ann, float(alpha["alpha_annualized"])]
+                    fig_wf = go.Figure(
+                        go.Waterfall(
+                            name="Alpha Decomposition",
+                            orientation="v",
+                            measure=["relative", "relative", "total"],
+                            x=["Benchmark Return", "Beta Contribution", "Alpha"],
+                            y=contrib,
+                        )
+                    )
+                    fig_wf.update_layout(title="Alpha Decomposition Waterfall")
+                    charts["alpha_decomposition_waterfall"] = _to_plotly_json(fig_wf)
 
                 hurst = _rolling_hurst(close)
                 if not hurst.empty:
